@@ -12,15 +12,16 @@ Fast iteration:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import List
 
-import pytest
 from compass_web.config import MAX_MODEL_SPAN, PipelineConfig, validate_geometry_limits
+from compass_web.pipeline import run_pipeline
 
 from materialized_enhancements.gene_data import GENE_LIBRARY, UNIQUE_CATEGORIES
 from materialized_enhancements.sculpture import (
     DEFAULT_SCALE,
     MAX_RADIUS,
+    MIN_SEED_COUNT,
     MIN_RADIUS,
     NUM_CIRCLES,
     _DST_RANGES,
@@ -65,7 +66,7 @@ def test_sculpture_combo_invariants(mask: int, selected: List[str]) -> None:
     for i, r in enumerate(radii):
         assert MIN_RADIUS <= r <= MAX_RADIUS, f"radii[{i}]={r}"
 
-    assert params["seed_count"] >= 2, f"seed_count {params['seed_count']}"
+    assert params["seed_count"] >= MIN_SEED_COUNT, f"seed_count {params['seed_count']}"
     assert 0 <= params["seed"] <= 9999, f"seed {params['seed']}"
 
     max_width, max_height = validate_geometry_limits(config.radii, config.z_increment)
@@ -102,3 +103,37 @@ def test_different_combos_produce_different_seeds() -> None:
         f"Seed collision rate {collision_rate:.1%} exceeds 5% "
         f"({len(seeds)} unique seeds from {len(ALL_COMBOS)} combos)"
     )
+
+
+def test_single_gene_selection_keeps_geometry_seed_floor() -> None:
+    """Active-gene filtering must not emit degenerate low-cell Voronoi configs."""
+    gene = next(g for g in GENE_LIBRARY if g["gene_id"] == "gfp")
+    params = compute_sculpture_params(
+        name=NAME,
+        selected_categories=[gene["category"]],
+        all_categories=UNIQUE_CATEGORIES,
+        gene_library=[gene],
+    )
+    config = build_pipeline_config(params)
+
+    assert params["input_system_sum"] == 1
+    assert params["input_points_unpadded"] == 3
+    assert params["seed_count"] == MIN_SEED_COUNT
+    assert config.seed_count == MIN_SEED_COUNT
+
+
+def test_eighteen_seed_slice_runs_observed_low_complexity_config() -> None:
+    """The observed 3-seed crash config should run once padded to 18 seeds."""
+    config = PipelineConfig(
+        radii=(5.5, 11.408, 12.37, 15.522, 11.98, 13.545, 10.384, 14.723),
+        z_increment=13.16,
+        seed_count=MIN_SEED_COUNT,
+        random_seed=2011,
+        extrusion_multiplier=-0.294,
+        scale_x=0.5,
+        scale_y=0.5,
+    )
+
+    result = run_pipeline(config, verbose=False)
+
+    assert result.stats["cell_solid_count"] > 0

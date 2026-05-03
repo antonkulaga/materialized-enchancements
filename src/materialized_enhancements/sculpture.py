@@ -26,6 +26,7 @@ DEFAULT_EXPORT_DIR = Path(__file__).resolve().parents[2] / "data" / "output" / "
 
 NUM_CIRCLES = 8
 DEFAULT_SCALE = 0.5  # compass-web default for scale_x / scale_y
+MIN_SEED_COUNT = 18  # Smallest safe slice from compass-web's default point generation.
 # DEFAULT_EXTRUSION = -0.2  # was fixed while investigating failure rates; now computed from gravy_score
 
 # ---------------------------------------------------------------------------
@@ -233,9 +234,10 @@ def compute_sculpture_params(
     radius = _remap(mass_med, *_SRC_RANGES["protein_mass_kda"], *_DST_RANGES["radius"])
     spacing = _remap(spacing_raw, 4.0, 21.0, *_DST_RANGES["spacing"])
     points = int(_remap(float(points_raw), *_SRC_RANGES["genes_in_system_sum_mod"], *_DST_RANGES["points"]))
+    seed_count = max(points, MIN_SEED_COUNT)
     extrusion = _remap(gravy_med, *_SRC_RANGES["gravy_score"], *_DST_RANGES["extrusion"])
-    scale_x = _remap(disorder_med, *_SRC_RANGES["disorder_pct"], *_DST_RANGES["scale_x"])
-    scale_y = _remap(pi_med, *_SRC_RANGES["isoelectric_point_pI"], *_DST_RANGES["scale_y"])
+    # scale_x = _remap(disorder_med, *_SRC_RANGES["disorder_pct"], *_DST_RANGES["scale_x"])
+    # scale_y = _remap(pi_med, *_SRC_RANGES["isoelectric_point_pI"], *_DST_RANGES["scale_y"])
 
     radii = _derive_radii(radius, seed)
 
@@ -243,7 +245,7 @@ def compute_sculpture_params(
         "seed": seed,
         "radius": radius,
         "spacing": round(spacing, 2),
-        "points": points,
+        "points": seed_count,
         "extrusion": extrusion,
         # "scale_x": scale_x,
         # "scale_y": scale_y,
@@ -251,7 +253,7 @@ def compute_sculpture_params(
         "scale_y": DEFAULT_SCALE,
         "radii": radii,
         "z_increment": round(spacing, 2),
-        "seed_count": points,
+        "seed_count": seed_count,
         "random_seed": seed,
         "pool_size": len(props_pool),
         # Gene-level inputs that drove the above parameters
@@ -264,6 +266,7 @@ def compute_sculpture_params(
         "input_pi_median": round(pi_med, 1),
         "input_exon_sum": exon_sum,
         "input_system_sum": system_sum,
+        "input_points_unpadded": points,
     }
 
 
