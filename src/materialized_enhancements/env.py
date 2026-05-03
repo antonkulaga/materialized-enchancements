@@ -105,8 +105,17 @@ IDLE_WARNING_SECONDS: int = int(os.getenv("IDLE_WARNING_SECONDS", "5"))
 # Umami analytics — both must be set for the tracking script to be injected.
 # UMAMI_SCRIPT_URL: full URL to /script.js on your Umami instance.
 # UMAMI_WEBSITE_ID: the UUID shown in Umami Settings → Websites.
+# UMAMI_DOMAINS: optional comma-separated hostnames to restrict tracking to
+#   (e.g. "materialized-enhancements.longevity-genie.info"). When set, Umami
+#   silently skips tracking on any other hostname — keeps localhost dev runs
+#   out of your production stats without touching the browser or the server.
 UMAMI_SCRIPT_URL: str = os.getenv("UMAMI_SCRIPT_URL", "")
 UMAMI_WEBSITE_ID: str = os.getenv("UMAMI_WEBSITE_ID", "")
+UMAMI_DOMAINS: str = os.getenv("UMAMI_DOMAINS", "")
+# UMAMI_HOST_URL: where the tracker POSTs data. Set to a same-domain proxy path
+# (e.g. https://materialized.enhancement.bio/stats) so the /api/send request
+# originates from the app's own domain and bypasses ad blocker pattern rules.
+UMAMI_HOST_URL: str = os.getenv("UMAMI_HOST_URL", "")
 
 
 def idle_redirect_url() -> str:

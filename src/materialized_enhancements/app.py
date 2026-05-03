@@ -8,6 +8,8 @@ import materialized_enhancements.pages.index  # noqa: F401 — registers pages v
 from materialized_enhancements.env import (
     GENERATED_PUBLIC_DIR,
     GENERATED_URL_PREFIX,
+    UMAMI_DOMAINS,
+    UMAMI_HOST_URL,
     UMAMI_SCRIPT_URL,
     UMAMI_WEBSITE_ID,
     ensure_generated_public_dirs,
@@ -23,11 +25,13 @@ _head_components: list[rx.Component] = [
 ]
 
 if UMAMI_SCRIPT_URL and UMAMI_WEBSITE_ID:
+    _umami_attrs: dict[str, str] = {"data-website-id": UMAMI_WEBSITE_ID}
+    if UMAMI_DOMAINS:
+        _umami_attrs["data-domains"] = UMAMI_DOMAINS
+    if UMAMI_HOST_URL:
+        _umami_attrs["data-host-url"] = UMAMI_HOST_URL
     _head_components.append(
-        rx.script(
-            src=UMAMI_SCRIPT_URL,
-            custom_attrs={"data-website-id": UMAMI_WEBSITE_ID},
-        )
+        rx.script(src=UMAMI_SCRIPT_URL, custom_attrs=_umami_attrs)
     )
 
 
