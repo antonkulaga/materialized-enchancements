@@ -80,7 +80,7 @@ def test_combo_count() -> None:
     """Verify we're testing all 2^N combos (enumeration constant)."""
     n = len(UNIQUE_CATEGORIES)
     assert len(ALL_COMBOS) == 2**n
-    assert n >= 9, f"Expected at least 9 categories, got {n}"
+    assert n >= 6, f"Expected at least 6 categories, got {n}"
 
 
 def test_all_seeds_deterministic() -> None:

@@ -18,7 +18,8 @@ from materialized_enhancements.sculpture import (
 
 NAME = "Test"
 
-FAILURE_MASKS_BATCH_1 = [8, 143, 333, 294, 174, 50, 257, 290, 447, 382]
+# Only masks valid for 6 categories (max 63); rest from old 9-category model removed.
+FAILURE_MASKS_BATCH_1 = [8, 50]
 
 
 def _mask_to_selected(mask: int) -> List[str]:

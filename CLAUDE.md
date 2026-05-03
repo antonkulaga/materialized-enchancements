@@ -15,6 +15,7 @@ materialized-enhancements/          ← repo root
 ├── data/
 │   ├── input/
 │   │   ├── gene_library.csv        ← canonical gene data (source of truth)
+│   │   ├── gene_confidence.csv     ← per-gene confidence assessments (1:N, value + argument + description)
 │   │   └── puzzle/                 ← SVG puzzle pieces, one per source organism
 │   │       ├── human_base.svg      ← base human silhouette
 │   │       ├── 1_tardigrade.svg
@@ -45,12 +46,13 @@ uv run start        # starts Reflex dev server (http://localhost:3000)
 
 ## Data Model
 
-### Three-table gene/species model
+### Normalized gene data model
 
-Gene data is split across three CSVs:
-- `gene_library.csv` — gene metadata (no organism column; species resolved via join)
+Gene data is split across multiple CSVs (treated like database tables, loaded with Polars):
+- `gene_library.csv` — gene metadata (no organism column, no confidence column; these are resolved via joins)
 - `species.csv` — species lookup (species_id → common_name, scientific_name, taxonomy, life-history)
 - `gene_species.csv` — many-to-many join (gene_id → species_id; multi-species genes have multiple rows)
+- `gene_confidence.csv` — per-gene confidence assessments (gene_id → value, argument, description; one gene can have multiple rows for multi-faceted confidence)
 
 ### CSV Columns (gene_library.csv)
 
@@ -58,6 +60,7 @@ Gene data is split across three CSVs:
 |---|---|---|
 | gene_id | `gene_id` | Unique gene identifier |
 | Gene | `gene` | Gene display name |
+| Manipulation | `manipulation` | How the gene is used (e.g., "Overexpression", "Knockout", "Base editing knockout") |
 | Category | `category` | Parent category (e.g., "Stress Resistance") |
 | Subcategory | `trait` | Specific trait within the category (e.g., "Radiation Shielding") |
 | Secondary Categories | `secondary_categories` | Pipe-separated parent category names for cross-cutting genes (optional) |
@@ -66,7 +69,6 @@ Gene data is split across three CSVs:
 | Mechanism | `mechanism` / `enhancement` | Molecular mechanism |
 | Achievements (effect sizes) | `achievements` | Quantified experimental results |
 | Highest Evidence Tier | `evidence_tier` | Evidence strength (T2–T6) |
-| Confidence | `confidence` | Confidence level |
 | Translational Gaps | `translational_gaps` | Remaining research needs |
 | Key References (DOIs) | `key_references` | DOI links to publications |
 | Notes | `notes` | Caveats and contradictions |
@@ -75,6 +77,23 @@ Species fields are resolved at load time via `gene_species.csv` + `species.csv`:
 - `species_ids: list[str]` — species_id(s) for this gene
 - `species_common_names: str` — joined common names (e.g., "Black Flying Fox & Bottlenose Dolphin")
 - `species_scientific_names: str` — joined scientific names (italic in UI)
+
+### CSV Columns (gene_confidence.csv)
+
+| CSV Column | Python field | Description |
+|---|---|---|
+| gene_id | `gene_id` | FK to gene_library |
+| value | `value` | Confidence level (Very High, High, Medium-High, Medium, Medium-Low, Low-Medium, Low, Declining, N/A) |
+| argument | `argument` | What aspect the confidence applies to (e.g., "mouse lifespan", "gain-of-function transfer"); empty for simple single-value genes |
+| description | `description` | Optional longer explanation or context |
+| primary | `primary` | TRUE for the main category-relevant confidence entry per gene; FALSE for secondary/caveats. Exactly one TRUE per gene_id. Avoid redundant inverse entries (e.g., "Low longevity" + "High NO effect" — keep only the positive-effect framing). |
+
+Confidence is resolved at load time via `gene_confidence.csv`:
+- `confidence_entries: list[ConfidenceEntry]` — all confidence assessments per gene
+- `confidence_primary: ConfidenceEntry` — the entry marked `primary=TRUE` (shown as colored pill in UI)
+- `confidence_details: list[ConfidenceEntry]` — non-primary entries (shown as clean text list, no colored pills)
+- `confidence_summary: str` — computed display string (e.g., "High (mouse); Low (human translation)")
+- `confidence_bucket: str` — highest-confidence bucket for UI color coding (high, medium_high, medium, low, unknown)
 
 ### Key distinction: Category vs Trait (Subcategory)
 
@@ -93,7 +112,8 @@ Species fields are resolved at load time via `gene_species.csv` + `species.csv`:
 
 - `SPECIES_LOOKUP: dict[str, SpeciesEntry]` — species_id → species metadata
 - `GENE_SPECIES_MAP: dict[str, list[str]]` — gene_id → list of species_ids
-- `GENE_LIBRARY: list[GeneEntry]` — all genes with resolved species fields
+- `GENE_CONFIDENCE_MAP: dict[str, list[ConfidenceEntry]]` — gene_id → structured confidence entries
+- `GENE_LIBRARY: list[GeneEntry]` — all genes with resolved species and confidence fields
 - `CATEGORY_COUNTS: dict[str, int]` — genes per category
 - `CATEGORY_TRAITS: dict[str, list[str]]` — category → trait (subcategory) names
 - `ANIMAL_LIBRARY: list[AnimalEntry]` — per-species view (keyed by species_id); each animal has `categories` (parent) and `traits` (subcategory) lists

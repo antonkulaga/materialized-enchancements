@@ -212,26 +212,27 @@ def compute_sculpture_params(
     if not props_pool:
         props_pool = list(gene_properties.values())
 
-    mass_values = [p["protein_mass_kda"] for p in props_pool]
-    gravy_values = [p["gravy_score"] for p in props_pool]
-    disorder_values = [p["disorder_pct"] for p in props_pool]
-    pi_values = [p["isoelectric_point_pI"] for p in props_pool]
-    exon_values = [p["exon_count"] for p in props_pool]
-    system_values = [p["genes_in_system"] for p in props_pool]
+    mass_values = [p["protein_mass_kda"] for p in props_pool if p.get("protein_mass_kda") is not None]
+    gravy_values = [p["gravy_score"] for p in props_pool if p.get("gravy_score") is not None]
+    disorder_values = [p["disorder_pct"] for p in props_pool if p.get("disorder_pct") is not None]
+    pi_values = [p["isoelectric_point_pI"] for p in props_pool if p.get("isoelectric_point_pI") is not None]
+    exon_values = [p["exon_count"] for p in props_pool if p.get("exon_count") is not None]
+    system_values = [p["genes_in_system"] for p in props_pool if p.get("genes_in_system") is not None]
 
-    mass_med = _median(mass_values)
-    gravy_med = _median(gravy_values)
-    disorder_med = _median(disorder_values)
-    pi_med = _median(pi_values)
+    mass_med = _median(mass_values) if mass_values else 50.0
+    gravy_med = _median(gravy_values) if gravy_values else -0.4
+    disorder_med = _median(disorder_values) if disorder_values else 30.0
+    pi_med = _median(pi_values) if pi_values else 7.0
 
-    exon_sum = sum(exon_values)
+    exon_sum = sum(exon_values) if exon_values else 10
     spacing_raw = (exon_sum % 18) + 4.0
 
-    system_sum = sum(system_values)
+    system_sum = sum(system_values) if system_values else 10
     points_raw = (system_sum % 299) + 2
 
     radius = _remap(mass_med, *_SRC_RANGES["protein_mass_kda"], *_DST_RANGES["radius"])
     spacing = _remap(spacing_raw, 4.0, 21.0, *_DST_RANGES["spacing"])
+    points = int(_remap(float(points_raw), *_SRC_RANGES["genes_in_system_sum_mod"], *_DST_RANGES["points"]))
     extrusion = _remap(gravy_med, *_SRC_RANGES["gravy_score"], *_DST_RANGES["extrusion"])
     scale_x = _remap(disorder_med, *_SRC_RANGES["disorder_pct"], *_DST_RANGES["scale_x"])
     scale_y = _remap(pi_med, *_SRC_RANGES["isoelectric_point_pI"], *_DST_RANGES["scale_y"])
@@ -242,7 +243,7 @@ def compute_sculpture_params(
         "seed": seed,
         "radius": radius,
         "spacing": round(spacing, 2),
-        "points": points_raw,
+        "points": points,
         "extrusion": extrusion,
         # "scale_x": scale_x,
         # "scale_y": scale_y,
@@ -250,7 +251,7 @@ def compute_sculpture_params(
         "scale_y": DEFAULT_SCALE,
         "radii": radii,
         "z_increment": round(spacing, 2),
-        "seed_count": points_raw,
+        "seed_count": points,
         "random_seed": seed,
         "pool_size": len(props_pool),
         # Gene-level inputs that drove the above parameters

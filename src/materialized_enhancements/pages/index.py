@@ -939,75 +939,158 @@ def _gene_selection_prop_row(label: str, value: rx.Var) -> rx.Component:
     )
 
 
-def _gene_confidence_badge(bucket: rx.Var, confidence: rx.Var) -> rx.Component:
-    pill_high = {
-        "fontSize": "0.92rem",
-        "fontWeight": "600",
-        "padding": "3px 12px",
-        "borderRadius": "6px",
-        "backgroundColor": "#d1fae7",
-        "color": "#047857",
-        "border": "1px solid #6ee7b7",
-    }
-    pill_mh = {
-        "fontSize": "0.92rem",
-        "fontWeight": "600",
-        "padding": "3px 12px",
-        "borderRadius": "6px",
-        "backgroundColor": "#cffafe",
-        "color": "#0e7490",
-        "border": "1px solid #67e8f9",
-    }
-    pill_med = {
-        "fontSize": "0.92rem",
-        "fontWeight": "600",
-        "padding": "3px 12px",
-        "borderRadius": "6px",
-        "backgroundColor": "#fef3c7",
-        "color": "#b45309",
-        "border": "1px solid #fcd34d",
-    }
-    pill_low = {
-        "fontSize": "0.92rem",
-        "fontWeight": "600",
-        "padding": "3px 12px",
-        "borderRadius": "6px",
-        "backgroundColor": "#fee2e2",
-        "color": "#b91c1c",
-        "border": "1px solid #fecaca",
-    }
-    pill_unk = {
-        "fontSize": "0.92rem",
-        "fontWeight": "600",
-        "padding": "3px 12px",
-        "borderRadius": "6px",
-        "backgroundColor": "#f3f4f6",
-        "color": "#4b5563",
-        "border": "1px solid #e5e7eb",
-    }
-    return rx.cond(
-        confidence != "",
-        rx.el.div(
+_CONF_PILL_STYLES: dict[str, dict[str, str]] = {
+    "very high": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#d1fae7",
+        "color": "#047857", "border": "1px solid #6ee7b7",
+        "whiteSpace": "nowrap",
+    },
+    "high": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#d1fae7",
+        "color": "#047857", "border": "1px solid #6ee7b7",
+        "whiteSpace": "nowrap",
+    },
+    "medium-high": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#cffafe",
+        "color": "#0e7490", "border": "1px solid #67e8f9",
+        "whiteSpace": "nowrap",
+    },
+    "medium": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#fef3c7",
+        "color": "#b45309", "border": "1px solid #fcd34d",
+        "whiteSpace": "nowrap",
+    },
+    "medium-low": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#fee2e2",
+        "color": "#b91c1c", "border": "1px solid #fecaca",
+        "whiteSpace": "nowrap",
+    },
+    "low-medium": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#fee2e2",
+        "color": "#b91c1c", "border": "1px solid #fecaca",
+        "whiteSpace": "nowrap",
+    },
+    "low": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#fee2e2",
+        "color": "#b91c1c", "border": "1px solid #fecaca",
+        "whiteSpace": "nowrap",
+    },
+    "declining": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#fee2e2",
+        "color": "#b91c1c", "border": "1px solid #fecaca",
+        "whiteSpace": "nowrap",
+    },
+    "n/a": {
+        "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+        "borderRadius": "6px", "backgroundColor": "#f3f4f6",
+        "color": "#4b5563", "border": "1px solid #e5e7eb",
+        "whiteSpace": "nowrap",
+    },
+}
+
+_CONF_PILL_DEFAULT = {
+    "fontSize": "0.82rem", "fontWeight": "600", "padding": "2px 10px",
+    "borderRadius": "6px", "backgroundColor": "#f3f4f6",
+    "color": "#4b5563", "border": "1px solid #e5e7eb",
+    "whiteSpace": "nowrap",
+}
+
+
+def _confidence_detail_line(entry: rx.Var) -> rx.Component:
+    return rx.el.div(
+        rx.el.span(
+            entry["value"],
+            style={
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "color": "#94a3b8",
+            },
+        ),
+        rx.cond(
+            entry["argument"] != "",
             rx.el.span(
-                "Confidence",
-                style={
-                    "fontSize": "0.95rem",
-                    "fontWeight": "900",
-                    "color": "#94a3b8",
-                    "marginRight": "8px",
-                    "textTransform": "uppercase",
-                    "letterSpacing": "0.06em",
-                },
+                entry["argument"],
+                style={"fontSize": "0.78rem", "color": "#cbd5e1", "marginLeft": "4px"},
             ),
-            rx.match(
-                bucket,
-                ("high", rx.el.span(confidence, style=pill_high)),
-                ("medium_high", rx.el.span(confidence, style=pill_mh)),
-                ("medium", rx.el.span(confidence, style=pill_med)),
-                ("low", rx.el.span(confidence, style=pill_low)),
-                ("unknown", rx.el.span(confidence, style=pill_unk)),
+            rx.fragment(),
+        ),
+        rx.cond(
+            entry["description"] != "",
+            rx.el.span(
+                " — ",
+                rx.el.span(entry["description"], style={"fontStyle": "italic"}),
+                style={"fontSize": "0.74rem", "color": "#64748b", "marginLeft": "2px"},
             ),
-            style={"display": "flex", "alignItems": "center", "flexWrap": "wrap"},
+            rx.fragment(),
+        ),
+        style={"display": "flex", "alignItems": "center", "flexWrap": "wrap", "gap": "2px", "padding": "1px 0"},
+    )
+
+
+def _gene_confidence_section(primary: rx.Var, details: rx.Var) -> rx.Component:
+    val_lower = primary["value"].lower()
+    pill = rx.el.span(
+        primary["value"],
+        style=rx.match(
+            val_lower,
+            *[(k, v) for k, v in _CONF_PILL_STYLES.items()],
+            _CONF_PILL_DEFAULT,
+        ),
+    )
+    primary_arg = rx.cond(
+        primary["argument"] != "",
+        rx.el.span(
+            primary["argument"],
+            style={"fontSize": "0.82rem", "color": "#e2e8f0", "marginLeft": "6px"},
+        ),
+        rx.fragment(),
+    )
+    primary_desc = rx.cond(
+        primary["description"] != "",
+        rx.el.span(
+            " — ",
+            rx.el.span(primary["description"], style={"fontStyle": "italic"}),
+            style={"fontSize": "0.78rem", "color": "#94a3b8", "marginLeft": "2px"},
+        ),
+        rx.fragment(),
+    )
+    return rx.cond(
+        primary["value"] != "",
+        rx.el.div(
+            rx.el.div(
+                rx.el.span(
+                    "Confidence",
+                    style={
+                        "fontSize": "0.95rem",
+                        "fontWeight": "900",
+                        "color": "#94a3b8",
+                        "marginRight": "8px",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.06em",
+                    },
+                ),
+                pill,
+                primary_arg,
+                primary_desc,
+                style={"display": "flex", "alignItems": "center", "flexWrap": "wrap", "gap": "2px"},
+            ),
+            rx.cond(
+                details.length() > 0,
+                rx.el.div(
+                    rx.foreach(details, _confidence_detail_line),
+                    style={"marginLeft": "8px", "marginTop": "2px"},
+                ),
+                rx.fragment(),
+            ),
+            style={"display": "flex", "flexDirection": "column", "gap": "2px"},
         ),
         rx.fragment(),
     )
@@ -1315,6 +1398,68 @@ def _secondary_categories_row(gene_item: rx.Var) -> rx.Component:
     )
 
 
+_MANIPULATION_ICON_MAP: list[tuple[str, str]] = [
+    ("knockout", "cut"),
+    ("knockin", "sign in"),
+    ("overexpression", "level up alternate"),
+    ("transfer", "exchange"),
+    ("editing", "pencil alternate"),
+    ("expansion", "copy"),
+    ("expression", "plus circle"),
+]
+
+
+def _manipulation_icon(icon_key: rx.Var, size: int = 11, color: str = "#6d28d9") -> rx.Component:
+    return rx.match(
+        icon_key,
+        *[(k, fomantic_icon(icon, size=size, color=color)) for k, icon in _MANIPULATION_ICON_MAP],
+        fomantic_icon("dna", size=size, color=color),
+    )
+
+
+def _manipulation_badge(gene_item: rx.Var, included: rx.Var) -> rx.Component:
+    return rx.el.span(
+        _manipulation_icon(
+            gene_item["manipulation_icon"],
+            size=10,
+            color=rx.cond(included, "#6d28d9", "#9ca3af"),
+        ),
+        gene_item["manipulation"],
+        style={
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "4px",
+            "fontSize": "0.72rem",
+            "fontWeight": "600",
+            "padding": "1px 6px",
+            "borderRadius": "4px",
+            "backgroundColor": rx.cond(included, "#f3f0ff", "#f3f4f6"),
+            "color": rx.cond(included, "#6d28d9", "#9ca3af"),
+            "whiteSpace": "nowrap",
+            "flexShrink": "0",
+        },
+    )
+
+
+def _manipulation_badge_dark(gene_item: rx.Var) -> rx.Component:
+    return rx.el.span(
+        _manipulation_icon(gene_item["manipulation_icon"], size=10, color="#c4b5fd"),
+        gene_item["manipulation"],
+        style={
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "4px",
+            "fontSize": "0.72rem",
+            "fontWeight": "700",
+            "padding": "2px 8px",
+            "borderRadius": "4px",
+            "backgroundColor": "rgba(124, 58, 237, 0.16)",
+            "color": "#c4b5fd",
+            "whiteSpace": "nowrap",
+        },
+    )
+
+
 def _gene_checkbox(gene_item: rx.Var) -> rx.Component:
     included = gene_item["included"]
     gene_sym = gene_item["gene"]
@@ -1345,10 +1490,10 @@ def _gene_checkbox(gene_item: rx.Var) -> rx.Component:
                         "fontSize": "0.93rem",
                         "fontWeight": "600",
                         "color": rx.cond(included, "#1a1a2e", "#9ca3af"),
-                        "width": "38%",
                         "flexShrink": "0",
                     },
                 ),
+                _manipulation_badge(gene_item, included),
                 rx.el.span(
                     gene_item["category_detail"],
                     style={
@@ -1472,7 +1617,7 @@ def _gene_checkbox(gene_item: rx.Var) -> rx.Component:
             },
         ),
         rx.el.div(
-            _gene_confidence_badge(gene_item["confidence_bucket"], gene_item["confidence"]),
+            _gene_confidence_section(gene_item["confidence_primary"], gene_item["confidence_details"]),
             _gene_tested_on_row(gene_item["testing_entries"]),
             style={
                 "display": "flex",
@@ -2502,14 +2647,33 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
             rx.el.div(
                 rx.el.div(
                     rx.el.div(
-                        rx.el.span(
-                            gene_sym,
-                            style={
-                                "fontSize": "1.08rem",
-                                "fontWeight": "900",
-                                "color": rx.cond(included, "#f8fafc", "#cbd5e1"),
-                            },
+                        rx.cond(
+                            gene_item["gene_url"] != "",
+                            rx.el.a(
+                                gene_sym,
+                                href=gene_item["gene_url"],
+                                target="_blank",
+                                rel="noopener noreferrer",
+                                title="Open in UniProt",
+                                style={
+                                    "fontSize": "1.08rem",
+                                    "fontWeight": "900",
+                                    "color": rx.cond(included, "#f8fafc", "#cbd5e1"),
+                                    "textDecoration": "none",
+                                    "borderBottom": "1px dotted rgba(124, 58, 237, 0.5)",
+                                    "_hover": {"color": "#a78bfa", "borderBottomColor": "#a78bfa"},
+                                },
+                            ),
+                            rx.el.span(
+                                gene_sym,
+                                style={
+                                    "fontSize": "1.08rem",
+                                    "fontWeight": "900",
+                                    "color": rx.cond(included, "#f8fafc", "#cbd5e1"),
+                                },
+                            ),
                         ),
+                        _manipulation_badge_dark(gene_item),
                         rx.el.span(
                             gene_item["price"],
                             " cr",
@@ -2573,7 +2737,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                 },
             ),
             rx.el.div(
-                _gene_confidence_badge(gene_item["confidence_bucket"], gene_item["confidence"]),
+                _gene_confidence_section(gene_item["confidence_primary"], gene_item["confidence_details"]),
                 _gene_tested_on_row(gene_item["testing_entries"]),
                 style={
                     "display": "flex",
@@ -2595,6 +2759,40 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                     rx.cond(
                         gene_item["key_references"] != "",
                         _rpg_gene_side_references(gene_item["key_reference_segments"]),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        gene_item["alphafold_url"] != "",
+                        rx.el.a(
+                            fomantic_icon("cube", size=14, color="#a78bfa"),
+                            rx.el.span(
+                                " AlphaFold 3D Structure",
+                                style={"marginLeft": "4px"},
+                            ),
+                            href=gene_item["alphafold_url"],
+                            target="_blank",
+                            rel="noopener noreferrer",
+                            title="View predicted 3D structure on AlphaFold",
+                            style={
+                                "display": "inline-flex",
+                                "alignItems": "center",
+                                "padding": "8px 14px",
+                                "borderRadius": "6px",
+                                "border": "1px solid rgba(167, 139, 250, 0.38)",
+                                "background": "rgba(124, 58, 237, 0.14)",
+                                "color": "#c4b5fd",
+                                "fontSize": "0.88rem",
+                                "fontWeight": "700",
+                                "textDecoration": "none",
+                                "cursor": "pointer",
+                                "marginTop": "4px",
+                                "_hover": {
+                                    "background": "rgba(124, 58, 237, 0.28)",
+                                    "color": "#e9d5ff",
+                                    "borderColor": "rgba(167, 139, 250, 0.6)",
+                                },
+                            },
+                        ),
                         rx.fragment(),
                     ),
                     style={
@@ -4637,7 +4835,7 @@ def _report_gene_row(gene_item: rx.Var) -> rx.Component:
             style={"display": "flex", "alignItems": "center", "flexWrap": "wrap", "gap": "4px"},
         ),
         rx.el.div(
-            _gene_confidence_badge(gene_item["confidence_bucket"], gene_item["confidence"]),
+            _gene_confidence_section(gene_item["confidence_primary"], gene_item["confidence_details"]),
             _gene_tested_on_row(gene_item["testing_entries"]),
             _gene_testing_table(gene_item["testing_entries"]),
             rx.cond(
@@ -5514,12 +5712,28 @@ def _report_pdf_long_content() -> rx.Component:
             ComposeState.included_composition_genes,
             lambda g: rx.el.div(
                 rx.el.div(
-                    rx.el.span(
-                        g["gene"],
-                        style={
-                            "fontWeight": "700",
-                            "color": "#1a1a2e",
-                        },
+                    rx.cond(
+                        g["gene_url"] != "",
+                        rx.el.a(
+                            g["gene"],
+                            href=g["gene_url"],
+                            target="_blank",
+                            rel="noopener noreferrer",
+                            style={
+                                "fontWeight": "700",
+                                "color": "#1a1a2e",
+                                "textDecoration": "none",
+                                "borderBottom": "1px dotted #7c3aed",
+                                "_hover": {"color": "#7c3aed"},
+                            },
+                        ),
+                        rx.el.span(
+                            g["gene"],
+                            style={
+                                "fontWeight": "700",
+                                "color": "#1a1a2e",
+                            },
+                        ),
                     ),
                     rx.el.span(" \u2014 ", style={"color": "#9ca3af"}),
                     rx.el.span(
@@ -5559,12 +5773,43 @@ def _report_pdf_long_content() -> rx.Component:
                     rx.fragment(),
                 ),
                 rx.cond(
-                    g["confidence"] != "",
-                    rx.el.p(
-                        rx.el.span("Confidence: ", style={"color": "#9ca3af", "fontWeight": "600"}),
-                        rx.el.span(g["confidence"], style={"color": "#047857", "fontWeight": "600"}),
+                    g["confidence_entries"].length() > 0,
+                    rx.el.div(
+                        rx.el.span("Confidence: ", style={"color": "#9ca3af", "fontWeight": "600", "fontSize": "0.74rem"}),
+                        rx.foreach(
+                            g["confidence_entries"],
+                            lambda ce: rx.el.span(
+                                rx.el.span(ce["value"], style={
+                                    "fontWeight": "600",
+                                    "color": rx.match(
+                                        ce["value"].lower(),
+                                        ("very high", "#047857"),
+                                        ("high", "#047857"),
+                                        ("medium-high", "#0e7490"),
+                                        ("medium", "#b45309"),
+                                        ("medium-low", "#b91c1c"),
+                                        ("low-medium", "#b91c1c"),
+                                        ("low", "#b91c1c"),
+                                        ("declining", "#b91c1c"),
+                                        "#4b5563",
+                                    ),
+                                }),
+                                rx.cond(
+                                    ce["argument"] != "",
+                                    rx.el.span(
+                                        " (",
+                                        ce["argument"],
+                                        ")",
+                                        style={"color": "#374151"},
+                                    ),
+                                    rx.fragment(),
+                                ),
+                                rx.el.span("; ", style={"color": "#9ca3af"}),
+                                style={"fontSize": "0.74rem"},
+                            ),
+                        ),
                         class_name="me-report-confidence",
-                        style={"fontSize": "0.74rem", "margin": "0 0 2px 0", "lineHeight": "1.45"},
+                        style={"fontSize": "0.74rem", "margin": "0 0 2px 0", "lineHeight": "1.45", "display": "flex", "flexWrap": "wrap", "alignItems": "baseline"},
                     ),
                     rx.fragment(),
                 ),

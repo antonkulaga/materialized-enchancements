@@ -29,7 +29,7 @@ from materialized_enhancements.artex import (
 def test_sculpture_artwork_v2_format() -> None:
     config = build_sculpture_artwork(
         personal_tag="Alice",
-        selected_categories=["Radiation & Extremophile"],
+        selected_categories=["Stress Resistance"],
         sculpture_params={"seed": 12345, "extrusion": -0.5},
         stl_filename="totem.stl",
         project_id="me-sculpture-abc",
@@ -37,7 +37,7 @@ def test_sculpture_artwork_v2_format() -> None:
     assert config["version"] == 2
     assert config["id"] == "me-sculpture-abc"
     assert "Alice" in config["title"]
-    assert "Radiation & Extremophile" in config["story"]
+    assert "Stress Resistance" in config["story"]
     assert config["runtime"]["renderer"] == "three-experimental"
     assert isinstance(config["assets"], list)
     assert len(config["assets"]) == 1
@@ -61,7 +61,7 @@ def test_sculpture_artwork_mood_in_range() -> None:
     for extrusion in (-1.0, -0.5, 0.0, 0.5, 1.0):
         config = build_sculpture_artwork(
             personal_tag="X",
-            selected_categories=["Energy"],
+            selected_categories=["Regeneration"],
             sculpture_params={"seed": 1, "extrusion": extrusion},
             stl_filename="x.stl",
             project_id="me-x",
@@ -72,7 +72,7 @@ def test_sculpture_artwork_mood_in_range() -> None:
 def test_sculpture_artwork_serializes_to_json() -> None:
     config = build_sculpture_artwork(
         personal_tag="Alice",
-        selected_categories=["Sleep & Consciousness", "New Senses"],
+        selected_categories=["Perception", "Expression"],
         sculpture_params={"seed": 42, "extrusion": -0.2},
         stl_filename="t.stl",
         project_id="me-test",
@@ -113,7 +113,7 @@ def test_jigsaw_artwork_v2_format() -> None:
 
 def test_package_zip_has_required_entries() -> None:
     config = build_sculpture_artwork(
-        "Alice", ["Energy"], {"seed": 1, "extrusion": 0.0}, "test.stl", "me-test"
+        "Alice", ["Regeneration"], {"seed": 1, "extrusion": 0.0}, "test.stl", "me-test"
     )
     stl_bytes = b"fake stl content"
     zip_bytes = build_artex_package_zip(config, stl_bytes, "test.stl")
@@ -199,7 +199,7 @@ def _make_publish_urlopen(
 
 def test_publish_and_push_sync_full_pipeline() -> None:
     config = build_sculpture_artwork(
-        "Alice", ["Energy"], {"seed": 1, "extrusion": 0.0}, "t.stl", "me-test-proj"
+        "Alice", ["Regeneration"], {"seed": 1, "extrusion": 0.0}, "t.stl", "me-test-proj"
     )
     stl_bytes = b"FAKE STL"
     captured: list[dict[str, Any]] = []

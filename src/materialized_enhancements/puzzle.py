@@ -43,6 +43,10 @@ _SPECIES_PUZZLE_MAP: dict[str, str] = {
     "mus_musculus": "25_mouse.svg",
     "homarus_americanus": "26_lobster.svg",
     "cyclorana_platycephala": "27_frog.svg",
+    "acomys_cahirinus": "25_mouse.svg",
+    "polypedilum_vanderplanki": "24_worm.svg",
+    "canis_familiaris": "18_cat.svg",
+    "bos_taurus": "5_elephant.svg",
 }
 
 _GENE_PUZZLE_OVERRIDE: dict[str, str] = {
@@ -75,6 +79,10 @@ _SPECIES_LAYER_MAP: dict[str, str] = {
     "mus_musculus": "25_mouse",
     "homarus_americanus": "26_lobster",
     "cyclorana_platycephala": "27_frog",
+    "acomys_cahirinus": "25_mouse",
+    "polypedilum_vanderplanki": "24_worm",
+    "canis_familiaris": "18_cat",
+    "bos_taurus": "5_elephant",
 }
 
 

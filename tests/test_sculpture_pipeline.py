@@ -5,7 +5,7 @@ initial seed (no retries). Combos whose first seed fails `is_valid_volume` are t
 ones that rely on seed-varying retry in production.
 
 Usage:
-  # Run all 512, stop on first failure, dump failing inputs
+  # Run all 64 (2^6 categories), stop on first failure, dump failing inputs
   uv run pytest tests/test_sculpture_pipeline.py -x --sculpture-failure-dir=data/sculpture_failures
 
   # Smoke: first 16 combos only
@@ -14,7 +14,7 @@ Usage:
   # Collect ALL failures (no -x), write JSONs
   uv run pytest tests/test_sculpture_pipeline.py --sculpture-failure-dir=data/sculpture_failures
 
-  # Only the 41 masks that failed on a prior full run (fast regression slice)
+  # Only known-failure masks (fast regression slice)
   uv run pytest tests/test_sculpture_pipeline.py::test_pipeline_first_seed_known_failures -x
 """
 
@@ -37,50 +37,10 @@ from materialized_enhancements.sculpture import (
 
 NAME = "Test"
 
-# Bitmasks that failed is_valid_volume on first seed in a prior full 512-combo run;
-# filenames under data/sculpture_failures/fail_mask*.json. Update when re-baselining.
+# Bitmasks that failed is_valid_volume on first seed in a prior full 64-combo run
+# (6 categories, max valid mask = 63). Update when re-baselining.
 KNOWN_FAILURE_MASKS: Tuple[int, ...] = (
-    8,
-    15,
-    50,
-    60,
-    113,
-    143,
-    182,
-    186,
-    187,
-    207,
-    242,
-    256,
-    260,
-    272,
-    276,
-    278,
-    286,
-    288,
-    289,
-    294,
-    300,
-    303,
-    304,
-    308,
-    312,
-    316,
-    318,
-    333,
-    341,
-    357,
-    376,
-    384,
-    388,
-    405,
-    417,
-    420,
-    421,
-    436,
-    447,
-    493,
-    497,
+    # Re-baseline by running the full 64-combo suite with --sculpture-failure-dir
 )
 
 
@@ -162,10 +122,11 @@ def test_pipeline_first_seed(
     _assert_pipeline_first_seed_valid_volume(mask, selected, request)
 
 
+@pytest.mark.skipif(not KNOWN_FAILURE_MASKS, reason="No known failure masks — re-baseline needed")
 @pytest.mark.parametrize(
     "mask",
-    KNOWN_FAILURE_MASKS,
-    ids=[f"mask={m:0{len(UNIQUE_CATEGORIES)}b}" for m in KNOWN_FAILURE_MASKS],
+    KNOWN_FAILURE_MASKS or (0,),
+    ids=[f"mask={m:0{len(UNIQUE_CATEGORIES)}b}" for m in (KNOWN_FAILURE_MASKS or (0,))],
 )
 def test_pipeline_first_seed_known_failures(
     mask: int,

@@ -81,11 +81,33 @@ class KeyReferenceSegment(TypedDict):
     href: str
 
 
+def _manipulation_icon_key(manipulation: str) -> str:
+    """Classify a manipulation string into an icon key for rx.match in the UI."""
+    m = manipulation.lower()
+    if "knockout" in m:
+        return "knockout"
+    if "knock-in" in m or "introgression" in m:
+        return "knockin"
+    if "overexpression" in m or "co-overexpression" in m:
+        return "overexpression"
+    if "transfer" in m:
+        return "transfer"
+    if "editing" in m:
+        return "editing"
+    if "expansion" in m:
+        return "expansion"
+    if "expression" in m or "induction" in m:
+        return "expression"
+    return "other"
+
+
 class SculptureSelectedGene(TypedDict):
     """Row passed to foreach for sculpture gene checkboxes (nested segments must be typed)."""
 
     gene_id: str
     gene: str
+    manipulation: str
+    manipulation_icon: str
     trait: str
     category: str
     category_detail: str
@@ -97,7 +119,10 @@ class SculptureSelectedGene(TypedDict):
     mechanism: str
     achievements: str
     evidence_tier: str
-    confidence: str
+    confidence_entries: list[dict[str, str]]
+    confidence_primary: dict[str, str]
+    confidence_details: list[dict[str, str]]
+    confidence_summary: str
     confidence_bucket: str
     testing_entries: list[dict[str, str]]
     translational_gaps: str
@@ -107,6 +132,8 @@ class SculptureSelectedGene(TypedDict):
     description: str
     enhancement: str
     paper_url: str
+    gene_url: str
+    alphafold_url: str
     puzzle_svg: str
     puzzle_src: str
     species_page_url: str
@@ -182,23 +209,12 @@ def _compact_gene_symbol(gene: str) -> str:
     without_brackets = re.sub(r"\s*[\(\[\{][^\)\]\}]*[\)\]\}]", "", gene)
     compact = re.sub(r"\s+", " ", without_brackets).strip()
     compact = re.sub(r"\s*/\s*", "/", compact)
-    compact = re.sub(r"\s*\+\s*", "+", compact)
-    compact = compact.replace("Greenland shark DNA-repair network+p53 C-term insertion", "GLS-p53")
+    compact = compact.replace("GS DNA-repair/TP53", "GS-p53")
     compact = compact.replace("POT1/SIRT3/RTEL1", "POT1+")
-    compact = compact.replace("PprI/PprA", "PprI")
-    compact = compact.replace("CLOCK+BMAL1", "CLOCK")
-    compact = compact.replace("MB+GSH", "MB/GSH")
-    compact = compact.replace("AFPs/AFGPs", "AFP")
-    compact = compact.replace("Prestin/SLC26A5", "Prestin")
-    compact = compact.replace("Reflectin+chromatophore", "Reflectin")
-    compact = compact.replace("Firefly luciferase+luciferin", "FLuc")
+    compact = compact.replace("Luciferase/Luciferin", "FLuc")
     compact = compact.replace("Tapetum lucidum", "Tapetum")
-    compact = compact.replace("CBP family", "CBP")
-    compact = compact.replace("piwi/smedwi", "smedwi")
-    compact = compact.replace("STING S358", "STING")
-    compact = compact.replace("scn4aa", "SCN4A")
-    compact = compact.replace("Melanin", "MEL")
-    compact = compact.replace("system", "")
+    compact = compact.replace("PIWI/SMEDWI", "SMEDWI")
+    compact = compact.replace("Acomys regen. program", "Acomys")
     return compact.strip()
 
 
@@ -251,20 +267,61 @@ def _split_key_references_with_links(text: str) -> list[KeyReferenceSegment]:
     return out
 
 
-def _confidence_bucket(raw: str) -> str:
-    """Normalize CSV confidence text to a small set of keys for UI styling."""
-    s = raw.strip().lower().replace("–", "-").replace("—", "-")
-    if not s:
+_VALUE_TO_BUCKET: dict[str, str] = {
+    "very high": "high",
+    "high": "high",
+    "medium-high": "medium_high",
+    "medium": "medium",
+    "medium-low": "low",
+    "low-medium": "low",
+    "low": "low",
+    "declining": "low",
+    "n/a": "unknown",
+}
+
+_BUCKET_RANK = {"high": 0, "medium_high": 1, "medium": 2, "low": 3, "unknown": 4}
+
+
+_NULL_EFFECT_PATTERNS: set[str] = {
+    "no effect", "null effect", "no benefit", "no improvement",
+    "harmful", "detrimental", "negative",
+    "won't produce", "won't work", "won't transfer",
+}
+
+
+def _is_null_effect(argument: str) -> bool:
+    """Return True if the argument indicates null or negative effect."""
+    arg_lower = argument.strip().lower()
+    return any(pat in arg_lower for pat in _NULL_EFFECT_PATTERNS)
+
+
+def _confidence_bucket_from_entries(entries: list[dict[str, str]]) -> str:
+    """Pick the highest-confidence bucket from entries with positive effect claims only."""
+    if not entries:
         return "unknown"
-    if "medium-high" in s or "medium high" in s:
-        return "medium_high"
-    if "medium" in s:
-        return "medium"
-    if "high" in s:
-        return "high"
-    if "low" in s:
-        return "low"
-    return "unknown"
+    best = "unknown"
+    for e in entries:
+        if _is_null_effect(e.get("argument", "")):
+            continue
+        b = _VALUE_TO_BUCKET.get(e.get("value", "").strip().lower(), "unknown")
+        if _BUCKET_RANK.get(b, 4) < _BUCKET_RANK.get(best, 4):
+            best = b
+    return best
+
+
+def _confidence_summary(entries: list[dict[str, str]]) -> str:
+    """Build a short display string from structured confidence entries."""
+    if not entries:
+        return ""
+    parts: list[str] = []
+    for e in entries:
+        v = e.get("value", "").strip()
+        arg = e.get("argument", "").strip()
+        if arg:
+            parts.append(f"{v} ({arg})")
+        else:
+            parts.append(v)
+    return "; ".join(parts)
 
 
 CATEGORY_COLORS: dict[str, str] = {
@@ -1480,6 +1537,8 @@ class ComposeState(rx.State):
             row: SculptureSelectedGene = {
                 "gene_id": g["gene_id"],
                 "gene": g["gene"],
+                "manipulation": g["manipulation"],
+                "manipulation_icon": _manipulation_icon_key(str(g["manipulation"])),
                 "trait": g["trait"],
                 "category": g["category"],
                 "category_detail": g["category_detail"],
@@ -1491,8 +1550,11 @@ class ComposeState(rx.State):
                 "mechanism": g["mechanism"],
                 "achievements": g["achievements"],
                 "evidence_tier": g["evidence_tier"],
-                "confidence": g["confidence"],
-                "confidence_bucket": _confidence_bucket(str(g.get("confidence", ""))),
+                "confidence_entries": g.get("confidence_entries", []),
+                "confidence_primary": g.get("confidence_primary", {"gene_id": "", "value": "", "argument": "", "description": "", "primary": False}),
+                "confidence_details": g.get("confidence_details", []),
+                "confidence_summary": _confidence_summary(g.get("confidence_entries", [])),
+                "confidence_bucket": _confidence_bucket_from_entries(g.get("confidence_entries", [])),
                 "testing_entries": g.get("testing_entries", []),
                 "translational_gaps": g["translational_gaps"],
                 "key_references": g["key_references"],
@@ -1501,6 +1563,8 @@ class ComposeState(rx.State):
                 "description": g["description"],
                 "enhancement": g["enhancement"],
                 "paper_url": g["paper_url"],
+                "gene_url": g.get("gene_url", ""),
+                "alphafold_url": g.get("alphafold_url", ""),
                 "puzzle_svg": g["puzzle_svg"],
                 "puzzle_src": f"/puzzle/{quote(g['puzzle_svg'])}" if g["puzzle_svg"] else "",
                 "species_page_url": g.get("species_page_url", ""),
@@ -1544,7 +1608,7 @@ class ComposeState(rx.State):
                         "species_id": sid,
                         "common_name": sp["common_name"] if sp else sid,
                         "scientific_name": sci,
-                        "species_url": species_wikipedia_url(sci),
+                        "species_url": sp["url"] if sp and sp["url"] else species_wikipedia_url(sci),
                         "superpower": "",
                         "genes": [],
                         "traits": [],

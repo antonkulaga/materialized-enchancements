@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TypedDict
 
@@ -15,17 +16,28 @@ DATA_PATH = DATA_DIR / "gene_library.csv"
 SPECIES_PATH = DATA_DIR / "species.csv"
 GENE_SPECIES_PATH = DATA_DIR / "gene_species.csv"
 GENE_TESTING_PATH = DATA_DIR / "gene_testing.csv"
+GENE_CONFIDENCE_PATH = DATA_DIR / "gene_confidence.csv"
 
 
 class SpeciesEntry(TypedDict):
     species_id: str
     scientific_name: str
     common_name: str
+    url: str
+
+
+class ConfidenceEntry(TypedDict):
+    gene_id: str
+    value: str
+    argument: str
+    description: str
+    primary: bool
 
 
 class GeneEntry(TypedDict):
     gene_id: str
     gene: str
+    manipulation: str
     species_ids: list[str]
     species_common_names: str
     species_scientific_names: str
@@ -38,13 +50,17 @@ class GeneEntry(TypedDict):
     mechanism: str
     achievements: str
     evidence_tier: str
-    confidence: str
+    confidence_entries: list[ConfidenceEntry]
+    confidence_primary: ConfidenceEntry
+    confidence_details: list[ConfidenceEntry]
     translational_gaps: str
     key_references: str
     notes: str
     description: str
     enhancement: str
     paper_url: str
+    gene_url: str
+    alphafold_url: str
     puzzle_svg: str
     species_page_url: str
     testing_entries: list[dict[str, str]]
@@ -79,6 +95,7 @@ class TestingEntry(TypedDict):
 
 _LIBRARY_COLUMN_MAP: dict[str, str] = {
     "Gene": "gene",
+    "Manipulation": "manipulation",
     "Category": "category",
     "Subcategory": "trait",
     "Short Description": "short_description",
@@ -86,12 +103,64 @@ _LIBRARY_COLUMN_MAP: dict[str, str] = {
     "Mechanism": "mechanism",
     "Achievements (effect sizes)": "achievements",
     "Highest Evidence Tier": "evidence_tier",
-    "Confidence": "confidence",
     "Translational Gaps": "translational_gaps",
     "Key References (DOIs)": "key_references",
     "Notes (limitations, contradictions, caveats)": "notes",
     "Secondary Categories": "secondary_categories_raw",
 }
+
+
+_NON_GENE_NAMES: set[str] = {
+    "melanin", "tapetum lucidum", "acomys regen. program",
+    "gs dna-repair / tp53",
+}
+
+_PROTEIN_DB_URLS: dict[str, str] = {
+    "uniprot": "https://www.uniprot.org/uniprotkb/{id}",
+}
+
+
+def _load_protein_id_lookup(path: Path = DATA_DIR / "gene_properties.csv") -> dict[str, tuple[str, str]]:
+    """Load gene_id → (protein_id, id_type) from gene_properties.csv."""
+    df = pl.read_csv(path).select(["gene_id", "protein_id", "id_type"])
+    lookup: dict[str, tuple[str, str]] = {}
+    for row in df.to_dicts():
+        pid = str(row.get("protein_id") or "").strip()
+        idt = str(row.get("id_type") or "").strip()
+        if pid and idt:
+            lookup[row["gene_id"].strip()] = (pid, idt)
+    return lookup
+
+
+PROTEIN_ID_LOOKUP: dict[str, tuple[str, str]] = _load_protein_id_lookup()
+
+
+def _gene_protein_url(gene_id: str, gene_display: str) -> str:
+    """Direct protein DB URL when accession is known, otherwise a UniProt search fallback."""
+    entry = PROTEIN_ID_LOOKUP.get(gene_id)
+    if entry:
+        pid, idt = entry
+        template = _PROTEIN_DB_URLS.get(idt)
+        if template:
+            return template.format(id=url_quote(pid))
+    name = gene_display.strip()
+    if name.lower() in _NON_GENE_NAMES:
+        return ""
+    primary = re.split(r"\s*/\s*", name)[0]
+    primary = re.sub(r"\s*\(.*?\)\s*", "", primary).strip()
+    primary = primary.split("-")[0].strip() if primary.startswith("TP53-") else primary
+    if not primary:
+        return ""
+    return "https://www.uniprot.org/uniprotkb?query=" + url_quote(primary)
+
+
+def _gene_alphafold_url(gene_id: str) -> str:
+    entry = PROTEIN_ID_LOOKUP.get(gene_id)
+    if entry:
+        pid, idt = entry
+        if idt == "uniprot" and pid:
+            return f"https://alphafold.ebi.ac.uk/entry/{url_quote(pid)}"
+    return ""
 
 
 def species_wikipedia_url(scientific_name: str) -> str:
@@ -102,12 +171,13 @@ def species_wikipedia_url(scientific_name: str) -> str:
 
 def _load_species_lookup(path: Path = SPECIES_PATH) -> dict[str, SpeciesEntry]:
     """Load species.csv into a lookup keyed by species_id."""
-    df = pl.read_csv(path).select(["species_id", "scientific_name", "common_name"])
+    df = pl.read_csv(path).select(["species_id", "scientific_name", "common_name", "url"])
     return {
         row["species_id"]: SpeciesEntry(
             species_id=row["species_id"],
             scientific_name=row["scientific_name"],
             common_name=row["common_name"],
+            url=str(row.get("url") or ""),
         )
         for row in df.to_dicts()
     }
@@ -124,8 +194,29 @@ def _load_gene_species_map(path: Path = GENE_SPECIES_PATH) -> dict[str, list[str
     return result
 
 
+def _load_gene_confidence_map(
+    path: Path = GENE_CONFIDENCE_PATH,
+) -> dict[str, list[ConfidenceEntry]]:
+    """Load gene_confidence.csv into a dict: gene_id → [ConfidenceEntry, ...]."""
+    df = pl.read_csv(path).fill_null("")
+    result: dict[str, list[ConfidenceEntry]] = {}
+    for row in df.to_dicts():
+        gid = str(row["gene_id"]).strip()
+        is_primary = str(row.get("primary", "")).strip().upper() == "TRUE"
+        entry = ConfidenceEntry(
+            gene_id=gid,
+            value=str(row["value"]).strip(),
+            argument=str(row["argument"]).strip(),
+            description=str(row["description"]).strip(),
+            primary=is_primary,
+        )
+        result.setdefault(gid, []).append(entry)
+    return result
+
+
 SPECIES_LOOKUP: dict[str, SpeciesEntry] = _load_species_lookup()
 GENE_SPECIES_MAP: dict[str, list[str]] = _load_gene_species_map()
+GENE_CONFIDENCE_MAP: dict[str, list[ConfidenceEntry]] = _load_gene_confidence_map()
 
 
 def load_gene_library(path: Path = DATA_PATH) -> list[GeneEntry]:
@@ -136,6 +227,7 @@ def load_gene_library(path: Path = DATA_PATH) -> list[GeneEntry]:
         .with_columns(
             pl.col("gene_id").str.strip_chars(),
             pl.col("gene").str.strip_chars(),
+            pl.col("manipulation").str.strip_chars(),
             pl.col("category").str.strip_chars(),
             pl.col("trait").str.strip_chars(),
             pl.col("short_description").str.strip_chars(),
@@ -158,8 +250,17 @@ def load_gene_library(path: Path = DATA_PATH) -> list[GeneEntry]:
         row["species_common_names"] = " & ".join(common_names) if common_names else "Unknown"
         row["species_scientific_names"] = " & ".join(scientific_names) if scientific_names else ""
         row["puzzle_svg"] = resolve_puzzle_svg(gid, sids)
-        first_sci = scientific_names[0] if scientific_names else ""
-        row["species_page_url"] = species_wikipedia_url(first_sci)
+        first_sid = sids[0] if sids else ""
+        first_sp = SPECIES_LOOKUP.get(first_sid)
+        row["species_page_url"] = (first_sp["url"] if first_sp and first_sp["url"] else species_wikipedia_url(scientific_names[0] if scientific_names else ""))
+        row["gene_url"] = _gene_protein_url(gid, row["gene"])
+        row["alphafold_url"] = _gene_alphafold_url(gid)
+        conf_list = [dict(c) for c in GENE_CONFIDENCE_MAP.get(gid, [])]
+        row["confidence_entries"] = conf_list
+        primaries = [c for c in conf_list if c["primary"]]
+        empty_conf: ConfidenceEntry = {"gene_id": gid, "value": "", "argument": "", "description": "", "primary": False}
+        row["confidence_primary"] = primaries[0] if primaries else (conf_list[0] if conf_list else empty_conf)
+        row["confidence_details"] = [c for c in conf_list if not c["primary"]]
         row["testing_entries"] = []
         raw_sec = str(row.pop("secondary_categories_raw", "") or "").strip()
         row["secondary_categories"] = [
@@ -228,7 +329,7 @@ def build_animal_library(library: list[GeneEntry]) -> list[AnimalEntry]:
                     species_id=sid,
                     common_name=sp["common_name"],
                     scientific_name=sp["scientific_name"],
-                    species_url=species_wikipedia_url(sp["scientific_name"]),
+                    species_url=sp["url"] if sp["url"] else species_wikipedia_url(sp["scientific_name"]),
                     genes=[],
                     categories=[],
                     traits=[],

@@ -24,17 +24,10 @@ from materialized_enhancements.sculpture import (
 
 NAME = "Test"
 
+# Only masks valid for 6 categories (max 63); rest from old 9-category model removed.
 SAMPLE_FAILURE_MASKS = [
-    8,     # 2s, tiny, wt=True, 11 cells
-    143,   # 11s, wt=True, 12k faces
-    333,   # 14s, wt=True, 16k faces
-    294,   # 19s, wt=True, 22k faces, 229 seeds
-    174,   # 16s, wt=True, 18k faces, low ratio 1.65
-    50,    # 15s, wt=False, 17k faces, high ratio 6.7
-    257,   # 12s, wt=False, 13k faces
-    290,   # 17s, wt=False, 19k faces
-    447,   # 17s, wt=True, 19k faces, 250 seeds (8-cat combo)
-    382,   # 23s, wt=True, 22k faces, low ratio 1.46 (should be "easy")
+    8,     # single-category combo
+    50,    # multi-category combo
 ]
 
 

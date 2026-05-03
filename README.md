@@ -28,29 +28,158 @@ Upgrading human DNA is not science fiction — it is already happening in adults
 
 ## Gene Library
 
-38 genes · 6 parent categories · 26+ source species spanning microbes, animals, fungi, humans, and archaic-human ancestry.
+55 genes · 6 parent categories · 39 source species spanning microbes, animals, fungi, humans, and archaic-human ancestry.
 
 | Category | Genes | Example organisms |
 |---|---|---|
-| Stress Resistance | 8 | Tardigrade, Deinococcus, Bdelloid rotifer |
-| Longevity & Genome | 10 | Greenland shark, Bowhead whale, Naked mole-rat |
-| Regeneration | 7 | Axolotl, Hydra, Planarian |
-| Environmental Adaptation | 5 | Tibetan yak, Wood frog, Bar-headed goose |
-| Perception | 4 | Mantis shrimp, Pit viper, Electric eel |
-| Expression | 4 | Cuttlefish, Mimic octopus, Firefly |
+| Environmental Adaptation | 12 | Sperm whale, Arctic ground squirrel, Egyptian mongoose |
+| Longevity & Genome | 11 | Greenland shark, Bowhead whale, Naked mole-rat |
+| Stress Resistance | 8 | Tardigrade, Deinococcus, Sleeping chironomid |
+| Regeneration | 8 | Axolotl, Planarian, Spiny mouse |
+| Perception | 8 | Little skate, Budgerigar, Pit viper |
+| Expression | 8 | Golden silk orbweaver, Deathstalker scorpion, Firefly |
 
 Each gene has an **evidence tier** (T2–T6), a **confidence level**, quantified achievements with citations, and honest notes about limitations, contradictions, and translational gaps.
 
-### Data files
+### Data schema
 
-Gene data is split across three CSV files in `data/input/`:
+Gene data lives in six CSV files under `data/input/`, organized like a relational database. Adding or editing genes requires **zero Python changes** — just edit the CSVs.
 
-| File | Purpose |
-|---|---|
-| `gene_library.csv` | Gene metadata (source of truth): name, category, subcategory, narrative, mechanism, evidence, references |
-| `species.csv` | Species lookup: taxonomy, life-history data |
-| `gene_species.csv` | Many-to-many join (gene ↔ species) |
-| `gene_properties.csv` | Pricing and biophysical properties for sculpture generation |
+#### Entity-relationship overview
+
+```
+                         ┌────────────────┐
+species.csv              │ gene_library   │         gene_properties.csv
+┌────────────┐           │────────────────│         ┌─────────────────┐
+│ species_id │◄──┐       │ gene_id    (PK)├────────►│ gene_id     (FK)│
+│ common_name│   │       │ Gene           │    1:1  │ protein_mass_kda│
+│ sci_name   │   │       │ Category       │         │ gene_price      │
+│ taxonomy…  │   │       │ Subcategory    │         │ …biophysical    │
+│ life-hist… │   │       │ Narrative      │         └─────────────────┘
+└────────────┘   │       │ Mechanism      │
+       ▲         │       │ Evidence Tier  │         gene_confidence.csv
+       │         │       │ References     │         ┌─────────────────┐
+gene_species.csv │       │ …              ├ ─ ─ ─ ►│ gene_id     (FK)│
+┌────────────┐   │       └────────────────┘  1:N   │ value           │
+│ gene_id(FK)├───┤              │ (optional)        │ argument        │
+│species_id  ├───┘              │                   └─────────────────┘
+│ (many:many)│                  │
+└────────────┘                  │                   gene_testing.csv
+                                │  (optional)       ┌─────────────────┐
+                                └ ─ ─ ─ ─ ─ ─ ─ ─ ►│ gene_id     (FK)│
+                                             1:N    │ host, delivery  │
+                                                    │ key_result      │
+                                                    │ doi, year       │
+                                                    └─────────────────┘
+
+─────► = required FK (app fails at startup if missing)
+─ ─ ─► = optional FK (app runs without rows for a gene)
+```
+
+#### Table: `gene_library.csv` — gene metadata (source of truth)
+
+| Column | Required | Description |
+|---|---|---|
+| `gene_id` | **PK** | Unique slug, e.g. `dsup`, `has2_nmr`. Used as join key everywhere. |
+| `Gene` | yes | Display name, e.g. `Dsup`, `HAS2` |
+| `Manipulation` | yes | How the gene is used: `Overexpression`, `Knockout`, `Base editing knockout`, etc. |
+| `Category` | yes | One of 6 parent categories: `Stress Resistance`, `Longevity & Genome`, `Regeneration`, `Environmental Adaptation`, `Perception`, `Expression` |
+| `Subcategory` | yes | Specific trait within the category, e.g. `Radiation Shielding`, `Hyaluronic Acid` |
+| `Narrative` | yes | 150–300 word biological story. Honest about contradictions — not hype. |
+| `Short Description` | yes | 1–2 sentence plain-language summary |
+| `Mechanism` | yes | Molecular mechanism of action |
+| `Achievements (effect sizes)` | yes | Quantified experimental results with citations |
+| `Highest Evidence Tier` | yes | `T1`–`T7` (T7 = association only, T6 = ≥4 independent labs, T5 = in-vivo mammal, T4 = in-vivo non-mammal, T3 = cell culture, T2 = computational, T1 = theoretical). Compound tiers like `T4 (human U2OS cell expression) + T3 (cross-species)` are allowed. |
+| `Translational Gaps` | yes | What research is still needed |
+| `Key References (DOIs)` | yes | Pipe-separated `Author Year URL` entries |
+| `Notes (limitations, contradictions, caveats)` | yes | Caveats, contradictions between studies, known failure modes |
+| `Secondary Categories` | optional | Pipe-separated additional parent category names for cross-cutting genes |
+
+#### Table: `species.csv` — organism lookup
+
+| Column | Required | Description |
+|---|---|---|
+| `species_id` | **PK** | Snake_case slug, e.g. `ramazzottius_varieornatus`, `heterocephalus_glaber` |
+| `scientific_name` | yes | Binomial name, e.g. `Ramazzottius varieornatus` |
+| `common_name` | yes | Display name, e.g. `Tardigrade`, `Naked mole-rat` |
+| `genus` | yes | Taxonomic genus |
+| `species` | yes | Taxonomic species epithet |
+| `kingdom` | yes | e.g. `Animalia` |
+| `phylum` | yes | e.g. `Chordata`, `Tardigrada` |
+| `class` | yes | Taxonomic class |
+| `order` | yes | Taxonomic order |
+| `family` | yes | Taxonomic family |
+| `max_longevity_years` | optional | Maximum recorded lifespan in years (from [AnAge](https://genomics.senescence.info/species/)) |
+| `adult_weight_g` | optional | Typical adult body weight in grams |
+| `metabolic_rate_w` | optional | Metabolic rate in watts |
+| `body_mass_g` | optional | Body mass used for allometric scaling |
+| `temperature_k` | optional | Body temperature in kelvin |
+| `female_maturity_days` | optional | Days to female sexual maturity |
+| `male_maturity_days` | optional | Days to male sexual maturity |
+| `gestation_days` | optional | Gestation period in days |
+| `imr_per_year` | optional | Initial mortality rate per year |
+| `mrdt_years` | optional | Mortality rate doubling time in years |
+| `url` | optional | Wikipedia or reference URL for the species |
+
+#### Table: `gene_species.csv` — many-to-many join
+
+| Column | Required | Description |
+|---|---|---|
+| `gene_id` | **FK** | References `gene_library.csv → gene_id` |
+| `species_id` | **FK** | References `species.csv → species_id` |
+
+One row per gene–species link. Multi-species genes (e.g. a gene studied in both mouse and fly) have multiple rows.
+
+#### Table: `gene_properties.csv` — pricing & biophysical data
+
+| Column | Required | Description |
+|---|---|---|
+| `gene_id` | **FK** | References `gene_library.csv → gene_id` |
+| `gene` | yes | Display name (must match `gene_library.csv → Gene`) |
+| `protein_id` | yes | UniProt/NCBI accession |
+| `id_type` | yes | `uniprot` or `ncbi` |
+| `reference_protein` | yes | Protein name for the reference entry |
+| `protein_length_aa` | yes | Protein length in amino acids |
+| `protein_mass_kda` | yes | Protein mass in kilodaltons |
+| `exon_count` | yes | Number of exons in the gene |
+| `genes_in_system` | yes | Gene count in the functional system |
+| `recipient_organism_count` | yes | Number of organisms this gene has been tested in |
+| `disorder_pct` | yes | Intrinsic disorder percentage (0–100) |
+| `isoelectric_point_pI` | yes | Isoelectric point |
+| `gravy_score` | yes | GRAVY hydropathy score |
+| `key_publication_year` | yes | Year of the key publication |
+| `category` | yes | Parent category (must match `gene_library.csv → Category`) |
+| `gene_price` | yes | Enhancement credit cost (positive integer) |
+
+#### Table: `gene_confidence.csv` — confidence assessments
+
+| Column | Required | Description |
+|---|---|---|
+| `gene_id` | **FK** | References `gene_library.csv → gene_id` |
+| `value` | yes | Confidence level: `Low`, `Low-Medium`, `Medium-Low`, `Medium`, `Medium-High`, `High`, `Very High`, `N/A`, or `Declining` |
+| `argument` | optional | Reasoning for the assessment |
+| `description` | optional | Extended explanation |
+
+Multiple rows per gene are allowed (e.g. different assessors or dimensions).
+
+#### Table: `gene_testing.csv` — experimental evidence records
+
+| Column | Required | Description |
+|---|---|---|
+| `gene_id` | **FK** | References `gene_library.csv → gene_id` |
+| `host` | yes | Test organism, e.g. `Human`, `Mouse`, `C. elegans` |
+| `tissue_or_system` | yes | Tissue/cell type tested, e.g. `cell_line (HEK293)`, `whole_organism` |
+| `intervention` | yes | e.g. `overexpression`, `knockout`, `mRNA delivery` |
+| `delivery` | yes | e.g. `stable_transfection`, `LNP`, `AAV` |
+| `integration` | yes | `stable`, `transient`, `episomal` |
+| `key_result` | yes | Main finding in one sentence |
+| `effect_size` | optional | Quantified effect, e.g. `~50% SSB reduction at 10 Gy` |
+| `positive` | yes | `true` if the result supports the gene's intended effect |
+| `reference_short` | yes | Short citation, e.g. `Hashimoto 2016 Nat Commun` |
+| `doi` | yes | DOI URL |
+| `year` | yes | Publication year |
+
+Multiple rows per gene — each row is one independent experiment/study.
 
 All files under `data/input/` are local runtime inputs and gitignored.
 
@@ -87,19 +216,52 @@ Copy `.env.template` to `.env` to override defaults (email delivery, deploy URL,
 
 ## Contributing a New Gene
 
-Scientists and biologists can propose new genes — no Python code changes needed.
+Scientists and biologists can propose new genes — **no Python code changes needed**. The app reads everything from the CSV files at startup.
 
-### Quick steps
+### Step-by-step
 
-1. **Pick a gene** with clear experimental evidence in at least one organism.
-2. **Add the species** to `data/input/species.csv` if it's new (use [AnAge](https://genomics.senescence.info/species/) for taxonomy/life-history).
-3. **Add the gene** to `data/input/gene_library.csv` — fill in the narrative, mechanism, evidence tier, confidence, and references.
-4. **Link gene to species** in `data/input/gene_species.csv`.
-5. **Test locally** with `uv run start`.
+1. **Choose a `gene_id`** — a unique snake_case slug (e.g. `klotho_overexp`, `p53_elephant`). This is the primary key used across all tables.
 
-Full column-by-column guide: see the [Contributing section in CLAUDE.md](CLAUDE.md#contributing-a-new-gene) or open a GitHub issue and we'll help.
+2. **Add the source species** to `species.csv` (skip if the species already exists):
+   - Use the scientific name in snake_case as `species_id` (e.g. `elephas_maximus`)
+   - Fill taxonomy columns from [AnAge](https://genomics.senescence.info/species/) or NCBI Taxonomy
+   - Life-history fields are optional but enrich the species card
 
-**Writing guidelines**: be honest about contradictions and limitations. Mention the strongest experimental evidence with effect sizes. End on a realistic assessment, not hype.
+3. **Add the gene row** to `gene_library.csv`:
+   - Assign one of the 6 parent categories and a specific subcategory (trait)
+   - Write the `Narrative` (150–300 words): describe the biology, cite the strongest evidence with effect sizes, be honest about contradictions and limitations
+   - Set `Highest Evidence Tier`: T7 (association only) → T6 (≥4 independent labs) → T5 (in-vivo mammal) → T4 (in-vivo non-mammal) → T3 (cell culture) → T2 (computational) → T1 (theoretical)
+   - Fill all required columns (see schema above)
+
+4. **Link gene to species** in `gene_species.csv`:
+   - Add one row per source species: `gene_id,species_id`
+   - Multi-species genes get multiple rows
+
+5. **Add pricing & protein data** to `gene_properties.csv`:
+   - Look up protein data from UniProt or NCBI
+   - Set `gene_price` (positive integer, typically 1–15 cr)
+
+6. **Add confidence assessment** to `gene_confidence.csv`:
+   - At minimum: `gene_id,value` (e.g. `klotho_overexp,Medium-High`)
+
+7. **Add experimental evidence** to `gene_testing.csv`:
+   - One row per independent experiment/study
+   - Include both positive and negative results (`positive` = `true` or `false`)
+
+8. **Test locally**: `uv run start` — the app should show the new gene in the correct category
+
+### Writing guidelines
+
+- Be honest about contradictions and limitations — mention failed replications and tissue-specific effects
+- Lead with the strongest experimental evidence and include quantified effect sizes
+- End on a realistic assessment, not hype
+- Use DOIs for all references
+
+### Integrity checks
+
+The app enforces at startup:
+- Every `gene_id` in `gene_library.csv` must have a matching row in `gene_properties.csv` with `gene_price > 0`
+- Every `species_id` referenced in `gene_species.csv` must exist in `species.csv`
 
 ---
 
