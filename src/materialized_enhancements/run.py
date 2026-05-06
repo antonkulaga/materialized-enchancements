@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import argparse
+import base64
+import json
 import os
+import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -50,3 +55,190 @@ def serve() -> None:
 
     environment.REFLEX_COMPILE_CONTEXT.set(constants.CompileContext.RUN)
     _run(env=constants.Env.PROD, running_mode=RunningMode.FULLSTACK)
+
+
+def _build_preselect_url(
+    name: str,
+    categories: int,
+    genes_per_category: int,
+    host: str,
+    port: int,
+) -> str:
+    """Build a materialization URL with pre-selected genes within budget."""
+    from materialized_enhancements.gene_data import (
+        DEFAULT_BUDGET,
+        GENE_LIBRARY,
+        GENE_PRICES,
+        UNIQUE_CATEGORIES,
+    )
+
+    cats_to_use = UNIQUE_CATEGORIES[: min(categories, len(UNIQUE_CATEGORIES))]
+
+    budget = DEFAULT_BUDGET
+    selected_cats: list[str] = []
+    selected_genes: list[str] = []
+
+    for cat in cats_to_use:
+        genes = sorted(
+            ((g["gene"], GENE_PRICES.get(g["gene"], 0)) for g in GENE_LIBRARY if g["category"] == cat),
+            key=lambda t: t[1],
+        )
+        for gene_name, price in genes[: genes_per_category]:
+            if budget - price >= 0:
+                if cat not in selected_cats:
+                    selected_cats.append(cat)
+                selected_genes.append(gene_name)
+                budget -= price
+
+    bitmask = 0
+    for cat in selected_cats:
+        idx = UNIQUE_CATEGORIES.index(cat) + 1
+        bitmask |= 1 << (idx - 1)
+
+    name_b64 = base64.urlsafe_b64encode(name.encode("utf-8")).decode("ascii").rstrip("=")
+    genes_json = json.dumps(selected_genes, separators=(",", ":"))
+    genes_b64 = base64.urlsafe_b64encode(genes_json.encode("utf-8")).decode("ascii").rstrip("=")
+    path = f"/materialization?report=1&name={quote(name_b64)}&cats={bitmask}&genes={quote(genes_b64)}"
+    url = f"http://{host}:{port}{path}"
+
+    print(f"Pre-selected {len(selected_genes)} genes across {len(selected_cats)} categories")
+    print(f"Budget: {DEFAULT_BUDGET - budget}/{DEFAULT_BUDGET} cr spent")
+    print(f"Genes: {', '.join(selected_genes)}")
+    print(f"URL: {url}")
+    return url
+
+
+def _spawn_open_when_ready(
+    name: str,
+    categories: int,
+    genes_per_category: int,
+    frontend_port: int,
+) -> None:
+    """Open the preselected URL from a side process after the frontend is ready."""
+    opener_script = """
+import sys
+import time
+import webbrowser
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
+
+from materialized_enhancements.run import _build_preselect_url
+
+name = sys.argv[1]
+categories = int(sys.argv[2])
+genes_per_category = int(sys.argv[3])
+frontend_port = int(sys.argv[4])
+url = _build_preselect_url(
+    name=name,
+    categories=categories,
+    genes_per_category=genes_per_category,
+    host="localhost",
+    port=frontend_port,
+)
+
+for _ in range(120):
+    time.sleep(3)
+    try:
+        resp = urlopen(f"http://localhost:{frontend_port}/materialization", timeout=2)
+        body = resp.read(4096).decode("utf-8", errors="replace").lower()
+    except (HTTPError, URLError, TimeoutError):
+        continue
+    if resp.status == 200 and "404: page not found" not in body:
+        print(f"\\n>>> Server ready on :{frontend_port}; opening browser\\n", flush=True)
+        webbrowser.open(url)
+        raise SystemExit(0)
+
+print("\\n>>> Timed out waiting for server.\\n", flush=True)
+"""
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            opener_script,
+            name,
+            str(categories),
+            str(genes_per_category),
+            str(frontend_port),
+        ],
+        cwd=Path.cwd(),
+    )
+
+
+def preselect() -> None:
+    """Start the Reflex dev server and open the materialization page with pre-selected genes.
+
+    Identical to ``uv run start`` but auto-opens the materialization page with
+    genes pre-selected via URL parameters once the server is ready.
+
+    Usage::
+
+        uv run preselect                     # all categories, 2 cheapest genes each
+        uv run preselect --categories 3      # first 3 categories only
+        uv run preselect --name "TestBot"    # custom personal tag
+        uv run preselect --url-only          # print URL only, don't start server
+    """
+    args_raw = sys.argv[1:]
+    dev_mode = "--dev" in args_raw
+    if dev_mode:
+        os.environ["MATERIALIZED_DEV_MODE"] = "1"
+        args_raw = [a for a in args_raw if a != "--dev"]
+
+    _setup()
+
+    parser = argparse.ArgumentParser(description="Start server with pre-selected genes on materialization page")
+    parser.add_argument("--name", default="TestUser", help="Personal tag / character name")
+    parser.add_argument("--categories", type=int, default=999,
+                        help="Number of categories to include")
+    parser.add_argument("--genes-per-category", type=int, default=2,
+                        help="Max cheapest genes to pick per category")
+    parser.add_argument("--frontend-port", type=int, default=3000,
+                        help="Frontend port to use and open")
+    parser.add_argument("--backend-port", type=int, default=8000,
+                        help="Backend port to use")
+    parser.add_argument("--backend-host", default=None,
+                        help="Backend bind host, defaults to Reflex config / .env")
+    parser.add_argument("--url-only", action="store_true", help="Print URL and exit without starting server")
+    parsed = parser.parse_args(args_raw)
+
+    if parsed.url_only:
+        _build_preselect_url(
+            name=parsed.name,
+            categories=parsed.categories,
+            genes_per_category=parsed.genes_per_category,
+            host="localhost",
+            port=parsed.frontend_port,
+        )
+        return
+
+    from reflex import constants
+    from reflex.config import get_config
+    from reflex.reflex import _run
+    from reflex.utils import processes
+    from reflex_base.config import environment
+
+    config = get_config()
+    frontend_port = processes.handle_port(
+        "frontend",
+        parsed.frontend_port or config.frontend_port or constants.DefaultPorts.FRONTEND_PORT,
+        auto_increment=not bool(parsed.frontend_port or config.frontend_port),
+    )
+    backend_port = processes.handle_port(
+        "backend",
+        parsed.backend_port or config.backend_port or constants.DefaultPorts.BACKEND_PORT,
+        auto_increment=not bool(parsed.backend_port or config.backend_port),
+    )
+
+    _spawn_open_when_ready(
+        name=parsed.name,
+        categories=parsed.categories,
+        genes_per_category=parsed.genes_per_category,
+        frontend_port=frontend_port,
+    )
+
+    environment.REFLEX_COMPILE_CONTEXT.set(constants.CompileContext.RUN)
+    _run(
+        env=constants.Env.DEV,
+        frontend_port=frontend_port,
+        backend_port=backend_port,
+        backend_host=parsed.backend_host,
+    )

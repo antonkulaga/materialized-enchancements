@@ -22,7 +22,6 @@ from materialized_enhancements.gene_data import (
     DEFAULT_BUDGET,
     GENE_LIBRARY,
     GENE_PRICES,
-    GENE_SPECIES_MAP,
     SPECIES_GENE_IDS,
     SPECIES_LOOKUP,
     UNIQUE_CATEGORIES,
@@ -1798,9 +1797,30 @@ class ComposeState(rx.State):
         if not cats or not tag:
             return
 
+        selected_genes: list[str] = []
+        genes_b64 = str(params.get("genes", ""))
+        if genes_b64:
+            genes_padding = "=" * (-len(genes_b64) % 4)
+            try:
+                genes_payload = json.loads(
+                    base64.urlsafe_b64decode(genes_b64 + genes_padding).decode("utf-8")
+                )
+            except (binascii.Error, ValueError, UnicodeDecodeError, TypeError):
+                logger.warning("apply_shared_report: invalid genes param")
+            else:
+                valid_genes = {
+                    g["gene"] for g in GENE_LIBRARY
+                    if g["category"] in cats
+                }
+                if isinstance(genes_payload, list):
+                    selected_genes = [
+                        str(gene) for gene in genes_payload
+                        if str(gene) in valid_genes
+                    ]
+
         self.personal_tag = tag
         self.selected_categories = cats
-        self.included_genes = [
+        self.included_genes = selected_genes or [
             g["gene"] for g in GENE_LIBRARY if g["category"] in cats
         ]
         self._recompute_params()

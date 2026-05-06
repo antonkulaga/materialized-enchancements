@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 start = "materialized_enhancements.run:main"
 serve = "materialized_enhancements.run:serve"
+preselect = "materialized_enhancements.run:preselect"
 
 [build-system]
 requires = ["uv-build"]
