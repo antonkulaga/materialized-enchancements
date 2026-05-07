@@ -50,6 +50,7 @@ from materialized_enhancements.env import (
     ARTEX_API_TOKEN,
     ARTEX_API_URL,
     ARTEX_DISPLAY_ID,
+    GENERATED_URL_PREFIX,
     RESEND_API_KEY,
     REPO_ROOT,
     ensure_generated_public_dirs,
@@ -720,6 +721,7 @@ class ComposeState(rx.State):
     choice_expanded: bool = True
     sculpture_expanded: bool = False
     viewer_expanded: bool = True
+    materialization_artifact_tab: str = "model"
     stl_base64: str = ""
     viewer_nonce: int = 0
 
@@ -938,6 +940,7 @@ class ComposeState(rx.State):
             self.report_pdf_url = ""
             self.report_params_url = ""
             self.viewer_expanded = True
+            self.materialization_artifact_tab = "model"
 
         yield rx.redirect("/materialization")
 
@@ -974,6 +977,7 @@ class ComposeState(rx.State):
             self.sculpture_expanded = False
             self.viewer_expanded = True
             self.report_expanded = True
+            self.materialization_artifact_tab = "model"
 
     def toggle_choice_expanded(self) -> None:
         self.choice_expanded = not self.choice_expanded
@@ -986,6 +990,26 @@ class ComposeState(rx.State):
 
     def toggle_report_expanded(self) -> None:
         self.report_expanded = not self.report_expanded
+
+    def show_model_artifact_tab(self) -> None:
+        self.materialization_artifact_tab = "model"
+
+    def show_report_artifact_tab(self):  # type: ignore[return]
+        self.materialization_artifact_tab = "report"
+        yield rx.call_script(
+            "setTimeout(function(){ "
+            "(async function(){ "
+            "if (window.__meUsePublishedPdfInPage && await window.__meUsePublishedPdfInPage()) return; "
+            "if (window.__meRenderPdfInPage) await window.__meRenderPdfInPage(); "
+            "})(); "
+            "}, 0)"
+        )
+
+    def show_jigsaw_artifact_tab(self) -> None:
+        self.materialization_artifact_tab = "jigsaw"
+
+    def show_support_artifact_tab(self) -> None:
+        self.materialization_artifact_tab = "support"
 
     def set_report_views_ready(self, ready: bool) -> None:
         self.report_views_ready = bool(ready)
@@ -1190,7 +1214,7 @@ class ComposeState(rx.State):
         tag = self.personal_tag.strip() or "anonymous"
         seed = self.sculpture_params.get("seed", self.param_seed)
         slug = _safe_report_slug(tag, seed)
-        public_path = f"/materialization?shared_report={quote(slug)}"
+        public_path = f"{GENERATED_URL_PREFIX}/reports/{quote(slug)}/index.html"
         self.report_publish_error = ""
         self.report_publishing = True
         self.report_expanded = True
@@ -1264,7 +1288,7 @@ class ComposeState(rx.State):
         relative_png = f"{rel_dir}/report.png"
         relative_pdf = f"{rel_dir}/report.pdf"
 
-        public_url = str(data.get("share_url", "")).strip() or f"{public_app_url()}/materialization?shared_report={quote(slug)}"
+        public_url = str(data.get("share_url", "")).strip() or generated_public_url(f"{rel_dir}/index.html")
         model_url = generated_public_url(relative_model)
         params_url = generated_public_url(relative_params)
         png_url = generated_public_url(relative_png)
@@ -1322,6 +1346,11 @@ class ComposeState(rx.State):
         self.report_png_url = png_url
         self.report_pdf_url = pdf_url
         self.report_params_url = params_url
+        yield rx.call_script(
+            "setTimeout(function(){ "
+            "if (window.__meUsePublishedPdfInPage) window.__meUsePublishedPdfInPage(); "
+            "}, 0)"
+        )
         yield rx.toast.success("Generated report links are ready.")
 
     def set_recipient_email(self, value: str) -> None:
@@ -1757,6 +1786,7 @@ class ComposeState(rx.State):
         self.sculpture_expanded = False
         self.viewer_expanded = True
         self.report_expanded = True
+        self.materialization_artifact_tab = "model"
         self.report_public_slug = slug
         self.report_public_url = f"{public_app_url()}/materialization?shared_report={quote(slug)}"
         self.report_model_url = generated_public_url(f"{rel_dir}/model.stl")

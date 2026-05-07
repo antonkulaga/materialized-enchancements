@@ -17,6 +17,10 @@
     var el = document.getElementById('report-published-url');
     return el && el.value ? String(el.value).trim() : '';
   }
+  function publishedReportPdfUrl() {
+    var el = document.getElementById('report-pdf-url');
+    return el && el.value ? String(el.value).trim() : '';
+  }
   function generatedShareUrl() {
     return window.__mePendingPublishedReportUrl || publishedReportUrl();
   }
@@ -224,6 +228,14 @@
 
   function feedback(text, color) {
     var fb = document.getElementById('report-copy-feedback');
+    if (!fb) return;
+    fb.style.color = color || '#16a085';
+    fb.textContent = text || '';
+    if (text) setTimeout(function () { if (fb.textContent === text) fb.textContent = ''; }, 3500);
+  }
+
+  function pdfFeedback(text, color) {
+    var fb = document.getElementById('report-pdf-feedback');
     if (!fb) return;
     fb.style.color = color || '#16a085';
     fb.textContent = text || '';
@@ -968,6 +980,102 @@
     }
     return pdf;
   }
+
+  async function pdfJsLibReady() {
+    if (window.pdfjsLib) return window.pdfjsLib;
+    if (window.__mePdfJsReady) return await window.__mePdfJsReady;
+    var deadline = Date.now() + 6000;
+    while (!window.pdfjsLib && Date.now() < deadline) {
+      await new Promise(function (r) { setTimeout(r, 80); });
+    }
+    if (window.pdfjsLib) return window.pdfjsLib;
+    throw new Error('PDF.js library not loaded.');
+  }
+
+  async function renderPdfDocumentInPage(pdfDoc) {
+    var root = document.getElementById('me-report-pdf-viewer');
+    if (!root) return false;
+    root.innerHTML = '';
+    root.setAttribute('data-pdf-rendered', '0');
+    var targetWidth = Math.max(320, Math.min(860, root.clientWidth - 44));
+    for (var pageNo = 1; pageNo <= pdfDoc.numPages; pageNo++) {
+      var page = await pdfDoc.getPage(pageNo);
+      var unitViewport = page.getViewport({ scale: 1 });
+      var scale = targetWidth / unitViewport.width;
+      var viewport = page.getViewport({ scale: scale });
+      var canvas = document.createElement('canvas');
+      var context = canvas.getContext('2d', { alpha: false });
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      canvas.style.cssText =
+        'display:block;width:100%;max-width:' + Math.ceil(viewport.width) + 'px;height:auto;' +
+        'margin:0 auto ' + (pageNo === pdfDoc.numPages ? '0' : '18px') + ' auto;' +
+        'background:#ffffff;border-radius:6px;box-shadow:0 12px 30px rgba(15,23,42,0.24);';
+      root.appendChild(canvas);
+      await page.render({ canvasContext: context, viewport: viewport }).promise;
+    }
+    root.setAttribute('data-pdf-rendered', '1');
+    return true;
+  }
+
+  async function renderPdfArrayBufferInPage(arrayBuffer) {
+    var pdfjs = await pdfJsLibReady();
+    var pdfDoc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    return await renderPdfDocumentInPage(pdfDoc);
+  }
+
+  async function renderPdfUrlInPage(url) {
+    var pdfjs = await pdfJsLibReady();
+    var pdfDoc = await pdfjs.getDocument(url).promise;
+    return await renderPdfDocumentInPage(pdfDoc);
+  }
+
+  window.__meUsePublishedPdfInPage = async function () {
+    var pdfUrl = publishedReportPdfUrl();
+    if (!pdfUrl) return false;
+    pdfFeedback('Rendering saved PDF...');
+    try {
+      var rendered = await renderPdfUrlInPage(pdfUrl);
+      if (!rendered) {
+        pdfFeedback('PDF preview area is not mounted.', '#b91c1c');
+        return false;
+      }
+      pdfFeedback('Showing saved PDF from the generated folder.');
+      return true;
+    } catch (err) {
+      console.error('[materialized] published PDF render failed', err);
+      pdfFeedback('Saved PDF render failed: ' + (err && err.message ? err.message : 'see console'), '#b91c1c');
+      return false;
+    }
+  };
+
+  window.__meRenderPdfInPage = async function () {
+    console.info('[materialized] __meRenderPdfInPage called');
+    if (typeof jspdf === 'undefined') {
+      pdfFeedback('jsPDF library not loaded. Reload the page.', '#b91c1c');
+      missingLib('jsPDF');
+      return;
+    }
+    stopObserver();
+    pdfFeedback('Rendering PDF...');
+    try {
+      await waitReportMounted(6000);
+      window.__mePaintReport();
+      await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
+      var pdf = await buildReportPdf();
+      var arrayBuffer = pdf.output('arraybuffer');
+      if (await renderPdfArrayBufferInPage(arrayBuffer)) {
+        pdfFeedback('PDF rendered in this page.');
+      } else {
+        pdfFeedback('PDF preview area is not mounted.', '#b91c1c');
+      }
+    } catch (err) {
+      console.error('[materialized] inline PDF render failed', err);
+      pdfFeedback('PDF render failed: ' + (err && err.message ? err.message : 'see console'), '#b91c1c');
+    } finally {
+      startObserver();
+    }
+  };
 
   window.__meDownloadPdf = function () {
     console.info('[materialized] __meDownloadPdf clicked');

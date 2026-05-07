@@ -186,12 +186,22 @@ def report_libs() -> rx.Component:
     - html-to-image: DOM → PNG rasterization (modern html2canvas successor)
     - jsPDF: client-side A4 PDF generation
     - qrcode-generator: tiny standalone QR code generator for share links
+    - PDF.js: in-page PDF preview canvas rendering
     - me_report.js: our own helpers (buttons wire into window.__meDownloadPng etc.)
     """
     return rx.fragment(
         rx.script(src="/vendor/html-to-image.js"),
         rx.script(src="/vendor/jspdf.umd.min.js"),
         rx.script(src="/vendor/qrcode.min.js"),
+        rx.script(
+            """
+            import * as pdfjsLib from '/vendor/pdf.min.mjs';
+            pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdf.worker.min.mjs';
+            window.pdfjsLib = pdfjsLib;
+            window.__mePdfJsReady = Promise.resolve(pdfjsLib);
+            """,
+            custom_attrs={"type": "module"},
+        ),
         rx.script(src="/vendor/me_report.js"),
     )
 
