@@ -6478,6 +6478,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
         #me-top-tab-menu.ui.top.attached.tabular.menu {
             background: #020617 !important;
             border-color: rgba(124, 58, 237, 0.42) !important;
+            border-radius: 0 !important;
         }
         #me-top-tab-menu.ui.top.attached.tabular.menu .item {
             color: #cbd5e1 !important;
@@ -6501,11 +6502,15 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
         #me-rpg-tab-segment.ui.bottom.attached.segment {
             background: #020617 !important;
             border-color: rgba(124, 58, 237, 0.42) !important;
+            border-radius: 0 !important;
         }
         html:has(#me-rpg-tab-segment),
-        body:has(#me-rpg-tab-segment),
+        body:has(#me-rpg-tab-segment) {
+            background: #020617 !important;
+        }
         #me-app-content:has(#me-rpg-tab-segment) {
             background: #020617 !important;
+            padding: 0 !important;
         }
         html:has(.me-rpg-profile-page),
         body:has(.me-rpg-profile-page) {
