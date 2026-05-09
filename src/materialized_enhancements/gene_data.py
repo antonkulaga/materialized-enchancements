@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import TypedDict
 
@@ -110,11 +109,6 @@ _LIBRARY_COLUMN_MAP: dict[str, str] = {
 }
 
 
-_NON_GENE_NAMES: set[str] = {
-    "melanin", "tapetum lucidum", "acomys regen. program",
-    "gs dna-repair / tp53",
-}
-
 _PROTEIN_DB_URLS: dict[str, str] = {
     "uniprot": "https://www.uniprot.org/uniprotkb/{id}",
 }
@@ -136,25 +130,18 @@ PROTEIN_ID_LOOKUP: dict[str, tuple[str, str]] = _load_protein_id_lookup()
 
 
 def _gene_protein_url(gene_id: str, gene_display: str) -> str:
-    """Direct protein DB URL when accession is known, otherwise a UniProt search fallback."""
+    """Direct protein DB URL when accession is known; empty string otherwise."""
     entry = PROTEIN_ID_LOOKUP.get(gene_id)
     if entry:
         pid, idt = entry
         template = _PROTEIN_DB_URLS.get(idt)
         if template:
             return template.format(id=url_quote(pid))
-    name = gene_display.strip()
-    if name.lower() in _NON_GENE_NAMES:
-        return ""
-    primary = re.split(r"\s*/\s*", name)[0]
-    primary = re.sub(r"\s*\(.*?\)\s*", "", primary).strip()
-    primary = primary.split("-")[0].strip() if primary.startswith("TP53-") else primary
-    if not primary:
-        return ""
-    return "https://www.uniprot.org/uniprotkb?query=" + url_quote(primary)
+    return ""
 
 
 def _gene_alphafold_url(gene_id: str) -> str:
+    """AlphaFold entry URL when UniProt accession is known; empty string otherwise."""
     entry = PROTEIN_ID_LOOKUP.get(gene_id)
     if entry:
         pid, idt = entry

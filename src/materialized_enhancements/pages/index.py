@@ -6358,6 +6358,10 @@ def _report_pdf_long_content() -> rx.Component:
                     ),
                     rx.el.span(")", style={"color": "#9ca3af"}),
                     style={"fontSize": "0.95rem", "marginBottom": "2px"},
+                    data_gene=g["gene"],
+                    data_trait=g["category_detail"],
+                    data_organism=g["species_common_names"],
+                    data_puzzle_src=g["puzzle_src"],
                 ),
                 rx.cond(
                     g["evidence_tier"] != "",
@@ -6510,7 +6514,7 @@ def _published_report_links() -> rx.Component:
         ComposeState.has_published_report,
         rx.el.div(
             rx.el.div(
-                "Generated report folder",
+                "Generated public report",
                 style={
                     "fontSize": "0.78rem",
                     "fontWeight": "700",
@@ -6522,7 +6526,7 @@ def _published_report_links() -> rx.Component:
             ),
             rx.el.div(
                 _published_report_link("Open PDF", ComposeState.report_pdf_url, "file pdf outline"),
-                _published_report_link("Share folder", ComposeState.report_public_url, "external alternate"),
+                _published_report_link("Open public report", ComposeState.report_public_url, "external alternate"),
                 _published_report_link("STL model", ComposeState.report_model_url, "cube"),
                 _published_report_link("Params", ComposeState.report_params_url, "code"),
                 style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
@@ -6546,6 +6550,31 @@ def _published_report_links() -> rx.Component:
             },
         ),
         rx.fragment(),
+    )
+
+
+def _generate_public_link_button() -> rx.Component:
+    return rx.el.button(
+        fomantic_icon("cloud upload", size=16),
+        rx.el.span(
+            rx.cond(
+                ComposeState.report_publishing,
+                " Creating public link...",
+                rx.cond(
+                    ComposeState.has_published_report,
+                    " Update public link",
+                    " Create public link",
+                ),
+            ),
+            style={"marginLeft": "2px"},
+        ),
+        on_click=ComposeState.start_report_publish,
+        class_name=rx.cond(
+            ComposeState.can_publish_report,
+            "ui primary button",
+            "ui disabled button",
+        ),
+        style={**_SOCIAL_BUTTON_STYLE, "flex": "0 1 auto", "minWidth": "220px"},
     )
 
 
@@ -6583,7 +6612,7 @@ def _report_portrait_upload_panel() -> rx.Component:
             },
         ),
         rx.el.p(
-            "Optional: choose a portrait or user picture. It is applied immediately to the report card, PNG, PDF, and sharable folder.",
+            "Optional: choose a portrait or user picture. It is applied immediately to the report card, PNG, PDF, and public link.",
             style={"width": "100%", "margin": "0", "fontSize": "0.82rem", "color": "#9ca3af"},
         ),
         rx.el.label(
@@ -6609,7 +6638,7 @@ def _report_portrait_upload_panel() -> rx.Component:
             },
         ),
         rx.el.div(
-            "Optional short note shown on the report. Editing it clears old share links so the sharable folder can be regenerated.",
+            "Optional short note shown on the report. Editing it clears old share links so the public report can be updated.",
             style={"fontSize": "0.74rem", "color": "#9ca3af", "maxWidth": "420px"},
         ),
         rx.upload(
@@ -6701,8 +6730,8 @@ def _report_pdf_viewer_panel() -> rx.Component:
                 rx.el.p(
                     rx.cond(
                         ComposeState.has_published_report,
-                        "This preview is rendering the saved PDF from your generated share folder.",
-                        "Render the A4 report here, then generate a sharable folder when you are ready to save and share it.",
+                        "This preview is rendering the saved PDF from your public report.",
+                        "Render the A4 report here, then create a public link when you are ready to save and share it.",
                     ),
                     style={"margin": "4px 0 0", "fontSize": "0.84rem", "color": "#9ca3af", "lineHeight": "1.45"},
                 ),
@@ -6720,6 +6749,13 @@ def _report_pdf_viewer_panel() -> rx.Component:
                     "})()"
                 ),
                 class_name="ui primary button",
+                style={"fontSize": "0.86rem", "padding": "9px 14px", "whiteSpace": "nowrap"},
+            ),
+            rx.el.button(
+                fomantic_icon("file pdf outline", size=14),
+                rx.el.span(" Download PDF (A4)", style={"marginLeft": "6px"}),
+                on_click=rx.call_script("window.__meDownloadPdf && window.__meDownloadPdf()"),
+                class_name="ui button",
                 style={"fontSize": "0.86rem", "padding": "9px 14px", "whiteSpace": "nowrap"},
             ),
             style={
@@ -6747,13 +6783,10 @@ def _report_pdf_viewer_panel() -> rx.Component:
             aria_label="Rendered personal enhancement PDF report",
             style={
                 "width": "100%",
-                "height": "min(76vh, 880px)",
-                "minHeight": "620px",
                 "border": "1px solid rgba(167, 139, 250, 0.38)",
                 "borderRadius": "12px",
                 "backgroundColor": "#e5e7eb",
                 "boxShadow": "0 18px 38px rgba(2, 6, 23, 0.28)",
-                "overflowY": "auto",
                 "overflowX": "hidden",
                 "padding": "18px",
                 "boxSizing": "border-box",
@@ -6848,49 +6881,6 @@ def _report_action_bar() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.el.div(
-                "PDF and sharing",
-                style={
-                    "width": "100%",
-                    "fontSize": "0.78rem",
-                    "fontWeight": "700",
-                    "color": "#cbd5e1",
-                    "textTransform": "uppercase",
-                    "letterSpacing": "0.08em",
-                },
-            ),
-            rx.el.button(
-                fomantic_icon("file pdf outline", size=16),
-                rx.el.span(" Download PDF (A4)", style={"marginLeft": "2px"}),
-                on_click=rx.call_script("window.__meDownloadPdf && window.__meDownloadPdf()"),
-                class_name="ui primary button",
-                style=_SOCIAL_BUTTON_STYLE,
-            ),
-            rx.el.button(
-                fomantic_icon("cloud upload", size=16),
-                rx.el.span(
-                    rx.cond(
-                        ComposeState.report_publishing,
-                        " Generating sharable folder…",
-                        rx.cond(
-                            ComposeState.has_published_report,
-                            " Regenerate sharable folder",
-                            " Generate sharable folder",
-                        ),
-                    ),
-                    style={"marginLeft": "2px"},
-                ),
-                on_click=ComposeState.start_report_publish,
-                class_name=rx.cond(
-                    ComposeState.can_publish_report,
-                    "ui button",
-                    "ui disabled button",
-                ),
-                style=_SOCIAL_BUTTON_STYLE,
-            ),
-            style={"display": "flex", "gap": "10px", "flexWrap": "wrap", "marginBottom": "10px"},
-        ),
-        rx.el.div(
-            rx.el.div(
                 "Sharing",
                 style={
                     "width": "100%",
@@ -6905,10 +6895,11 @@ def _report_action_bar() -> rx.Component:
                 rx.cond(
                     ComposeState.has_published_report,
                     "Your model and report are saved. QR, copy, and social buttons now use the public folder.",
-                    "To share, first generate a sharable folder. This saves the model and report, then creates the QR and social link.",
+                    "Create a public link when you are ready to share this report. This saves the model and report, then turns on QR, copy, and social sharing.",
                 ),
                 style={"width": "100%", "margin": "0", "fontSize": "0.82rem", "color": "#9ca3af"},
             ),
+            _generate_public_link_button(),
             _share_qr_panel(),
             rx.el.button(
                 fomantic_icon("copy", size=16),
@@ -7060,8 +7051,17 @@ def _report_section_body() -> rx.Component:
                     style={"display": "none"},
                 ),
                 _report_hidden_capture_content(),
-                _report_portrait_upload_panel(),
+                rx.script(
+                    """
+                    setTimeout(function () {
+                      if (window.__meRenderActiveReportPdfInPage) {
+                        window.__meRenderActiveReportPdfInPage();
+                      }
+                    }, 0);
+                    """
+                ),
                 _report_pdf_viewer_panel(),
+                _report_portrait_upload_panel(),
                 _report_action_bar(),
             ),
             rx.el.p(

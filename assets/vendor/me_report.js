@@ -42,10 +42,20 @@
   function reportTargetUrl() {
     return generatedShareUrl();
   }
-  function browserAbsoluteUrl(pathOrUrl) {
+  function reportPdfTargetUrl() {
+    return reportTargetUrl() || absoluteShareUrl();
+  }
+  function canonicalAbsoluteUrl(pathOrUrl) {
     var v = String(pathOrUrl || '').trim();
     if (!v) return '';
     if (/^https?:\/\//i.test(v)) return v;
+    if (v.charAt(0) === '/') return canonicalOrigin() + v;
+    return canonicalOrigin() + '/' + v;
+  }
+  function localAssetUrl(pathOrUrl) {
+    var v = String(pathOrUrl || '').trim();
+    if (!v) return '';
+    if (/^https?:\/\//i.test(v) || v.indexOf('data:') === 0) return v;
     if (v.charAt(0) === '/') return window.location.origin + v;
     return window.location.origin + '/' + v;
   }
@@ -71,14 +81,14 @@
     var urlEl = document.getElementById('report-share-url');
     if (!urlEl) return;
     var url = reportTargetUrl();
-    urlEl.textContent = url || 'Generate a sharable folder to create a public QR/link.';
+    urlEl.textContent = url || 'Create a public link to generate the QR and sharing buttons.';
   }
 
   function qrPlaceholder(el) {
     if (!el) return false;
     el.innerHTML = '';
     var span = document.createElement('span');
-    span.textContent = 'Generate sharable folder';
+    span.textContent = 'Create public link';
     span.style.cssText =
       'font-size:10px;line-height:1.2;text-align:center;color:#9ca3af;';
     el.appendChild(span);
@@ -160,7 +170,12 @@
 
   window.__mePaintReport = function () {
     var url = reportTargetUrl();
-    if (url !== lastShareUrl) {
+    var urlEl = document.getElementById('report-share-url');
+    var qrEl = document.getElementById('report-qr');
+    var needsInitialPaint =
+      (urlEl && !urlEl.textContent) ||
+      (qrEl && !qrEl.childNodes.length);
+    if (url !== lastShareUrl || needsInitialPaint) {
       paintShareUrl();
       paintQr();
       lastShareUrl = url;
@@ -434,10 +449,10 @@
       var entry = entries[i];
       var header = entry.querySelector('div');
       if (!header) continue;
-      var spans = header.querySelectorAll('span');
-      var gene = spans[0] ? (spans[0].textContent || '').trim() : '';
-      var trait = spans[2] ? (spans[2].textContent || '').trim() : '';
-      var organism = spans[4] ? (spans[4].textContent || '').trim() : '';
+      var gene = (header.getAttribute('data-gene') || '').trim();
+      var trait = (header.getAttribute('data-trait') || '').trim();
+      var organism = (header.getAttribute('data-organism') || '').trim();
+      var puzzleSrc = (header.getAttribute('data-puzzle-src') || '').trim();
       var descEl = entry.querySelector('.me-report-desc');
       var tierEl = entry.querySelector('.me-report-evidence-tier');
       var confEl = entry.querySelector('.me-report-confidence');
@@ -446,6 +461,7 @@
         gene: gene,
         trait: trait,
         organism: organism,
+        puzzleSrc: puzzleSrc,
         evidenceTier: tierEl ? (tierEl.textContent || '').replace(/^\s*Evidence tier:\s*/i, '').trim() : '',
         confidence: confEl ? (confEl.textContent || '').replace(/^\s*Confidence:\s*/i, '').trim() : '',
         testedOn: testedEl ? (testedEl.textContent || '').replace(/^\s*Tested on:\s*/i, '').trim() : '',
@@ -459,11 +475,41 @@
    * rasterization). Keeps the output tiny (tens of KB instead of 20+ MB)
    * and perfectly sharp at any zoom. Handles multi-page flow via
    * explicit y-cursor tracking. */
-  function renderGenePages(pdf, rows, layout) {
+  async function renderGenePages(pdf, rows, layout) {
+    var silhouettes = {};
+    var uniqueSrcs = [];
+    for (var si = 0; si < rows.length; si++) {
+      var src = rows[si].puzzleSrc;
+      if (src && uniqueSrcs.indexOf(src) < 0) uniqueSrcs.push(src);
+    }
+    var loadPromises = uniqueSrcs.map(function (src) {
+      return loadPuzzleRasterForPdf(src).then(function (result) {
+        if (result) silhouettes[src] = result;
+      });
+    });
+    await Promise.all(loadPromises);
+
     var pageW = layout.pageW, pageH = layout.pageH, margin = layout.margin;
     var maxY = pageH - margin;
     var contentW = pageW - margin * 2;
+    var cardPad = 4;
+    var silW = 16;
+    var cardInner = contentW - cardPad - 2;
     var y = margin;
+    var palette = {
+      'Stress Resistance': [124, 58, 237],
+      'Longevity & Genome': [14, 165, 233],
+      'Environmental Adaptation': [16, 185, 129],
+      'Regeneration': [245, 158, 11],
+      'Perception': [236, 72, 153],
+      'Expression': [99, 102, 241],
+    };
+    function catRgb(trait) {
+      for (var k in palette) {
+        if (trait && trait.indexOf(k) === 0) return palette[k];
+      }
+      return [124, 58, 237];
+    }
 
     function ensureSpace(h) {
       if (y + h > maxY) {
@@ -474,71 +520,133 @@
 
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(16);
-    pdf.setTextColor('#1a1a2e');
+    pdf.setTextColor(26, 26, 46);
     ensureSpace(10);
-    pdf.text(pdfSafeWinAnsi('Gene library \u2014 full descriptions'), margin, y + 6);
+    pdf.text(pdfSafeWinAnsi('Gene library'), margin, y + 6);
     y += 10;
 
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    pdf.setTextColor('#374151');
+    pdf.setFontSize(9);
+    pdf.setTextColor(55, 65, 81);
     var introLines = pdf.splitTextToSize(
       pdfSafeWinAnsi(
-        'The sculpture you just generated was shaped by the following genes. ' +
-        'Each entry is a short narrative about the gene in its source organism ' +
-        '(mechanistic detail is available in the Gene Library tab).'
+        'Full narratives for each selected gene. Each entry describes the gene ' +
+        'in its source organism with evidence tier and testing context.'
       ),
       contentW
     );
-    ensureSpace(introLines.length * 4.5 + 4);
+    ensureSpace(introLines.length * 4 + 4);
     pdf.text(introLines, margin, y + 4);
-    y += introLines.length * 4.5 + 6;
+    y += introLines.length * 4 + 6;
 
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
+      var accentRgb = catRgb(r.trait);
+
+      var geneName = pdfSafeWinAnsi(r.gene || '');
+      var traitText = pdfSafeWinAnsi(r.trait || '');
+      var orgText = pdfSafeWinAnsi(r.organism || '');
+      var descText = r.description ? pdfSafeWinAnsi(r.description) : '';
+      var sil = r.puzzleSrc ? silhouettes[r.puzzleSrc] : null;
+      var silReserve = sil ? silW + 4 : 0;
+      var textW = cardInner - 4 - silReserve;
+      var descLines = descText ? pdf.splitTextToSize(descText, textW) : [];
+      var metaCount = 0;
+      if (r.evidenceTier) metaCount++;
+      if (r.confidence) metaCount++;
+      if (r.testedOn) metaCount++;
+      var orgLineH = orgText ? 4 : 0;
+      var cardH = 14 + orgLineH + metaCount * 4 + descLines.length * 3.6 + 6;
+      if (sil) cardH = Math.max(cardH, silW / sil.aspect + 10);
+
+      ensureSpace(Math.min(cardH, 50));
+
+      pdf.setFillColor(accentRgb[0], accentRgb[1], accentRgb[2]);
+      pdf.rect(margin, y, 1.5, Math.min(cardH, maxY - y), 'F');
+
+      pdf.setDrawColor(229, 231, 235);
+      pdf.setFillColor(255, 255, 255);
+      pdf.setLineWidth(0.2);
+      pdf.rect(margin + 1.5, y, contentW - 1.5, Math.min(cardH, maxY - y), 'FD');
+
+      if (sil) {
+        var silH = silW / sil.aspect;
+        var silX = margin + contentW - silW - 3;
+        var silY = y + 3;
+        try {
+          pdf.addImage(sil.dataUrl, 'PNG', silX, silY, silW, silH, undefined, 'FAST');
+        } catch (_es) {}
+      }
+
+      var cx = margin + cardPad + 2;
+      var cy = y + 5;
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
-      pdf.setTextColor('#1a1a2e');
-      var titleLine = pdfSafeWinAnsi(
-        r.gene + ' \u2014 ' + r.trait + ' (' + r.organism + ')'
-      );
-      var titleLines = pdf.splitTextToSize(titleLine, contentW);
-      ensureSpace(titleLines.length * 4.5 + 2);
-      pdf.text(titleLines, margin, y + 4);
-      y += titleLines.length * 4.5 + 2;
+      pdf.setTextColor(26, 26, 46);
+      pdf.text(pdf.splitTextToSize(geneName, textW)[0] || '', cx, cy);
+      cy += 4.5;
 
-      function metaBlock(label, text) {
-        if (!text) return;
+      if (orgText) {
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(8);
+        pdf.setTextColor(13, 148, 136);
+        pdf.text(pdf.splitTextToSize(orgText, textW)[0] || '', cx, cy);
+        cy += 4;
+      }
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(accentRgb[0], accentRgb[1], accentRgb[2]);
+      pdf.text(pdf.splitTextToSize(traitText, textW)[0] || '', cx, cy);
+      cy += 5;
+
+      function metaLine(lbl, val) {
+        if (!val) return;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.setTextColor(156, 163, 175);
+        pdf.text(pdfSafeWinAnsi(lbl + ':'), cx, cy);
+        var lblW = pdf.getTextWidth(pdfSafeWinAnsi(lbl + ': '));
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7);
+        pdf.setTextColor(75, 85, 99);
+        var valLines = pdf.splitTextToSize(pdfSafeWinAnsi(val), textW - lblW - 2);
+        pdf.text(valLines[0] || '', cx + lblW, cy);
+        cy += 4;
+      }
+      metaLine('Evidence', r.evidenceTier || '');
+      metaLine('Confidence', r.confidence || '');
+      metaLine('Tested on', r.testedOn || '');
+
+      if (descLines.length) {
+        cy += 1;
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(8);
-        pdf.setTextColor('#6b7280');
-        var line = pdfSafeWinAnsi(label + ': ' + text);
-        var lines = pdf.splitTextToSize(line, contentW);
-        ensureSpace(lines.length * 3.8 + 1);
-        pdf.text(lines, margin, y + 3);
-        y += lines.length * 3.8 + 1;
+        pdf.setTextColor(55, 65, 81);
+        for (var dl = 0; dl < descLines.length; dl++) {
+          if (cy + 3.6 > maxY) {
+            pdf.addPage();
+            y = margin;
+            cy = margin + 4;
+            var remainLines = descLines.length - dl;
+            var contH = Math.min(remainLines * 3.6 + 8, maxY - margin);
+            pdf.setFillColor(accentRgb[0], accentRgb[1], accentRgb[2]);
+            pdf.rect(margin, y, 1.5, contH, 'F');
+            pdf.setDrawColor(229, 231, 235);
+            pdf.setFillColor(255, 255, 255);
+            pdf.setLineWidth(0.2);
+            pdf.rect(margin + 1.5, y, contentW - 1.5, contH, 'FD');
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(8);
+            pdf.setTextColor(55, 65, 81);
+          }
+          pdf.text(descLines[dl], cx, cy);
+          cy += 3.6;
+        }
       }
-      metaBlock('Evidence tier', r.evidenceTier || '');
-      metaBlock('Confidence', r.confidence || '');
-      metaBlock('Tested on', r.testedOn || '');
 
-      if (r.description) {
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9);
-        pdf.setTextColor('#374151');
-        var descLines = pdf.splitTextToSize(pdfSafeWinAnsi(r.description), contentW);
-        ensureSpace(descLines.length * 4);
-        pdf.text(descLines, margin, y + 3);
-        y += descLines.length * 4 + 1;
-      }
-
-      y += 3;
-      pdf.setDrawColor('#e5e7eb');
-      pdf.setLineWidth(0.2);
-      ensureSpace(2);
-      pdf.line(margin, y, pageW - margin, y);
-      y += 3;
+      y = cy + 5;
     }
   }
 
@@ -548,8 +656,7 @@
    */
   function loadPuzzleRasterForPdf(puzzleSrc) {
     if (!puzzleSrc) return Promise.resolve(null);
-    var url =
-      puzzleSrc.indexOf('http') === 0 ? puzzleSrc : canonicalOrigin() + puzzleSrc;
+    var url = localAssetUrl(puzzleSrc);
     return new Promise(function (resolve) {
       var img = new Image();
       img.crossOrigin = 'anonymous';
@@ -609,16 +716,52 @@
     });
   }
 
+  function loadHumanRasterForPdf() {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function () {
+        try {
+          var maxH = 620;
+          var w = img.naturalWidth || img.width || 1;
+          var h = img.naturalHeight || img.height || 1;
+          var scale = Math.min(maxH / h, 1);
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+          var c = document.createElement('canvas');
+          c.width = cw;
+          c.height = ch;
+          var ctx = c.getContext('2d');
+          ctx.clearRect(0, 0, cw, ch);
+          ctx.drawImage(img, 0, 0, cw, ch);
+          resolve({
+            dataUrl: c.toDataURL('image/png'),
+            aspect: cw / ch,
+          });
+        } catch (_e) {
+          resolve(null);
+        }
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = localAssetUrl('/images/body_only.webp');
+    });
+  }
+
   /** Build a PNG data URL for the share QR (same generator as on-screen QR). */
-  function qrDataUrlForShare() {
+  function qrDataUrlForShare(urlOverride) {
     return new Promise(function (resolve) {
       if (typeof qrcode === 'undefined') {
         resolve('');
         return;
       }
       try {
+        var targetUrl = urlOverride || reportTargetUrl();
+        if (!targetUrl) {
+          resolve('');
+          return;
+        }
         var qr = qrcode(0, 'M');
-        qr.addData(reportTargetUrl());
+        qr.addData(targetUrl);
         qr.make();
         var tag = qr.createImgTag(4, 0);
         var div = document.createElement('div');
@@ -662,322 +805,457 @@
     var pageH = layout.pageH;
     var w = pageW - m * 2;
     var y = m;
-    var coverMaxY = pageH - m - 36;
-
-    function ensureCoverSpace(h) {
-      if (y + h > coverMaxY) {
-        pdf.addPage();
-        y = m;
-      }
-    }
 
     var name = pdfSafeWinAnsi((document.getElementById('report-share-name') || {}).value || '');
     var seed = pdfSafeWinAnsi(String((document.getElementById('report-share-seed') || {}).value || ''));
     var points = pdfSafeWinAnsi(String((document.getElementById('report-share-points') || {}).value || ''));
     var note = pdfSafeWinAnsi(characterNote());
-    var cats = pdfSafeWinAnsi((document.getElementById('report-export-categories') || {}).value || '');
-    var urlText = pdfSafeWinAnsi(
-      ((document.getElementById('report-share-url') || {}).textContent || '').trim() ||
-      reportTargetUrl()
-    );
+    var catsRaw = String((document.getElementById('report-export-categories') || {}).value || '');
+    var cats = catsRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    var urlText = pdfSafeWinAnsi(reportPdfTargetUrl());
 
-    var views = window.__reportViews || {};
+    var animalsList = [];
+    var compositionGenes = [];
+    try {
+      animalsList = JSON.parse((document.getElementById('report-export-animals-json') || {}).value || '[]');
+    } catch (_e) {
+      animalsList = [];
+    }
+    try {
+      compositionGenes = JSON.parse((document.getElementById('report-export-composition-genes-json') || {}).value || '[]');
+    } catch (_e2) {
+      compositionGenes = [];
+    }
+
     var userpic = await loadUserpicRasterForPdf();
-    var imgSize = Math.min(52, (w - 6) / 3);
+    var human = await loadHumanRasterForPdf();
+    var qrUrl = await qrDataUrlForShare(urlText);
+    var palette = {
+      'Stress Resistance': [124, 58, 237],
+      'Longevity & Genome': [14, 165, 233],
+      'Environmental Adaptation': [16, 185, 129],
+      'Regeneration': [245, 158, 11],
+      'Perception': [236, 72, 153],
+      'Expression': [99, 102, 241],
+    };
+    var bodyPos = {
+      'Expression': [0.39, 0.24],
+      'Perception': [0.61, 0.24],
+      'Longevity & Genome': [0.32, 0.50],
+      'Stress Resistance': [0.68, 0.50],
+      'Environmental Adaptation': [0.36, 0.76],
+      'Regeneration': [0.64, 0.76],
+    };
+    var countsByCat = {};
+    for (var ci = 0; ci < cats.length; ci++) countsByCat[cats[ci]] = 0;
+    for (var gi = 0; gi < compositionGenes.length; gi++) {
+      var catName = String(compositionGenes[gi].category || '');
+      if (catName) countsByCat[catName] = (countsByCat[catName] || 0) + 1;
+    }
 
+    function rgb(cat) {
+      return palette[cat] || [124, 58, 237];
+    }
+    function rounded(x, yy, ww, hh, mode, radius) {
+      var r = radius || 2.5;
+      if (pdf.roundedRect) pdf.roundedRect(x, yy, ww, hh, r, r, mode || 'S');
+      else pdf.rect(x, yy, ww, hh, mode || 'S');
+    }
+    function label(text, x, yy) {
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.8);
+      pdf.setTextColor(107, 114, 128);
+      pdf.text(pdfSafeWinAnsi(String(text || '').toUpperCase()), x, yy);
+    }
+    function card(x, yy, ww, hh, title) {
+      pdf.setDrawColor(229, 231, 235);
+      pdf.setFillColor(255, 255, 255);
+      pdf.setLineWidth(0.25);
+      rounded(x, yy, ww, hh, 'FD', 3);
+      if (title) {
+        label(title, x + 4, yy + 7);
+        pdf.setDrawColor(229, 231, 235);
+        pdf.line(x + 4, yy + 10, x + ww - 4, yy + 10);
+      }
+    }
+    function statBox(x, yy, ww, title, value, accent) {
+      var c = accent || [124, 58, 237];
+      pdf.setDrawColor(229, 231, 235);
+      pdf.setFillColor(249, 250, 251);
+      rounded(x, yy, ww, 19, 'FD', 2.5);
+      label(title, x + 3, yy + 6);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(c[0], c[1], c[2]);
+      pdf.text(pdfSafeWinAnsi(String(value || '\u2014')), x + 3, yy + 14);
+    }
+    function systemPill(cat, x, yy, ww) {
+      var c = rgb(cat);
+      pdf.setDrawColor(c[0], c[1], c[2]);
+      pdf.setFillColor(255, 255, 255);
+      rounded(x, yy, ww, 8, 'S', 4);
+      pdf.setFillColor(c[0], c[1], c[2]);
+      pdf.circle(x + 4, yy + 4, 1.3, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.6);
+      pdf.setTextColor(31, 41, 55);
+      var txt = pdfSafeWinAnsi(cat + ' (' + (countsByCat[cat] || 0) + ')');
+      pdf.text(pdf.splitTextToSize(txt, ww - 9), x + 7, yy + 4.9);
+    }
+
+    pdf.setFillColor(248, 249, 250);
+    pdf.rect(0, 0, pageW, pageH, 'F');
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(124, 58, 237);
+    pdf.text(pdfSafeWinAnsi('MATERIALIZED ENHANCEMENTS'), m, y + 4);
+    pdf.setFontSize(22);
+    pdf.setTextColor(26, 26, 46);
+    pdf.text(pdfSafeWinAnsi('Personal enhancement report'), m, y + 15);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(107, 114, 128);
+    pdf.text(pdfSafeWinAnsi('A character-sheet summary of selected enhancement systems, source organisms, and genes.'), m, y + 22);
+
+    pdf.setFillColor(243, 240, 255);
+    pdf.setDrawColor(212, 197, 249);
+    rounded(pageW - m - 42, y + 1, 42, 15, 'FD', 4);
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(109, 40, 217);
+    pdf.text(pdfSafeWinAnsi('LOADOUT #' + seed), pageW - m - 39, y + 10);
+    if (userpic) {
+      try {
+        pdf.addImage(userpic, 'PNG', pageW - m - 65, y, 18, 18);
+        pdf.setDrawColor(167, 139, 250);
+        pdf.rect(pageW - m - 65, y, 18, 18);
+      } catch (_e3) {}
+    }
+    y += 30;
+
+    var statW = (w - 8) / 3;
+    statBox(m, y, statW, 'Character', name || '\u2014', [26, 26, 46]);
+    statBox(m + statW + 4, y, statW, 'Model points', points || '\u2014', [124, 58, 237]);
+    statBox(m + (statW + 4) * 2, y, statW, 'Selected genes', String(compositionGenes.length || 0), [16, 185, 129]);
+    y += 25;
+
+    if (note) {
+      card(m, y, w, 20, 'Character note');
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(8);
+      pdf.setTextColor(55, 65, 81);
+      var noteLines = pdf.splitTextToSize(note, w - 10);
+      pdf.text(noteLines.slice(0, 3), m + 5, y + 15);
+      y += 24;
+    }
+
+    var mainY = y;
+    var bodyW = 78;
+    var mainH = 116;
+    var sideX = m + bodyW + 7;
+    var sideW = w - bodyW - 7;
+    card(m, mainY, bodyW, mainH, 'Body-map selection');
+    var bodyImgX = m + 17;
+    var bodyImgY = mainY + 16;
+    var bodyImgH = 72;
+    var bodyImgW = 40;
+    if (human && human.dataUrl) {
+      bodyImgW = Math.min(48, bodyImgH * human.aspect);
+      bodyImgX = m + (bodyW - bodyImgW) / 2;
+      try {
+        pdf.addImage(human.dataUrl, 'PNG', bodyImgX, bodyImgY, bodyImgW, bodyImgH, undefined, 'FAST');
+      } catch (_e4) {}
+    } else {
+      pdf.setDrawColor(156, 163, 175);
+      pdf.ellipse(m + bodyW / 2, bodyImgY + 8, 5, 6, 'S');
+      pdf.line(m + bodyW / 2, bodyImgY + 14, m + bodyW / 2, bodyImgY + 48);
+      pdf.line(m + bodyW / 2, bodyImgY + 23, m + bodyW / 2 - 12, bodyImgY + 34);
+      pdf.line(m + bodyW / 2, bodyImgY + 23, m + bodyW / 2 + 12, bodyImgY + 34);
+      pdf.line(m + bodyW / 2, bodyImgY + 48, m + bodyW / 2 - 10, bodyImgY + 70);
+      pdf.line(m + bodyW / 2, bodyImgY + 48, m + bodyW / 2 + 10, bodyImgY + 70);
+    }
+    for (var mc = 0; mc < cats.length; mc++) {
+      var mp = bodyPos[cats[mc]];
+      if (!mp) continue;
+      var mrgb = rgb(cats[mc]);
+      var pinX = bodyImgX + bodyImgW * mp[0];
+      var pinY = bodyImgY + bodyImgH * mp[1];
+      pdf.setFillColor(mrgb[0], mrgb[1], mrgb[2]);
+      pdf.setDrawColor(255, 255, 255);
+      pdf.circle(pinX, pinY, 3, 'FD');
+      var pinCount = countsByCat[cats[mc]] || 0;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text(String(pinCount), pinX - (pinCount >= 10 ? 1.8 : 1), pinY + 1.8);
+    }
+
+    card(sideX, mainY, sideW, mainH, 'Selected systems');
+    var pillY = mainY + 15;
+    for (var pc = 0; pc < cats.length; pc++) {
+      systemPill(cats[pc], sideX + 4, pillY, sideW - 8);
+      pillY += 9.5;
+      if (pillY > mainY + 68) break;
+    }
+    var summaryY = mainY + 78;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(26, 26, 46);
+    pdf.text(pdfSafeWinAnsi('Character build'), sideX + 4, summaryY);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.2);
+    pdf.setTextColor(55, 65, 81);
+    var summary = [
+      'Source organisms: ' + animalsList.length,
+      'Enhancement systems: ' + cats.length,
+      'Selected genes: ' + compositionGenes.length,
+    ];
+    pdf.text(pdf.splitTextToSize(pdfSafeWinAnsi(summary.join('  \u00b7  ')), sideW - 8), sideX + 4, summaryY + 6);
+    y = mainY + mainH + 7;
+
+    var orgCols = 3;
+    var orgColW = (w - 4 * (orgCols + 1)) / orgCols;
+    var orgRowH = 7.5;
+    var maxOrg = animalsList.length;
+    var orgRows = Math.ceil(maxOrg / orgCols);
+    var orgCardH = 14 + orgRows * orgRowH + 4;
+    card(m, y, w, orgCardH, 'Source organisms');
+    var orgX = m + 4;
+    var orgY = y + 15;
+    for (var oi = 0; oi < maxOrg; oi++) {
+      var an = animalsList[oi] || {};
+      var ox = orgX + (oi % orgCols) * (orgColW + 4);
+      var oy = orgY + Math.floor(oi / orgCols) * orgRowH;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.8);
+      pdf.setTextColor(26, 26, 46);
+      var orgName = String(an.common_name || an.organism || '\u2014');
+      pdf.text(pdf.splitTextToSize(pdfSafeWinAnsi(orgName), orgColW - 2)[0] || '', ox, oy);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.2);
+      pdf.setTextColor(75, 85, 99);
+      pdf.text(pdf.splitTextToSize(pdfSafeWinAnsi(an.primary_trait || '\u2014'), orgColW - 2)[0] || '', ox, oy + 3.4);
+    }
+    y += orgCardH + 7;
+
+    var geneCols = 3;
+    var geneColW = (w - 4 * (geneCols + 1)) / geneCols;
+    var geneRowH = 7;
+    var maxGenes = compositionGenes.length;
+    var geneRows = Math.ceil(maxGenes / geneCols);
+    var geneCardH = 14 + geneRows * geneRowH + 4;
+    card(m, y, w, geneCardH, 'Gene loadout');
+    for (var cgIdx = 0; cgIdx < maxGenes; cgIdx++) {
+      var cg = compositionGenes[cgIdx] || {};
+      var gx = m + 4 + (cgIdx % geneCols) * (geneColW + 4);
+      var gy = y + 15 + Math.floor(cgIdx / geneCols) * geneRowH;
+      var gc = rgb(String(cg.category || ''));
+      pdf.setFillColor(gc[0], gc[1], gc[2]);
+      pdf.circle(gx + 1.5, gy - 1.2, 1.3, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.2);
+      pdf.setTextColor(26, 26, 46);
+      var geneNameTxt = pdfSafeWinAnsi(String(cg.gene || ''));
+      pdf.text(pdf.splitTextToSize(geneNameTxt, geneColW - 6)[0] || '', gx + 4, gy);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(5.4);
+      pdf.setTextColor(75, 85, 99);
+      var traitTxt = pdfSafeWinAnsi(String(cg.category_detail || ''));
+      pdf.text(pdf.splitTextToSize(traitTxt, geneColW - 6)[0] || '', gx + 4, gy + 3);
+    }
+    y += geneCardH + 5;
+  }
+
+  async function renderShareFooterPage(pdf, layout) {
+    var m = layout.margin;
+    var pageW = layout.pageW;
+    var pageH = layout.pageH;
+    var w = pageW - m * 2;
+
+    var urlText = pdfSafeWinAnsi(reportPdfTargetUrl());
+    var qrUrl = await qrDataUrlForShare(urlText);
+
+    pdf.setFillColor(248, 249, 250);
+    pdf.rect(0, 0, pageW, pageH, 'F');
+
+    var y = m;
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.setTextColor(124, 58, 237);
     pdf.text(pdfSafeWinAnsi('MATERIALIZED ENHANCEMENTS'), m, y + 4);
     pdf.setFontSize(18);
     pdf.setTextColor(26, 26, 46);
-    pdf.text(pdfSafeWinAnsi('Character enhancement report'), m, y + 12);
-    if (userpic) {
-      try {
-        var portraitSize = 20;
-        var portraitX = pageW - m - portraitSize;
-        var portraitY = y + 1;
-        pdf.setDrawColor(167, 139, 250);
-        pdf.setLineWidth(0.35);
-        pdf.rect(portraitX - 1, portraitY - 1, portraitSize + 2, portraitSize + 2);
-        pdf.addImage(userpic, 'PNG', portraitX, portraitY, portraitSize, portraitSize);
-      } catch (_e) {}
-    }
-    y += userpic ? 26 : 16;
+    pdf.text(pdfSafeWinAnsi('Open this character'), m, y + 15);
+    y += 24;
 
-    pdf.setDrawColor(167, 139, 250);
-    pdf.setLineWidth(0.35);
+    pdf.setDrawColor(212, 197, 249);
     pdf.line(m, y, pageW - m, y);
-    y += 5;
+    y += 8;
 
-    pdf.setFont('courier', 'bold');
-    pdf.setFontSize(10);
+    var qrSize = 50;
+    if (qrUrl) {
+      try {
+        var qrX = (pageW - qrSize) / 2;
+        pdf.addImage(qrUrl, 'PNG', qrX, y, qrSize, qrSize);
+        y += qrSize + 8;
+      } catch (_e5) {
+        y += 4;
+      }
+    }
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(55, 65, 81);
+    pdf.text(pdfSafeWinAnsi('Scan the QR code or visit the link below to open this character:'), m, y);
+    y += 8;
+
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(7.5);
     pdf.setTextColor(124, 58, 237);
-    var stamp = pdfSafeWinAnsi('LOADOUT #' + seed);
-    pdf.text(stamp, pageW - m - pdf.getTextWidth(stamp), y);
-    y += 6;
+    var urlLines = pdf.splitTextToSize(urlText || pdfSafeWinAnsi('Create a public link from the app to publish this report.'), w);
+    pdf.text(urlLines, m, y);
+    y += urlLines.length * 4 + 12;
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
-    pdf.setTextColor(156, 163, 175);
-    pdf.text(pdfSafeWinAnsi('CHARACTER'), m, y);
-    pdf.text(pdfSafeWinAnsi('SEED'), m + 58, y);
-    pdf.text(pdfSafeWinAnsi('POINTS'), m + 108, y);
-    y += 4;
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(26, 26, 46);
-    pdf.text(name, m, y);
-    pdf.setFont('courier', 'bold');
-    pdf.setTextColor(124, 58, 237);
-    pdf.text(seed, m + 58, y);
-    pdf.setTextColor(26, 26, 46);
-    pdf.text(points, m + 108, y);
-    y += 8;
+    pdf.setTextColor(107, 114, 128);
+    pdf.text(pdfSafeWinAnsi('materialized-enhancements  \u00b7  GlucoseDAO  \u00b7  Longevity Genie'), pageW - m - 70, pageH - 7);
+  }
 
-    if (note) {
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7);
-      pdf.setTextColor(107, 114, 128);
-      pdf.text(pdfSafeWinAnsi('CHARACTER NOTE'), m, y);
-      y += 4;
-      pdf.setFont('helvetica', 'italic');
-      pdf.setFontSize(8.2);
-      pdf.setTextColor(55, 65, 81);
-      var noteLines = pdf.splitTextToSize(note, w);
-      pdf.text(noteLines, m, y + 3);
-      y += noteLines.length * 3.7 + 5;
-    }
+  function renderModelViewsPage(pdf, layout) {
+    var m = layout.margin;
+    var pageW = layout.pageW;
+    var pageH = layout.pageH;
+    var w = pageW - m * 2;
+    var v = window.__reportViews;
+    if (!v || (!v.front && !v.side && !v.back)) return false;
 
-    var vx = m;
-    var labels = ['FRONT', 'SIDE', 'BACK'];
-    var keys = ['front', 'side', 'back'];
-    for (var vi = 0; vi < 3; vi++) {
-      var src = views[keys[vi]];
-      var bx = vx + vi * (imgSize + 3);
-      pdf.setDrawColor(124, 58, 237);
-      pdf.setLineWidth(0.15);
-      pdf.rect(bx, y, imgSize, imgSize);
-      if (src && src.length > 100) {
-        try {
-          pdf.addImage(src, 'PNG', bx, y, imgSize, imgSize, undefined, 'FAST');
-        } catch (_e) {
-          pdf.setFont('helvetica', 'italic');
-          pdf.setFontSize(7);
-          pdf.setTextColor(156, 163, 175);
-          pdf.text('(view)', bx + 2, y + imgSize / 2);
-        }
-      } else {
-        pdf.setFont('helvetica', 'italic');
-        pdf.setFontSize(7);
-        pdf.setTextColor(156, 163, 175);
-        pdf.text('(view)', bx + 2, y + imgSize / 2);
-      }
-      pdf.setFont('courier', 'bold');
-      pdf.setFontSize(6);
-      pdf.setTextColor(196, 181, 253);
-      pdf.text(labels[vi], bx + 2, y + imgSize - 1);
-    }
-    y += imgSize + 6;
+    pdf.setFillColor(248, 249, 250);
+    pdf.rect(0, 0, pageW, pageH, 'F');
 
+    var y = m;
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
-    pdf.setTextColor(107, 114, 128);
-    pdf.text(pdfSafeWinAnsi('ENHANCEMENT CATEGORIES'), m, y);
-    y += 4;
+    pdf.setTextColor(124, 58, 237);
+    pdf.text(pdfSafeWinAnsi('MATERIALIZED ENHANCEMENTS'), m, y + 4);
+    pdf.setFontSize(18);
+    pdf.setTextColor(26, 26, 46);
+    pdf.text(pdfSafeWinAnsi('Printable 3D model'), m, y + 15);
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    pdf.setTextColor(124, 58, 237);
-    var catLines = pdf.splitTextToSize(pdfSafeWinAnsi(cats || '\u2014'), w);
-    pdf.text(catLines, m, y + 3);
-    y += catLines.length * 3.6 + 4;
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8);
+    pdf.setFontSize(8.5);
     pdf.setTextColor(107, 114, 128);
-    pdf.text(pdfSafeWinAnsi('SOURCE ORGANISMS'), m, y);
-    y += 4;
+    pdf.text(pdfSafeWinAnsi('Three views of the parametric sculpture shaped by your gene selection.'), m, y + 22);
+    y += 30;
 
-    var animalsList = [];
-    try {
-      var jsonRaw = (document.getElementById('report-export-animals-json') || {}).value || '[]';
-      animalsList = JSON.parse(jsonRaw);
-    } catch (_e) {
-      animalsList = [];
-    }
+    var viewW = (w - 8) / 3;
+    var viewH = viewW * 1.2;
+    var labels = ['Front', 'Side', 'Back'];
+    var sources = [v.front, v.side, v.back];
+    for (var vi = 0; vi < 3; vi++) {
+      var vx = m + vi * (viewW + 4);
+      pdf.setDrawColor(229, 231, 235);
+      pdf.setFillColor(255, 255, 255);
+      pdf.setLineWidth(0.25);
+      if (pdf.roundedRect) pdf.roundedRect(vx, y, viewW, viewH + 12, 3, 3, 'FD');
+      else pdf.rect(vx, y, viewW, viewH + 12, 'FD');
 
-    /* Three columns; compact primary trait only (full list is in gene appendix). */
-    var colCount = 3;
-    var colGap = 2.8;
-    var colW = (w - colGap * (colCount - 1)) / colCount;
-    var boxMm = Math.min(14, Math.max(8, imgSize * 0.16));
-
-    function cellMetrics(an, thumb) {
-      var orgName = pdfSafeWinAnsi(String(an.organism || ''));
-      var traitsArr = an.traits || [];
-      var oneTrait =
-        an.primary_trait ||
-        (traitsArr.length ? traitsArr[0] : '') ||
-        '\u2014';
-      var traitsStr = pdfSafeWinAnsi(oneTrait);
-      var textX = boxMm + 2.5;
-      var textW = colW - textX - 1;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(26, 26, 46);
-      var titleLines = pdf.splitTextToSize(orgName, textW);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(6.5);
-      pdf.setTextColor(55, 65, 81);
-      var traitLines = pdf.splitTextToSize(pdfSafeWinAnsi('Trait: ') + traitsStr, textW);
-      var textBlockH = titleLines.length * 3.6 + traitLines.length * 3;
-      var drawW = boxMm;
-      var drawH = boxMm;
-      if (thumb && thumb.aspect) {
-        var ar = thumb.aspect;
-        if (ar >= 1) drawH = boxMm / ar;
-        else drawW = boxMm * ar;
-      }
-      var h = Math.max(textBlockH, thumb ? drawH : 0, 9);
-      return {
-        titleLines: titleLines,
-        traitLines: traitLines,
-        textX: textX,
-        drawW: drawW,
-        drawH: drawH,
-        h: h,
-      };
-    }
-
-    function drawCell(x0, y0, thumb, met) {
-      if (thumb && thumb.dataUrl) {
+      if (sources[vi]) {
         try {
-          pdf.addImage(thumb.dataUrl, 'PNG', x0, y0, met.drawW, met.drawH);
-        } catch (_e) {}
-      }
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(26, 26, 46);
-      pdf.text(met.titleLines, x0 + met.textX, y0 + 3.5);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(6.5);
-      pdf.setTextColor(55, 65, 81);
-      pdf.text(met.traitLines, x0 + met.textX, y0 + 3.5 + met.titleLines.length * 3.6);
-    }
-
-    for (var ai = 0; ai < animalsList.length; ai += colCount) {
-      var thumbs = [];
-      var mets = [];
-      var rowH = 0;
-      for (var c = 0; c < colCount; c++) {
-        var idx = ai + c;
-        if (idx >= animalsList.length) break;
-        var an = animalsList[idx];
-        var th = await loadPuzzleRasterForPdf(an.puzzle_src || '');
-        var met = cellMetrics(an, th);
-        thumbs.push(th);
-        mets.push(met);
-        rowH = Math.max(rowH, met.h);
+          pdf.addImage(sources[vi], 'PNG', vx + 2, y + 2, viewW - 4, viewH - 4, undefined, 'FAST');
+        } catch (_ev) {}
+      } else {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(156, 163, 175);
+        pdf.text('No view', vx + viewW / 2 - 6, y + viewH / 2);
       }
 
-      if (y + rowH > pageH - m - 36) {
-        pdf.addPage();
-        y = m;
-      }
-
-      var yRow = y;
-      for (var c2 = 0; c2 < mets.length; c2++) {
-        var x0 = m + c2 * (colW + colGap);
-        drawCell(x0, yRow, thumbs[c2], mets[c2]);
-      }
-      y = yRow + rowH + 2.5;
-    }
-
-    if (!animalsList.length) {
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(55, 65, 81);
-      var animFallback = pdf.splitTextToSize(
-        pdfSafeWinAnsi((document.getElementById('report-export-animals') || {}).value || '\u2014'),
-        w
-      );
-      pdf.text(animFallback, m, y + 3);
-      y += animFallback.length * 3.2 + 4;
-    }
-
-    var compositionGenes = [];
-    try {
-      var cgRaw = (document.getElementById('report-export-composition-genes-json') || {}).value || '[]';
-      compositionGenes = JSON.parse(cgRaw);
-    } catch (_e) {
-      compositionGenes = [];
-    }
-
-    if (compositionGenes.length) {
-      ensureCoverSpace(10);
-      y += 4;
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
-      pdf.setTextColor(107, 114, 128);
-      pdf.text(pdfSafeWinAnsi('GENES IN COMPOSITION'), m, y);
-      y += 4;
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7.2);
-      pdf.setTextColor(55, 65, 81);
-      for (var gi = 0; gi < compositionGenes.length; gi++) {
-        var cg = compositionGenes[gi];
-        var gLine =
-          String(cg.gene || '') +
-          ' \u2014 ' +
-          String(cg.category_detail || '') +
-          (cg.source_organism ? ' (' + String(cg.source_organism) + ')' : '');
-        var gLines = pdf.splitTextToSize(pdfSafeWinAnsi(gLine), w);
-        ensureCoverSpace(gLines.length * 3.1 + 1);
-        pdf.text(gLines, m, y + 3);
-        y += gLines.length * 3.1 + 0.4;
-      }
-      y += 2;
+      pdf.setTextColor(26, 26, 46);
+      pdf.text(labels[vi], vx + viewW / 2 - pdf.getTextWidth(labels[vi]) / 2, y + viewH + 6);
     }
+    y += viewH + 20;
 
-    /* Footer after organisms + composition summary (full narratives: appendix pages). */
-    y += 6;
-    var urlLines = pdf.splitTextToSize(urlText, w - 26);
-    var footerH = 22 + Math.max(18, urlLines.length * 3.2);
-    if (y + footerH > pageH - m) {
-      pdf.addPage();
-      y = m;
-    }
+    var name = pdfSafeWinAnsi((document.getElementById('report-share-name') || {}).value || '');
+    var points = pdfSafeWinAnsi(String((document.getElementById('report-share-points') || {}).value || ''));
+    var catsRaw = String((document.getElementById('report-export-categories') || {}).value || '');
+    var cats = catsRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
 
-    var qrUrl = await qrDataUrlForShare();
-    var fy = y;
-    if (qrUrl) {
-      try {
-        pdf.addImage(qrUrl, 'PNG', m, fy, 22, 22);
-      } catch (_e) {}
-    }
+    pdf.setDrawColor(229, 231, 235);
+    pdf.setFillColor(255, 255, 255);
+    pdf.setLineWidth(0.25);
+    var storyH = 72;
+    if (pdf.roundedRect) pdf.roundedRect(m, y, w, storyH, 3, 3, 'FD');
+    else pdf.rect(m, y, w, storyH, 'FD');
+
+    var sx = m + 6;
+    var sy = y + 8;
+
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(9);
-    pdf.setTextColor(124, 58, 237);
-    pdf.text(pdfSafeWinAnsi('materialized-enhancements'), m + 26, fy + 7);
+    pdf.setFontSize(11);
+    pdf.setTextColor(26, 26, 46);
+    pdf.text(pdfSafeWinAnsi('How this 3D model was generated'), sx, sy);
+    sy += 7;
+
     pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(55, 65, 81);
+    var storyText = pdfSafeWinAnsi(
+      'The app takes the selected genes with measured biophysical data and turns them into a ' +
+      'Voronoi-based printable shape. Your name and category choices make the seed, so the same ' +
+      'choices always recreate the same object.'
+    );
+    var storyLines = pdf.splitTextToSize(storyText, w - 12);
+    pdf.text(storyLines, sx, sy);
+    sy += storyLines.length * 4 + 5;
+
+    pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(7.5);
     pdf.setTextColor(107, 114, 128);
-    pdf.text(pdfSafeWinAnsi('GlucoseDAO \u00b7 Longevity Genie'), m + 26, fy + 13);
-    pdf.setFont('courier', 'normal');
-    pdf.setFontSize(6.5);
+    pdf.text(pdfSafeWinAnsi('Inputs:'), sx, sy);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(pdfSafeWinAnsi(' protein mass, exon count, biological system size, GRAVY score, disorder, pI, name, and categories.'), sx + pdf.getTextWidth('Inputs: '), sy);
+    sy += 5;
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(124, 58, 237);
+    pdf.text(pdfSafeWinAnsi('Outputs:'), sx, sy);
+    pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(107, 114, 128);
-    pdf.text(urlLines, m + 26, fy + 19);
+    pdf.text(pdfSafeWinAnsi(' seed, radius, layer spacing, Voronoi points, surface extrusion, and print-safe scale.'), sx + pdf.getTextWidth('Outputs: '), sy);
+    sy += 7;
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(26, 26, 46);
+    pdf.text(pdfSafeWinAnsi('Character: ' + (name || '—')), sx, sy);
+    pdf.text(pdfSafeWinAnsi('Model points: ' + (points || '—')), sx + 50, sy);
+    pdf.text(pdfSafeWinAnsi('Enhancement systems: ' + cats.length), sx + 100, sy);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(107, 114, 128);
+    pdf.text(pdfSafeWinAnsi('materialized-enhancements  ·  GlucoseDAO  ·  Longevity Genie'), pageW - m - 70, pageH - 7);
+    return true;
   }
 
   async function buildReportPdf() {
     var pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
     var layout = { pageW: 210, pageH: 297, margin: 15 };
     await renderCoverPageA4(pdf, layout);
+    if (window.__reportViews && (window.__reportViews.front || window.__reportViews.side || window.__reportViews.back)) {
+      pdf.addPage();
+      renderModelViewsPage(pdf, layout);
+    }
     var rows = readGeneRows();
     if (rows.length) {
       pdf.addPage();
-      renderGenePages(pdf, rows, layout);
+      await renderGenePages(pdf, rows, layout);
     }
+    pdf.addPage();
+    await renderShareFooterPage(pdf, layout);
     return pdf;
   }
 
@@ -997,7 +1275,7 @@
     if (!root) return false;
     root.innerHTML = '';
     root.setAttribute('data-pdf-rendered', '0');
-    var targetWidth = Math.max(320, Math.min(860, root.clientWidth - 44));
+    var targetWidth = Math.max(320, root.clientWidth - 36);
     for (var pageNo = 1; pageNo <= pdfDoc.numPages; pageNo++) {
       var page = await pdfDoc.getPage(pageNo);
       var unitViewport = page.getViewport({ scale: 1 });
@@ -1008,7 +1286,7 @@
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
       canvas.style.cssText =
-        'display:block;width:100%;max-width:' + Math.ceil(viewport.width) + 'px;height:auto;' +
+        'display:block;width:100%;height:auto;' +
         'margin:0 auto ' + (pageNo === pdfDoc.numPages ? '0' : '18px') + ' auto;' +
         'background:#ffffff;border-radius:6px;box-shadow:0 12px 30px rgba(15,23,42,0.24);';
       root.appendChild(canvas);
@@ -1049,9 +1327,33 @@
     }
   };
 
+  async function waitPdfViewerMounted(timeoutMs) {
+    var deadline = Date.now() + (timeoutMs || 6000);
+    while (!document.getElementById('me-report-pdf-viewer') && Date.now() < deadline) {
+      await new Promise(function (r) { setTimeout(r, 100); });
+    }
+    if (!document.getElementById('me-report-pdf-viewer')) {
+      throw new Error('PDF preview area is not mounted.');
+    }
+  }
+
+  window.__meRenderActiveReportPdfInPage = async function () {
+    try {
+      await waitPdfViewerMounted(6000);
+      if (window.__meUsePublishedPdfInPage && await window.__meUsePublishedPdfInPage()) return;
+      if (window.__meRenderPdfInPage) await window.__meRenderPdfInPage();
+    } catch (err) {
+      console.error('[materialized] automatic PDF render failed', err);
+      pdfFeedback('PDF render failed: ' + (err && err.message ? err.message : 'see console'), '#b91c1c');
+    }
+  };
+
   window.__meRenderPdfInPage = async function () {
+    if (window.__mePdfRendering) { console.info('[materialized] __meRenderPdfInPage skipped (already rendering)'); return; }
+    window.__mePdfRendering = true;
     console.info('[materialized] __meRenderPdfInPage called');
     if (typeof jspdf === 'undefined') {
+      window.__mePdfRendering = false;
       pdfFeedback('jsPDF library not loaded. Reload the page.', '#b91c1c');
       missingLib('jsPDF');
       return;
@@ -1073,6 +1375,7 @@
       console.error('[materialized] inline PDF render failed', err);
       pdfFeedback('PDF render failed: ' + (err && err.message ? err.message : 'see console'), '#b91c1c');
     } finally {
+      window.__mePdfRendering = false;
       startObserver();
     }
   };
@@ -1138,7 +1441,7 @@
     if (typeof htmlToImage === 'undefined') {
       return JSON.stringify({ error: 'html-to-image library not loaded.' });
     }
-    window.__mePendingPublishedReportUrl = browserAbsoluteUrl(publishedUrlOverride);
+    window.__mePendingPublishedReportUrl = canonicalAbsoluteUrl(publishedUrlOverride);
     stopObserver();
     try {
       await waitReportMounted(timeoutMs);
@@ -1166,7 +1469,7 @@
   window.__meCopyShareLink = async function () {
     var url = reportTargetUrl();
     if (!url) {
-      feedback('Generate a sharable folder first.', '#b45309');
+      feedback('Create a public link first.', '#b45309');
       return;
     }
     try {
@@ -1185,7 +1488,7 @@
   window.__meShareIntent = function (network) {
     var rawUrl = reportTargetUrl();
     if (!rawUrl) {
-      feedback('Generate a sharable folder first.', '#b45309');
+      feedback('Create a public link first.', '#b45309');
       return;
     }
     var url = encodeURIComponent(rawUrl);

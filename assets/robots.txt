@@ -4,5 +4,5 @@ Allow: /llms.txt
 Disallow: /_event/
 Disallow: /ping
 
-Sitemap: https://materialized-enhancements.longevity-genie.info/sitemap.xml
-# LLM-readable overview: https://materialized-enhancements.longevity-genie.info/llms.txt
+Sitemap: https://enhancement.bio/sitemap.xml
+# LLM-readable overview: https://enhancement.bio/llms.txt

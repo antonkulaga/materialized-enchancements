@@ -12,6 +12,13 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 
+def _terminal_hyperlink(url: str) -> str:
+    """Return an OSC 8 hyperlink for terminals that support clickable links."""
+    if not sys.stdout.isatty():
+        return url
+    return f"\033]8;;{url}\033\\{url}\033]8;;\033\\"
+
+
 def _setup() -> None:
     """Load .env and ensure cwd is the project root (where rxconfig.py lives)."""
     root = Path(__file__).resolve().parents[2]
@@ -104,7 +111,7 @@ def _build_preselect_url(
     print(f"Pre-selected {len(selected_genes)} genes across {len(selected_cats)} categories")
     print(f"Budget: {DEFAULT_BUDGET - budget}/{DEFAULT_BUDGET} cr spent")
     print(f"Genes: {', '.join(selected_genes)}")
-    print(f"URL: {url}")
+    print(f"URL: {_terminal_hyperlink(url)}")
     return url
 
 

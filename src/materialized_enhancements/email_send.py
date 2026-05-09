@@ -140,7 +140,7 @@ def send_email_via_resend(
         "Authorization": f"Bearer {RESEND_API_KEY}",
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "User-Agent": "materialized-enhancements/0.2 (+https://longevity-genie.info)",
+        "User-Agent": "materialized-enhancements/0.2 (+https://enhancement.bio)",
     }
     req = urllib.request.Request(RESEND_API_URL, data=body, headers=headers, method="POST")
     logger.info(

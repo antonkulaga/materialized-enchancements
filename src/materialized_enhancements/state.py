@@ -50,7 +50,6 @@ from materialized_enhancements.env import (
     ARTEX_API_TOKEN,
     ARTEX_API_URL,
     ARTEX_DISPLAY_ID,
-    GENERATED_URL_PREFIX,
     RESEND_API_KEY,
     REPO_ROOT,
     ensure_generated_public_dirs,
@@ -1004,10 +1003,8 @@ class ComposeState(rx.State):
         self.materialization_artifact_tab = "report"
         yield rx.call_script(
             "setTimeout(function(){ "
-            "(async function(){ "
-            "if (window.__meUsePublishedPdfInPage && await window.__meUsePublishedPdfInPage()) return; "
-            "if (window.__meRenderPdfInPage) await window.__meRenderPdfInPage(); "
-            "})(); "
+            "if (window.__meRenderActiveReportPdfInPage) window.__meRenderActiveReportPdfInPage(); "
+            "else if (window.__meRenderPdfInPage) window.__meRenderPdfInPage(); "
             "}, 0)"
         )
 
@@ -1222,7 +1219,7 @@ class ComposeState(rx.State):
         tag = self.personal_tag.strip() or "anonymous"
         seed = self.sculpture_params.get("seed", self.param_seed)
         slug = _safe_report_slug(tag, seed)
-        public_path = f"{GENERATED_URL_PREFIX}/reports/{quote(slug)}/index.html"
+        public_path = generated_public_url(f"reports/{slug}/index.html")
         self.report_publish_error = ""
         self.report_publishing = True
         self.report_expanded = True
@@ -1296,7 +1293,7 @@ class ComposeState(rx.State):
         relative_png = f"{rel_dir}/report.png"
         relative_pdf = f"{rel_dir}/report.pdf"
 
-        public_url = str(data.get("share_url", "")).strip() or generated_public_url(f"{rel_dir}/index.html")
+        public_url = generated_public_url(f"{rel_dir}/index.html")
         model_url = generated_public_url(relative_model)
         params_url = generated_public_url(relative_params)
         png_url = generated_public_url(relative_png)
@@ -1724,10 +1721,10 @@ class ComposeState(rx.State):
 
     @rx.var
     def share_url(self) -> str:
-        """Build a URL-encoded shareable link that recreates this exact sculpture.
+        """Build a URL-encoded shareable link that recreates this exact selection.
 
         Uses the same 1-indexed category bitmask convention as sculpture._build_category_bitmask
-        so recipients regenerate the deterministic identical piece on page load.
+        plus an optional encoded gene list so recipients regenerate the same checked genes.
         """
         if not self.selected_categories or not self.personal_tag.strip():
             return ""
@@ -1737,7 +1734,12 @@ class ComposeState(rx.State):
             if cat in UNIQUE_CATEGORIES:
                 idx = UNIQUE_CATEGORIES.index(cat) + 1
                 bitmask |= 1 << (idx - 1)
-        return f"{public_app_url()}/materialization?report=1&name={quote(name_b64)}&cats={bitmask}"
+        url = f"{public_app_url()}/materialization?report=1&name={quote(name_b64)}&cats={bitmask}"
+        if self.included_genes:
+            genes_json = json.dumps(self.included_genes, separators=(",", ":"))
+            genes_b64 = base64.urlsafe_b64encode(genes_json.encode("utf-8")).decode("ascii").rstrip("=")
+            url = f"{url}&genes={quote(genes_b64)}"
+        return url
 
     def apply_saved_report(self) -> None:
         """Load a generated report bundle from ?shared_report=<slug>."""
@@ -1796,7 +1798,7 @@ class ComposeState(rx.State):
         self.report_expanded = True
         self.materialization_artifact_tab = "model"
         self.report_public_slug = slug
-        self.report_public_url = f"{public_app_url()}/materialization?shared_report={quote(slug)}"
+        self.report_public_url = generated_public_url(f"{rel_dir}/index.html")
         self.report_model_url = generated_public_url(f"{rel_dir}/model.stl")
         self.report_png_url = generated_public_url(f"{rel_dir}/report.png")
         self.report_pdf_url = generated_public_url(f"{rel_dir}/report.pdf")
