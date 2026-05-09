@@ -22,7 +22,6 @@ from materialized_enhancements.gene_data import (
     DEFAULT_BUDGET,
     GENE_LIBRARY,
     GENE_PRICES,
-    GENE_SPECIES_MAP,
     SPECIES_GENE_IDS,
     SPECIES_LOOKUP,
     UNIQUE_CATEGORIES,
@@ -364,6 +363,11 @@ _TAB_ROUTE_MAP: dict[str, str] = {
 def _has_artex_integration_settings(api_url: str, api_token: str, display_id: str) -> bool:
     """Return true only when enough ARTEX settings exist to publish to a wall."""
     return bool(api_url.strip() and api_token.strip() and display_id.strip())
+
+
+def _has_artex_ui_context(from_kiosk: bool) -> bool:
+    """Show wall controls only in an ARTEX launch context."""
+    return from_kiosk
 
 
 def _html_escape(value: object) -> str:
@@ -721,6 +725,7 @@ class ComposeState(rx.State):
     choice_expanded: bool = True
     sculpture_expanded: bool = False
     viewer_expanded: bool = True
+    materialization_artifact_tab: str = "model"
     stl_base64: str = ""
     viewer_nonce: int = 0
 
@@ -939,8 +944,10 @@ class ComposeState(rx.State):
             self.report_pdf_url = ""
             self.report_params_url = ""
             self.viewer_expanded = True
+            self.materialization_artifact_tab = "model"
+            redirect_url = "/materialization?from=ARTEX" if self.artex_from_kiosk else "/materialization"
 
-        yield rx.redirect("/materialization")
+        yield rx.redirect(redirect_url)
 
         try:
             loop = asyncio.get_event_loop()
@@ -975,6 +982,7 @@ class ComposeState(rx.State):
             self.sculpture_expanded = False
             self.viewer_expanded = True
             self.report_expanded = True
+            self.materialization_artifact_tab = "model"
 
     def toggle_choice_expanded(self) -> None:
         self.choice_expanded = not self.choice_expanded
@@ -987,6 +995,24 @@ class ComposeState(rx.State):
 
     def toggle_report_expanded(self) -> None:
         self.report_expanded = not self.report_expanded
+
+    def show_model_artifact_tab(self) -> None:
+        self.materialization_artifact_tab = "model"
+
+    def show_report_artifact_tab(self):  # type: ignore[return]
+        self.materialization_artifact_tab = "report"
+        yield rx.call_script(
+            "setTimeout(function(){ "
+            "if (window.__meRenderActiveReportPdfInPage) window.__meRenderActiveReportPdfInPage(); "
+            "else if (window.__meRenderPdfInPage) window.__meRenderPdfInPage(); "
+            "}, 0)"
+        )
+
+    def show_jigsaw_artifact_tab(self) -> None:
+        self.materialization_artifact_tab = "jigsaw"
+
+    def show_support_artifact_tab(self) -> None:
+        self.materialization_artifact_tab = "support"
 
     def set_report_views_ready(self, ready: bool) -> None:
         self.report_views_ready = bool(ready)
@@ -1006,8 +1032,7 @@ class ComposeState(rx.State):
     def apply_artex_params(self) -> None:
         """Read ?from=ARTEX, ?token=, ?display_id=, ?redirect= from the URL on page load."""
         params = self.router.url.query_parameters
-        if str(params.get("from", "")).strip() == "ARTEX":
-            self.artex_from_kiosk = True
+        self.artex_from_kiosk = str(params.get("from", "")).strip() == "ARTEX"
         token = str(params.get("token", "")).strip()
         if token:
             self.artex_api_token = token
@@ -1088,11 +1113,14 @@ class ComposeState(rx.State):
 
     @rx.var
     def artex_section_visible(self) -> bool:
-        """Show ARTEX UI only when wall-publish settings are configured."""
-        return _has_artex_integration_settings(
-            self.artex_api_url,
-            self.artex_api_token,
-            self.artex_display_id,
+        """Show ARTEX UI only when wall publishing is available in this context."""
+        return (
+            _has_artex_ui_context(self.artex_from_kiosk)
+            and _has_artex_integration_settings(
+                self.artex_api_url,
+                self.artex_api_token,
+                self.artex_display_id,
+            )
         )
 
     def download_artifacts(self):  # type: ignore[return]
@@ -1191,7 +1219,7 @@ class ComposeState(rx.State):
         tag = self.personal_tag.strip() or "anonymous"
         seed = self.sculpture_params.get("seed", self.param_seed)
         slug = _safe_report_slug(tag, seed)
-        public_path = f"/materialization?shared_report={quote(slug)}"
+        public_path = generated_public_url(f"reports/{slug}/index.html")
         self.report_publish_error = ""
         self.report_publishing = True
         self.report_expanded = True
@@ -1265,7 +1293,7 @@ class ComposeState(rx.State):
         relative_png = f"{rel_dir}/report.png"
         relative_pdf = f"{rel_dir}/report.pdf"
 
-        public_url = str(data.get("share_url", "")).strip() or f"{public_app_url()}/materialization?shared_report={quote(slug)}"
+        public_url = generated_public_url(f"{rel_dir}/index.html")
         model_url = generated_public_url(relative_model)
         params_url = generated_public_url(relative_params)
         png_url = generated_public_url(relative_png)
@@ -1323,6 +1351,11 @@ class ComposeState(rx.State):
         self.report_png_url = png_url
         self.report_pdf_url = pdf_url
         self.report_params_url = params_url
+        yield rx.call_script(
+            "setTimeout(function(){ "
+            "if (window.__meUsePublishedPdfInPage) window.__meUsePublishedPdfInPage(); "
+            "}, 0)"
+        )
         yield rx.toast.success("Generated report links are ready.")
 
     def set_recipient_email(self, value: str) -> None:
@@ -1688,10 +1721,10 @@ class ComposeState(rx.State):
 
     @rx.var
     def share_url(self) -> str:
-        """Build a URL-encoded shareable link that recreates this exact sculpture.
+        """Build a URL-encoded shareable link that recreates this exact selection.
 
         Uses the same 1-indexed category bitmask convention as sculpture._build_category_bitmask
-        so recipients regenerate the deterministic identical piece on page load.
+        plus an optional encoded gene list so recipients regenerate the same checked genes.
         """
         if not self.selected_categories or not self.personal_tag.strip():
             return ""
@@ -1701,7 +1734,12 @@ class ComposeState(rx.State):
             if cat in UNIQUE_CATEGORIES:
                 idx = UNIQUE_CATEGORIES.index(cat) + 1
                 bitmask |= 1 << (idx - 1)
-        return f"{public_app_url()}/materialization?report=1&name={quote(name_b64)}&cats={bitmask}"
+        url = f"{public_app_url()}/materialization?report=1&name={quote(name_b64)}&cats={bitmask}"
+        if self.included_genes:
+            genes_json = json.dumps(self.included_genes, separators=(",", ":"))
+            genes_b64 = base64.urlsafe_b64encode(genes_json.encode("utf-8")).decode("ascii").rstrip("=")
+            url = f"{url}&genes={quote(genes_b64)}"
+        return url
 
     def apply_saved_report(self) -> None:
         """Load a generated report bundle from ?shared_report=<slug>."""
@@ -1758,8 +1796,9 @@ class ComposeState(rx.State):
         self.sculpture_expanded = False
         self.viewer_expanded = True
         self.report_expanded = True
+        self.materialization_artifact_tab = "model"
         self.report_public_slug = slug
-        self.report_public_url = f"{public_app_url()}/materialization?shared_report={quote(slug)}"
+        self.report_public_url = generated_public_url(f"{rel_dir}/index.html")
         self.report_model_url = generated_public_url(f"{rel_dir}/model.stl")
         self.report_png_url = generated_public_url(f"{rel_dir}/report.png")
         self.report_pdf_url = generated_public_url(f"{rel_dir}/report.pdf")
@@ -1798,9 +1837,30 @@ class ComposeState(rx.State):
         if not cats or not tag:
             return
 
+        selected_genes: list[str] = []
+        genes_b64 = str(params.get("genes", ""))
+        if genes_b64:
+            genes_padding = "=" * (-len(genes_b64) % 4)
+            try:
+                genes_payload = json.loads(
+                    base64.urlsafe_b64decode(genes_b64 + genes_padding).decode("utf-8")
+                )
+            except (binascii.Error, ValueError, UnicodeDecodeError, TypeError):
+                logger.warning("apply_shared_report: invalid genes param")
+            else:
+                valid_genes = {
+                    g["gene"] for g in GENE_LIBRARY
+                    if g["category"] in cats
+                }
+                if isinstance(genes_payload, list):
+                    selected_genes = [
+                        str(gene) for gene in genes_payload
+                        if str(gene) in valid_genes
+                    ]
+
         self.personal_tag = tag
         self.selected_categories = cats
-        self.included_genes = [
+        self.included_genes = selected_genes or [
             g["gene"] for g in GENE_LIBRARY if g["category"] in cats
         ]
         self._recompute_params()
@@ -2357,8 +2417,7 @@ class JigsawState(rx.State):
     def apply_artex_params(self) -> None:
         """Read ?from=ARTEX, ?token=, ?display_id=, ?redirect= from the URL on page load."""
         params = self.router.url.query_parameters
-        if str(params.get("from", "")).strip() == "ARTEX":
-            self.artex_from_kiosk = True
+        self.artex_from_kiosk = str(params.get("from", "")).strip() == "ARTEX"
         token = str(params.get("token", "")).strip()
         if token:
             self.artex_api_token = token
@@ -2441,11 +2500,14 @@ class JigsawState(rx.State):
 
     @rx.var
     def artex_section_visible(self) -> bool:
-        """Show ARTEX UI only when wall-publish settings are configured."""
-        return _has_artex_integration_settings(
-            self.artex_api_url,
-            self.artex_api_token,
-            self.artex_display_id,
+        """Show ARTEX UI only when wall publishing is available in this context."""
+        return (
+            _has_artex_ui_context(self.artex_from_kiosk)
+            and _has_artex_integration_settings(
+                self.artex_api_url,
+                self.artex_api_token,
+                self.artex_display_id,
+            )
         )
 
     @rx.var

@@ -15,7 +15,6 @@ materialized-enhancements/          ← repo root
 ├── data/
 │   ├── input/
 │   │   ├── gene_library.csv        ← canonical gene data (source of truth)
-│   │   ├── gene_confidence.csv     ← per-gene confidence assessments (1:N, value + argument + description)
 │   │   └── puzzle/                 ← SVG puzzle pieces, one per source organism
 │   │       ├── human_base.svg      ← base human silhouette
 │   │       ├── 1_tardigrade.svg
@@ -46,13 +45,12 @@ uv run start        # starts Reflex dev server (http://localhost:3000)
 
 ## Data Model
 
-### Normalized gene data model
+### Three-table gene/species model
 
-Gene data is split across multiple CSVs (treated like database tables, loaded with Polars):
-- `gene_library.csv` — gene metadata (no organism column, no confidence column; these are resolved via joins)
+Gene data is split across three CSVs:
+- `gene_library.csv` — gene metadata (no organism column; species resolved via join)
 - `species.csv` — species lookup (species_id → common_name, scientific_name, taxonomy, life-history)
 - `gene_species.csv` — many-to-many join (gene_id → species_id; multi-species genes have multiple rows)
-- `gene_confidence.csv` — per-gene confidence assessments (gene_id → value, argument, description; one gene can have multiple rows for multi-faceted confidence)
 
 ### CSV Columns (gene_library.csv)
 
@@ -60,7 +58,6 @@ Gene data is split across multiple CSVs (treated like database tables, loaded wi
 |---|---|---|
 | gene_id | `gene_id` | Unique gene identifier |
 | Gene | `gene` | Gene display name |
-| Manipulation | `manipulation` | How the gene is used (e.g., "Overexpression", "Knockout", "Base editing knockout") |
 | Category | `category` | Parent category (e.g., "Stress Resistance") |
 | Subcategory | `trait` | Specific trait within the category (e.g., "Radiation Shielding") |
 | Secondary Categories | `secondary_categories` | Pipe-separated parent category names for cross-cutting genes (optional) |
@@ -69,6 +66,7 @@ Gene data is split across multiple CSVs (treated like database tables, loaded wi
 | Mechanism | `mechanism` / `enhancement` | Molecular mechanism |
 | Achievements (effect sizes) | `achievements` | Quantified experimental results |
 | Highest Evidence Tier | `evidence_tier` | Evidence strength (T2–T6) |
+| Confidence | `confidence` | Confidence level |
 | Translational Gaps | `translational_gaps` | Remaining research needs |
 | Key References (DOIs) | `key_references` | DOI links to publications |
 | Notes | `notes` | Caveats and contradictions |
@@ -77,23 +75,6 @@ Species fields are resolved at load time via `gene_species.csv` + `species.csv`:
 - `species_ids: list[str]` — species_id(s) for this gene
 - `species_common_names: str` — joined common names (e.g., "Black Flying Fox & Bottlenose Dolphin")
 - `species_scientific_names: str` — joined scientific names (italic in UI)
-
-### CSV Columns (gene_confidence.csv)
-
-| CSV Column | Python field | Description |
-|---|---|---|
-| gene_id | `gene_id` | FK to gene_library |
-| value | `value` | Confidence level (Very High, High, Medium-High, Medium, Medium-Low, Low-Medium, Low, Declining, N/A) |
-| argument | `argument` | What aspect the confidence applies to (e.g., "mouse lifespan", "gain-of-function transfer"); empty for simple single-value genes |
-| description | `description` | Optional longer explanation or context |
-| primary | `primary` | TRUE for the main category-relevant confidence entry per gene; FALSE for secondary/caveats. Exactly one TRUE per gene_id. Avoid redundant inverse entries (e.g., "Low longevity" + "High NO effect" — keep only the positive-effect framing). |
-
-Confidence is resolved at load time via `gene_confidence.csv`:
-- `confidence_entries: list[ConfidenceEntry]` — all confidence assessments per gene
-- `confidence_primary: ConfidenceEntry` — the entry marked `primary=TRUE` (shown as colored pill in UI)
-- `confidence_details: list[ConfidenceEntry]` — non-primary entries (shown as clean text list, no colored pills)
-- `confidence_summary: str` — computed display string (e.g., "High (mouse); Low (human translation)")
-- `confidence_bucket: str` — highest-confidence bucket for UI color coding (high, medium_high, medium, low, unknown)
 
 ### Key distinction: Category vs Trait (Subcategory)
 
@@ -112,8 +93,7 @@ Confidence is resolved at load time via `gene_confidence.csv`:
 
 - `SPECIES_LOOKUP: dict[str, SpeciesEntry]` — species_id → species metadata
 - `GENE_SPECIES_MAP: dict[str, list[str]]` — gene_id → list of species_ids
-- `GENE_CONFIDENCE_MAP: dict[str, list[ConfidenceEntry]]` — gene_id → structured confidence entries
-- `GENE_LIBRARY: list[GeneEntry]` — all genes with resolved species and confidence fields
+- `GENE_LIBRARY: list[GeneEntry]` — all genes with resolved species fields
 - `CATEGORY_COUNTS: dict[str, int]` — genes per category
 - `CATEGORY_TRAITS: dict[str, list[str]]` — category → trait (subcategory) names
 - `ANIMAL_LIBRARY: list[AnimalEntry]` — per-species view (keyed by species_id); each animal has `categories` (parent) and `traits` (subcategory) lists
@@ -153,6 +133,30 @@ Confidence is resolved at load time via `gene_confidence.csv`:
 - **Category metadata lives in `state.py`**: display colours, icons, and ordering for categories are the only thing allowed to be coded in Python (they are UI config, not domain data).
 - **When the CSV changes, code must not change**: adding/removing rows or editing gene fields should require zero Python edits.
 - **Puzzle SVG mapping lives in `puzzle.py` → `_SPECIES_PUZZLE_MAP`**: maps species_id to SVG filenames in `data/input/puzzle/`. Gene-level overrides (e.g., `epas1_tibetan` → homo-longi) are in `_GENE_PUZZLE_OVERRIDE`. When new SVGs are added, only `_SPECIES_PUZZLE_MAP` and `_SPECIES_LAYER_MAP` need updating. The resolved filename is stored as `puzzle_svg` on each `GeneEntry` at load time.
+
+### Species SVG Resolution
+
+Species silhouette SVGs come from two sources:
+
+1. **Hand-drawn jigsaw pieces** — artistic SVGs in `data/input/puzzle/` (e.g., `1_tardigrade.svg`) used for the original 28 species in the jigsaw puzzle and `ALL_ANIMALS.svg`.
+2. **PhyloPic silhouettes** — downloaded from [phylopic.org](https://www.phylopic.org/) into `data/input/puzzle/phylopic/`. Used for new species and to replace incorrect substitutes (e.g., dog was using cat SVG).
+
+**When adding a new species:**
+
+1. Run `python3 scripts/download_phylopic.py` to download silhouettes from PhyloPic for all species in `data/input/species.csv`.
+2. Add the species_id → filename mapping to `_SPECIES_PUZZLE_MAP` in `puzzle.py`. Use `phylopic/<species_id>.svg` (or `.png`) for PhyloPic-sourced files.
+3. Add the corresponding layer label to `_SPECIES_LAYER_MAP` (used by `build_jigsaw_svg()` if a matching layer exists in `ALL_ANIMALS.svg`).
+
+**PhyloPic API resolution strategy** (implemented in `scripts/download_phylopic.py`):
+
+- Search by exact scientific name (lowercase): `GET /nodes?filter_name=<name>&build=538`
+- If not found, try genus only
+- If not found, try higher taxonomic levels (family, order, etc.)
+- Prefer SVG source files; fall back to PNG when SVG unavailable
+- Walk up parent nodes (up to 4 levels) to find any image
+- Attribution metadata is saved in `data/input/puzzle/phylopic/ATTRIBUTION.json`
+
+**License compliance**: PhyloPic images have individual Creative Commons licenses. The `ATTRIBUTION.json` file records the license for each downloaded image. Check it before distributing.
 
 ---
 
@@ -217,15 +221,16 @@ Old `?tab=<key>` URLs are redirected by `AppState.redirect_legacy_tab` on the `/
 ### Generated Report Links
 
 - The Materialization report has two URL concepts:
-  - `ComposeState.share_url` is the deterministic recreate URL (`/materialization?report=1&name=<b64>&cats=<bitmask>`).
+  - `ComposeState.share_url` is the deterministic recreate URL (`/materialization?report=1&name=<b64>&cats=<bitmask>&genes=<b64-json-list>`). The `genes` parameter preserves the exact checked gene selection; without it, shared reports fall back to all genes in selected categories.
   - `ComposeState.report_public_url` is the published static landing page under `/generated/reports/<slug>/index.html` with Open Graph/Twitter metadata for social previews.
 - Generated public report files are written under `GENERATED_PUBLIC_DIR` (default `data/output/public`) and served by `app.py` at `GENERATED_URL_PREFIX` (default `/generated`).
 - A published report folder contains `index.html`, `model.stl`, `params.json`, `report.png`, and `report.pdf`. These are runtime artifacts and must remain gitignored.
 - `assets/vendor/me_report.js` builds the browser-only PNG/PDF bundle with `__meBuildReportBundleBase64()`; do not add Python image dependencies for this path.
-- The report QR/copy/social controls are intentionally gated: before the user clicks **Generate sharable folder**, show explanatory placeholder text instead of a working QR/share link. After generation succeeds, those controls use `report_public_url`.
-- In split dev mode (`uv run start`), the frontend is `http://localhost:3000` while backend static serving is on `http://localhost:8000`; mirror generated reports into `.web/public/generated/` and resolve the sharable URL from `window.location.origin` so local `/generated/...` URLs work from the frontend origin. Localhost links should use `http` unless TLS is explicitly configured.
+- The report QR/copy/social controls are intentionally gated: before the user clicks **Create public link**, show explanatory placeholder text instead of a working QR/share link. After generation succeeds, those controls use `report_public_url`.
+- The PDF should always contain a usable URL: while publishing, use the pending public report URL; after publishing, use `report_public_url`; before publishing, fall back to `ComposeState.share_url`.
+- In split dev mode (`uv run start`), the frontend is `http://localhost:3000` while backend static serving is on `http://localhost:8000`; mirror generated reports into `.web/public/generated/` and resolve public report links from `window.location.origin` so local `/generated/...` URLs work from the frontend origin. Localhost links should use `http` unless TLS is explicitly configured.
 - Optional report portraits/user pictures are uploaded via Reflex upload into `ComposeState.report_portrait_data_url` and consumed by the browser-side PNG/PDF exporters. Keep this in-browser/data-URL path; do not add Python image processing dependencies for it.
-- The optional free-text field is named "Character note"; it is a short visitor-authored explanation/dedication/story for the profile and should be included in report card, PNG, PDF, params JSON, and regenerated share folders.
+- The optional free-text field is named "Character note"; it is a short visitor-authored explanation/dedication/story for the profile and should be included in report card, PNG, PDF, params JSON, and regenerated public report links.
 - Social shares must target the generated `index.html` landing page, not the raw `report.png`. The landing page uses `report.png` as `og:image` and should expose both "Make your own character" (`/`) and "Open this exact character" (`ComposeState.share_url`) actions.
 
 ---
@@ -292,20 +297,23 @@ Category icon mapping lives in `state.py → CATEGORY_ICONS` (Fomantic UI icon n
 - In the sculpture compose gene list, do not style unchecked genes with strikethrough; use muted text and the checkbox only—strikethrough reads as rejecting the gene.
 - When implementing an attached plan, do not edit the plan file; use the existing to-do list, mark items `in_progress` as work starts, and continue through all listed items unless blocked.
 - In user-facing copy, prefer clear exhibit terms such as "Enhancement credits (cr)", "Printable 3D model", and "Personal enhancement report"; avoid confusing jargon like "loadout", "sculpture", or "gene splicing" unless explicitly requested.
-- For the RPG UI, keep primary labels, checkboxes, category names, and the Materialize CTA large and readable; small controls and headings repeatedly caused usability issues.
+- For the RPG UI, keep primary labels, category names, gene action controls, body-map marker labels, and the Materialize CTA large and readable; on desktop and mobile, keep markers anchored near the intended body regions and never hide the CTA in fixed-height panes.
+- For the Materialization artifact inventory, use large centered image cards with a clearly attached active panel; avoid tiny tab chrome, nested image borders, and technical STL/protein jargon. Explain the 3D print as a simple reward/goodie visitors unlocked through gene choices.
+- In the sharing panel, use "Create public link" wording and place the action inside the panel; avoid "generate sharable folder" copy in visitor-facing UI.
+- In the report artifact UI, keep report customization below the rendered report preview, and keep PDF render/download actions together in the rendered PDF panel with automatic rendering when the report tab opens.
+- Keep model parameters folded by default, compact when opened, and populated with visitor-selected categories/genes before showing derived numeric mappings.
 
 ## Learned Workspace Facts
 
 - Legacy `reflex-mui-datagrid` wiring was removed from the active app. The public Gene Library UI is the custom RPG accordion flow in `src/materialized_enhancements/pages/index.py`.
 - Use `rx.script(js_body_string)` or `rx.script(src=...)` for client JS. `rx.el.script(...)` with a string body can be escaped/not executed by Reflex; inline handlers defined that way won't register on `window`.
-- Browser-side export libraries are vendored under `assets/vendor/` (`html-to-image.js`, `jspdf.umd.min.js`, `qrcode.min.js`, `me_report.js`) and loaded via `rx.script(src="/vendor/<file>.js")` so the app works offline / in kiosk mode without `cdn.jsdelivr.net`.
+- Browser-side export libraries are vendored under `assets/vendor/` (`html-to-image.js`, `jspdf.umd.min.js`, `qrcode.min.js`, `me_report.js`) and loaded via `rx.script(src="/vendor/<file>.js")` so the app works offline; in Reflex dev mode, edited vendor JS must also be copied to `.web/public/vendor/` or tested after restarting `reflex run`.
 - `html-to-image` on this app: move off-screen capture nodes into the viewport for the snapshot; avoid `display: flex` on the snapshot root inside SVG `foreignObject`; call with `skipFonts: true` (Fomantic `semantic.min.css` pulls thousands of twemoji URLs and can exhaust the browser without it — see `h2iOptions()` in `assets/vendor/me_report.js`); for PNG export use full `opacity: 1`, high `z-index`, and `waitImages()` — very low opacity often rasterizes as blank in Chromium.
 - MutationObservers that repaint DOM (e.g. QR painter) must be idempotent with a signature guard, must ignore mutations inside the rewritten subtree, and must debounce via `requestAnimationFrame`; otherwise an `innerHTML` rewrite retriggers the observer and freezes the browser.
 - Sculpture capture: the hidden `<textarea id="stl-b64-data">` must stay mounted for same-origin iframes; `assets/sculpture_viewer/capture.html` is loaded with a changing `nonce` query param and postMessages front/side/back PNGs to the parent.
-- The shareable-report URL encodes state as `/materialization?report=1&name=<b64>&cats=<bitmask>`; `apply_shared_report` re-seeds `ComposeState` deterministically on page load so recipients regenerate the identical sculpture without server persistence. Old `/?tab=sculpture&…` URLs are redirected by `AppState.redirect_legacy_tab`.
+- The recreate URL encodes state as `/materialization?report=1&name=<b64>&cats=<bitmask>&genes=<b64-json-list>`; exact model reproduction requires `genes`, the same input CSVs, and the same generation code, while generated `params.json` is the strongest saved reproduction artifact.
 - Published generated reports are stored under `data/output/public/reports/<slug>/` and served at `/generated/reports/<slug>/`. The folder contains public download files plus a crawler-friendly `index.html`; never commit generated contents.
-- PDF export: do not rasterize `#me-report-pdf-long` per A4 page (balloons file size). Use jsPDF `text()` / `splitTextToSize()` from DOM rows. Page 1 is built in `renderCoverPageA4()` from hidden inputs and `window.__reportViews`, not from scaling a screenshot of `#me-report-card`.
-- In Reflex dev mode, `assets/` is copied to `.web/public/` at compile time; the dev server serves the `.web/public/` copy. When you edit vendored JS under `assets/vendor/` without restarting `reflex run`, copy into `.web/public/vendor/` or restart — otherwise you test a stale asset.
-- Gene/sculpture inputs use `data/input/gene_library.csv`, `data/input/species.csv`, `data/input/gene_species.csv`, and `data/input/gene_properties.csv` (see `gene_data.py` / `sculpture.py`). Species are resolved via the join table, not embedded in the gene CSV. The CSV has separate `Category` (parent) and `Subcategory` (trait) columns; the loader maps them to `category` and `trait` fields and computes `category_detail` as `f"{category} / {trait}"` for display.
-- The whole `data/input/` tree is gitignored in this repo; CSVs and puzzle SVGs are local runtime inputs. There is no in-repo command that generates `gene_properties*` — obtain files from the team or another machine, or recreate them using `data/input/sculpture_mapping_spec.md` as the spec.
-- Dev server / LAN: `python-dotenv` loads repo-root `.env` in `rxconfig.py` and `src/materialized_enhancements/run.py` before config. Backend bind defaults to `0.0.0.0` via `BACKEND_BIND_HOST` (or `REFLEX_BACKEND_HOST` when set). `vite_allowed_hosts` is permissive by default so `http://<LAN-IP>:3000` works; optionally restrict with `BACKEND_VITE_ALLOWED_HOSTS`. For phones on Wi‑Fi, `API_URL` may need the machine LAN IP and backend port, not `localhost`, or websockets/state can fail after the first paint.
+- PDF export: do not rasterize `#me-report-pdf-long` per A4 page (balloons file size). Use jsPDF `text()` / `splitTextToSize()` from DOM rows; page 1 is built in `renderCoverPageA4()` from hidden inputs and `window.__reportViews`, and report JS should use canonical origin only for public share URLs while loading local static assets from the current browser origin.
+- For browser testing Materialization flows, use `uv run preselect` to start the app with a representative preselected report URL; test that generated `/materialization?report=1...` route instead of an empty selection.
+- Gene/sculpture inputs use `data/input/gene_library.csv`, `data/input/species.csv`, `data/input/gene_species.csv`, and `data/input/gene_properties.csv` (see `gene_data.py` / `sculpture.py`); the whole `data/input/` tree is gitignored, and there is no in-repo command that generates `gene_properties*`.
+- Dev server / LAN: `python-dotenv` loads repo-root `.env` in `rxconfig.py` and `src/materialized_enhancements/run.py` before config. Backend bind defaults to `0.0.0.0` via `BACKEND_BIND_HOST` (or `REFLEX_BACKEND_HOST` when set). `vite_allowed_hosts` is permissive by default so `http://<LAN-IP>:3000` works; optionally restrict with `BACKEND_VITE_ALLOWED_HOSTS`. For phones on Wi‑Fi, `API_URL` may need the machine LAN IP and backend port, not `localhost`; mobile browsers are forced to a `width=1440` desktop viewport, so phone-specific CSS usually needs orientation/height rules rather than narrow `max-width` breakpoints.

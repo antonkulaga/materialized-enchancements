@@ -4,7 +4,7 @@
 
 An RPG-style character creator for speculative human enhancement. Spend enhancement credits on real genes from extraordinary organisms, watch your profile light up by category, then materialize the result as a unique 3D-printable artifact and a personal enhancement report.
 
-**[Try it live](https://materialized-enhancements.longevity-genie.info/)** · [Project video](https://www.youtube.com/watch?v=adCYIcbR4Gs) · [Open source](https://github.com/winternewt/materialized-enchancements)
+**[Try it live](https://enhancement.bio/)** · [Project video](https://www.youtube.com/watch?v=adCYIcbR4Gs) · [Open source](https://github.com/winternewt/materialized-enchancements)
 
 ---
 
@@ -22,7 +22,7 @@ Upgrading human DNA is not science fiction — it is already happening in adults
 2. **Spend enhancement credits** — browse the gene library grouped by category (Stress Resistance, Longevity & Genome, Regeneration, Environmental Adaptation, Perception, Expression). Each gene comes from a real organism and costs credits based on evidence strength.
 3. **Watch your profile light up** — the human silhouette fills in by category as you build your loadout.
 4. **Materialize** — generate a deterministic 3D-printable STL from the selected genes and your name. The geometry is driven by real protein properties (molecular weight, exon count, hydropathy, system size).
-5. **Review and share** — inspect front/side/back captures, download STL + params, export a square PNG or A4 PDF report, and optionally generate a shareable landing page with social previews.
+5. **Review and share** — inspect front/side/back captures, download STL + params, export a square PNG or A4 PDF report, and optionally create a public report link with social previews.
 
 ---
 
@@ -209,7 +209,7 @@ Copy `.env.template` to `.env` to override defaults (email delivery, deploy URL,
 | Route | Tab | Purpose |
 |---|---|---|
 | `/` | **Character Profile** | Name your character, spend the 100 cr enhancement budget, browse the gene library |
-| `/materialization` | **Materialization** | 3D viewer, STL/params downloads, report customization, PNG/PDF exports, shareable link |
+| `/materialization` | **Materialization** | 3D viewer, STL/params downloads, report customization, PNG/PDF exports, public report link |
 | `/about` | **About** | Project story, video, team, support links |
 
 ---
@@ -267,15 +267,20 @@ The app enforces at startup:
 
 ## Generated Reports & Sharing
 
-The Materialization tab keeps exports local until the visitor explicitly chooses to share. **Generate sharable folder** writes a public landing page with:
+The Materialization tab has two link types:
+
+- **Recreate URL** — a deterministic `/materialization?report=1&name=<b64>&cats=<bitmask>&genes=<b64-json-list>` URL that rebuilds the same character from the name, selected categories, and exact checked genes.
+- **Public report link** — a generated `/generated/reports/<slug>/index.html` landing page with social metadata and downloadable artifacts.
+
+Exports stay local until the visitor clicks **Create public link**. That action writes a public report folder with:
 
 - `index.html` — crawler-friendly page with Open Graph/Twitter metadata
 - `model.stl` — the printable sculpture
-- `params.json` — reproducibility parameters
+- `params.json` — strongest saved reproduction artifact, including selected categories, checked genes, sculpture parameters, and the recreate URL
 - `report.png` — square social preview card
 - `report.pdf` — A4 personal enhancement report
 
-Reports are generated in the browser using vendored JS (`html-to-image`, `jsPDF`, `qrcode`) — no server-side image dependencies.
+QR, copy, and social sharing buttons use the public report link after it exists. Before publication, the PDF still embeds the recreate URL so the character selection can be opened again. Reports are generated in the browser using vendored JS (`html-to-image`, `jsPDF`, `qrcode`) — no server-side image dependencies.
 
 ---
 

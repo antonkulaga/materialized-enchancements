@@ -4,15 +4,15 @@
 
 ## Canonical Site
 
-- Site: https://materialized-enhancements.longevity-genie.info
+- Site: https://enhancement.bio
 - Repository: https://github.com/winternewt/materialized-enchancements
 - Data source: `data/input/gene_library_extended.csv` loaded by `materialized_enhancements.gene_data`
 
 ## Public Pages
 
-- [Character Profile](https://materialized-enhancements.longevity-genie.info/): Interactive genetic enhancement loadout builder: visitors choose real-world genes, source organisms, and enhancement categories that shape a future-human profile.
-- [Materialization](https://materialized-enhancements.longevity-genie.info/materialization): 3D materialization page for the selected gene profile, including the generated sculpture, shareable report, STL export, and ARTEX publishing flow.
-- [About Materialized Enhancements](https://materialized-enhancements.longevity-genie.info/about): Project background for the Materialized Enhancements artwork, started at CODAME Art+Tech and now developed by the joint GlucoseDAO and Longevity Genie team.
+- [Character Profile](https://enhancement.bio/): Interactive genetic enhancement loadout builder: visitors choose real-world genes, source organisms, and enhancement categories that shape a future-human profile.
+- [Materialization](https://enhancement.bio/materialization): 3D materialization page for the selected gene profile, including the generated sculpture, shareable report, STL export, and ARTEX publishing flow.
+- [About Materialized Enhancements](https://enhancement.bio/about): Project background for the Materialized Enhancements artwork, started at CODAME Art+Tech and now developed by the joint GlucoseDAO and Longevity Genie team.
 
 ## Crawl Guidance
 

@@ -24,6 +24,6 @@ config = rx.Config(
         rx.el.meta(name="google-site-verification", content="BoBYqc8A_Xkw0AHGsMrk9Y_Ms3zsltZZtvd8Rltrs4w"),
     ],
     tailwind=None,
-    vite_allowed_hosts=["materialized-enhancements.longevity-genie.info"],
+    vite_allowed_hosts=["enhancement.bio"],
     show_built_with_reflex=False,
 )
