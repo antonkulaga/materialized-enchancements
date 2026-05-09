@@ -105,7 +105,7 @@ def _email_send_form(
                     accent_class,
                     f"ui disabled {accent_class.removeprefix('ui ')}",
                 ),
-                style={"padding": "9px 14px", "fontSize": "0.88rem", "whiteSpace": "nowrap"},
+                style={"padding": "12px 18px", "fontSize": "0.96rem", "fontWeight": "900", "whiteSpace": "nowrap"},
             ),
             style={"display": "flex", "gap": "8px", "alignItems": "stretch"},
         ),
@@ -140,7 +140,7 @@ def _email_send_form(
             ),
             rx.fragment(),
         ),
-        style={"marginTop": "8px"},
+        style={"marginTop": "0"},
     )
 
 
@@ -3066,7 +3066,7 @@ def _materialization_support_panel() -> rx.Component:
     return rx.el.div(
         rx.el.h3(
             fomantic_icon("print", size=18, color="#a78bfa"),
-            rx.el.span(" Printing Support and Partners", style={"marginLeft": "8px"}),
+            rx.el.span(" 3D Printing Support", style={"marginLeft": "8px"}),
             style={"color": "#f8fafc", "display": "flex", "alignItems": "center", "margin": "0 0 12px"},
         ),
         rx.el.div(
@@ -3201,7 +3201,7 @@ def _materialization_edit_character_cta() -> rx.Component:
     return rx.el.a(
         fomantic_icon("user edit", size=16, color="#ffffff"),
         rx.el.span(
-            "To edit genes or identity, return to Character profile",
+            "Edit character",
             style={"marginLeft": "8px"},
         ),
         href="/",
@@ -3211,10 +3211,231 @@ def _materialization_edit_character_cta() -> rx.Component:
             "alignItems": "center",
             "justifyContent": "center",
             "marginBottom": "0",
-            "padding": "11px 14px",
-            "fontWeight": "700",
+            "padding": "11px 18px",
+            "fontWeight": "900",
             "textDecoration": "none",
         },
+    )
+
+
+def _reward_artifact_choice(
+    label: str,
+    description: str,
+    icon_name: str,
+    image_src: str,
+    image_alt: str,
+    active: rx.Var,
+    on_click: rx.EventSpec,
+) -> rx.Component:
+    """Compact clickable artifact selector shown inside the reward card."""
+    return rx.el.button(
+        rx.el.div(
+            rx.el.strong(label, style={"display": "block", "fontSize": "1.34rem", "lineHeight": "1.15"}),
+            rx.el.span(description, style={"fontSize": "1.05rem", "lineHeight": "1.35", "color": rx.cond(active, "#dbeafe", "#cbd5e1")}),
+            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 2px"},
+        ),
+        rx.el.div(
+            rx.el.img(
+                src=image_src,
+                alt=image_alt,
+                loading="lazy",
+                decoding="async",
+                style={
+                    "width": "100%",
+                    "height": "100%",
+                    "objectFit": "contain",
+                    "objectPosition": "center",
+                    "display": "block",
+                    "filter": "saturate(1.08) contrast(1.04)",
+                },
+            ),
+            rx.el.div(
+                fomantic_icon(icon_name, size=20, color="#ffffff"),
+                style={
+                    "position": "absolute",
+                    "right": "10px",
+                    "top": "10px",
+                    "width": "36px",
+                    "height": "36px",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "borderRadius": "999px",
+                    "background": "rgba(15, 23, 42, 0.78)",
+                    "boxShadow": "0 8px 16px rgba(2, 6, 23, 0.28)",
+                },
+            ),
+            style={
+                "position": "relative",
+                "width": "100%",
+                "aspectRatio": "4 / 3",
+                "maxHeight": "280px",
+                "overflow": "hidden",
+                "borderRadius": "14px",
+                "background": "rgba(15, 23, 42, 0.72)",
+                "border": rx.cond(active, "2px solid rgba(253, 230, 138, 0.95)", "1px solid rgba(196, 181, 253, 0.24)"),
+            },
+        ),
+        type="button",
+        on_click=on_click,
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "stretch",
+            "gap": "10px",
+            "padding": "12px",
+            "borderRadius": "20px",
+            "border": rx.cond(active, "4px solid rgba(253, 230, 138, 0.92)", "2px solid rgba(196, 181, 253, 0.24)"),
+            "background": rx.cond(
+                active,
+                "linear-gradient(135deg, rgba(124, 58, 237, 0.58), rgba(15, 23, 42, 0.78))",
+                "rgba(15, 23, 42, 0.54)",
+            ),
+            "boxShadow": rx.cond(
+                active,
+                "0 0 0 4px rgba(124, 58, 237, 0.28), 0 18px 36px rgba(250, 204, 21, 0.18)",
+                "none",
+            ),
+            "color": "#f8fafc",
+            "cursor": "pointer",
+            "font": "inherit",
+            "textAlign": "center",
+            "appearance": "none",
+            "width": "100%",
+            "maxWidth": "none",
+        },
+    )
+
+
+def _materialization_reward_panel() -> rx.Component:
+    """Visitor-facing reward card for all generated materialization outputs."""
+    model_active = ComposeState.materialization_artifact_tab != "report"
+    report_active = ComposeState.materialization_artifact_tab == "report"
+    return rx.cond(
+        ComposeState.has_stl,
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon("trophy", size=34, color="#fde68a"),
+                    style={
+                        "width": "68px",
+                        "height": "68px",
+                        "display": "flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                        "borderRadius": "999px",
+                        "background": "radial-gradient(circle, rgba(250, 204, 21, 0.34), rgba(124, 58, 237, 0.20) 58%, rgba(15, 23, 42, 0.66))",
+                        "border": "1px solid rgba(253, 230, 138, 0.48)",
+                        "boxShadow": "0 0 0 5px rgba(124, 58, 237, 0.16), 0 0 34px rgba(250, 204, 21, 0.24)",
+                        "flex": "0 0 auto",
+                    },
+                ),
+                rx.el.div(
+                    rx.el.span(
+                        fomantic_icon("unlock alternate", size=13, color="#fde68a"),
+                        rx.el.span(" Reward unlocked", style={"marginLeft": "6px"}),
+                        style={
+                            "display": "inline-flex",
+                            "alignItems": "center",
+                            "width": "fit-content",
+                            "padding": "6px 11px",
+                            "borderRadius": "999px",
+                            "background": "rgba(250, 204, 21, 0.16)",
+                            "color": "#fde68a",
+                            "fontSize": "0.82rem",
+                            "fontWeight": "950",
+                            "letterSpacing": "0.08em",
+                            "textTransform": "uppercase",
+                            "border": "1px solid rgba(253, 230, 138, 0.28)",
+                        },
+                    ),
+                    rx.el.h2(
+                        "Quest complete: your enhancement artifacts are ready",
+                        style={
+                            "margin": "10px 0 8px",
+                            "color": "#f8fafc",
+                            "fontSize": "clamp(1.45rem, 2.2vw, 2.15rem)",
+                            "lineHeight": "1.08",
+                            "fontWeight": "950",
+                            "textShadow": "0 2px 18px rgba(124, 58, 237, 0.34)",
+                        },
+                    ),
+                    rx.el.p(
+                        "Your selected genes became two take-home rewards: a printable 3D model you can inspect, "
+                        "download, or make, and a personal enhancement report you can share online or print.",
+                        style={
+                            "margin": "0",
+                            "color": "#dbeafe",
+                            "fontSize": "1.02rem",
+                            "lineHeight": "1.5",
+                            "maxWidth": "62rem",
+                        },
+                    ),
+                    style={"minWidth": "0", "flex": "1 1 560px"},
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "16px",
+                    "flexWrap": "wrap",
+                },
+            ),
+            rx.el.div(
+                rx.el.div(
+                    "Need to change the selected genes or visitor name?",
+                    style={
+                        "marginBottom": "8px",
+                        "color": "#cbd5e1",
+                        "fontSize": "0.9rem",
+                        "fontWeight": "800",
+                        "textAlign": "center",
+                    },
+                ),
+                _materialization_edit_character_cta(),
+                style={"marginTop": "14px", "textAlign": "center"},
+            ),
+            rx.el.div(
+                _reward_artifact_choice(
+                    "Printable 3D model",
+                    "Ready to inspect, download, and print.",
+                    "cube",
+                    "/images/icons/shapes.jpg",
+                    "Printed Materialized Enhancements 3D shapes",
+                    model_active,
+                    ComposeState.show_model_artifact_tab,
+                ),
+                _reward_artifact_choice(
+                    "Personal enhancement report",
+                    "Ready to share online or print.",
+                    "file alternate",
+                    "/images/icons/report_icon.jpeg",
+                    "Personal enhancement report icon",
+                    report_active,
+                    ComposeState.show_report_artifact_tab,
+                ),
+                style={
+                    "display": "grid",
+                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+                    "gap": "16px",
+                    "justifyContent": "stretch",
+                    "alignItems": "stretch",
+                    "marginTop": "16px",
+                },
+            ),
+            style={
+                "position": "relative",
+                "overflow": "hidden",
+                "padding": "18px",
+                "borderRadius": "18px",
+                "background": (
+                    "radial-gradient(circle at 5% 8%, rgba(250, 204, 21, 0.24), transparent 24%), "
+                    "linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(76, 29, 149, 0.38))"
+                ),
+                "border": "1px solid rgba(253, 230, 138, 0.24)",
+                "boxShadow": "0 18px 42px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+            },
+        ),
+        rx.fragment(),
     )
 
 
@@ -3518,80 +3739,21 @@ def _jigsaw_artifact_placeholder() -> rx.Component:
 
 
 def _artifact_inventory_panel() -> rx.Component:
-    model_active = ComposeState.materialization_artifact_tab == "model"
     report_active = ComposeState.materialization_artifact_tab == "report"
-    jigsaw_active = ComposeState.materialization_artifact_tab == "jigsaw"
-    support_active = ComposeState.materialization_artifact_tab == "support"
     return rx.el.div(
         rx.el.div(
-            _artifact_tab_button(
-                "Printable 3D model",
-                "You unlocked a real-world 3D print file for your gene character.",
-                "cube",
-                _model_artifact_preview(),
-                rx.cond(
-                    ComposeState.generating,
-                    rx.el.span("Building", class_name="ui mini violet label"),
-                    rx.cond(ComposeState.has_stl, rx.el.span("Ready", class_name="ui mini green label"), rx.fragment()),
-                ),
-                model_active,
-                ComposeState.show_model_artifact_tab,
-            ),
-            _artifact_tab_button(
-                "Personal report",
-                "Export the character card, PDF, share folder, and social links.",
-                "file alternate",
-                _report_artifact_preview(),
-                rx.cond(ComposeState.has_stl, rx.el.span("Ready", class_name="ui mini green label"), rx.fragment()),
-                report_active,
-                ComposeState.show_report_artifact_tab,
-            ),
-            _artifact_tab_button(
-                "Jigsaw",
-                "Future organism-piece artifact for the same enhancement character.",
-                "puzzle piece",
-                _jigsaw_artifact_preview(),
-                rx.el.span("Soon", class_name="ui mini violet label"),
-                jigsaw_active,
-                ComposeState.show_jigsaw_artifact_tab,
-            ),
-            _artifact_tab_button(
-                "Support / Collaborate",
-                "Donate, request an EU print, or partner as a fabrication studio.",
-                "heart",
-                _support_artifact_preview(),
-                rx.el.span("Open", class_name="ui mini violet label"),
-                support_active,
-                ComposeState.show_support_artifact_tab,
-            ),
-            style={
-                "display": "grid",
-                "gridTemplateColumns": "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
-                "alignItems": "stretch",
-                "gap": "16px",
-                "padding": "2px 2px 0",
-            },
-        ),
-        rx.el.div(
             rx.cond(
-                model_active,
+                report_active,
+                _report_section_body(),
                 _sculpture_section_body(),
-                rx.cond(
-                    report_active,
-                    _report_section_body(),
-                    rx.cond(jigsaw_active, _jigsaw_artifact_placeholder(), _materialization_support_panel()),
-                ),
             ),
+            class_name="me-artifact-active-panel",
             style={
-                "padding": "14px 14px 14px 18px",
-                "border": "0",
-                "borderRadius": "0 0 16px 16px",
-                "background": "linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.86))",
-                "boxShadow": (
-                    "inset 4px 0 0 rgba(196, 181, 253, 0.95), "
-                    "inset 0 4px 0 rgba(196, 181, 253, 0.95), "
-                    "0 18px 38px rgba(2, 6, 23, 0.24)"
-                ),
+                "padding": "12px",
+                "border": "4px solid rgba(253, 230, 138, 0.92)",
+                "borderRadius": "20px",
+                "background": "linear-gradient(135deg, rgba(124, 58, 237, 0.58), rgba(15, 23, 42, 0.78))",
+                "boxShadow": "0 0 0 4px rgba(124, 58, 237, 0.28), 0 18px 36px rgba(250, 204, 21, 0.18)",
                 "minWidth": "0",
             },
         ),
@@ -3605,7 +3767,6 @@ def _artifact_inventory_panel() -> rx.Component:
         },
     )
 
-
 def _rpg_materialization_output() -> rx.Component:
     return rx.el.div(
         rx.el.textarea(
@@ -3615,7 +3776,7 @@ def _rpg_materialization_output() -> rx.Component:
         ),
         _report_capture_iframe(),
         _shared_report_banner(),
-        _materialization_edit_character_cta(),
+        _materialization_reward_panel(),
         _artifact_inventory_panel(),
         class_name="me-rpg-output-panel",
         style={"display": "flex", "flexDirection": "column", "gap": "14px"},
@@ -3657,6 +3818,11 @@ def _rpg_flow_css() -> rx.Component:
         .me-rpg-output-panel label,
         .me-rpg-output-panel div {
             border-color: rgba(148, 163, 184, 0.24);
+        }
+        .me-rpg-output-panel .me-artifact-active-panel {
+            border: 4px solid rgba(253, 230, 138, 0.92) !important;
+            border-radius: 20px !important;
+            box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.28), 0 18px 36px rgba(250, 204, 21, 0.18) !important;
         }
         .me-rpg-dashboard {
             display: grid;
@@ -4452,32 +4618,32 @@ def _rpg_materialize_layout() -> rx.Component:
 def _param_row(label: str, value: rx.Var, unit: str = "") -> rx.Component:
     """A single row in the sculpture parameters panel."""
     return rx.el.div(
-        rx.el.span(label, style={"fontSize": "0.92rem", "color": "#94a3b8", "flex": "0 0 100px"}),
+        rx.el.span(label, style={"fontSize": "0.78rem", "color": "#94a3b8", "flex": "0 0 74px"}),
         rx.el.span(
             value,
-            rx.el.span(f" {unit}" if unit else "", style={"color": "#64748b", "fontSize": "0.8rem"}),
-            style={"fontSize": "0.98rem", "fontWeight": "600", "color": "#f8fafc"},
+            rx.el.span(f" {unit}" if unit else "", style={"color": "#64748b", "fontSize": "0.72rem"}),
+            style={"fontSize": "0.82rem", "fontWeight": "800", "color": "#f8fafc"},
         ),
-        style={"display": "flex", "alignItems": "center", "gap": "8px", "padding": "4px 0"},
+        style={"display": "flex", "alignItems": "center", "gap": "6px", "padding": "2px 0"},
     )
 
 
 def _input_row(label: str, value: rx.Var, unit: str, arrow: bool = False) -> rx.Component:
     """Compact row: label + value + optional arrow connector."""
     return rx.el.div(
-        rx.el.span(label, style={"fontSize": "0.92rem", "color": "#94a3b8", "flex": "0 0 100px"}),
+        rx.el.span(label, style={"fontSize": "0.78rem", "color": "#94a3b8", "flex": "0 0 84px"}),
         rx.el.span(
             value,
-            rx.el.span(f" {unit}" if unit else "", style={"color": "#64748b", "fontSize": "0.8rem"}),
-            style={"fontSize": "0.98rem", "fontWeight": "600", "color": "#f8fafc"},
+            rx.el.span(f" {unit}" if unit else "", style={"color": "#64748b", "fontSize": "0.72rem"}),
+            style={"fontSize": "0.82rem", "fontWeight": "800", "color": "#f8fafc"},
         ),
         *(
             [rx.el.span(
                 "\u2192",
-                style={"fontSize": "0.88rem", "color": "#7c3aed", "fontWeight": "600", "marginLeft": "auto"},
+                style={"fontSize": "0.78rem", "color": "#7c3aed", "fontWeight": "700", "marginLeft": "auto"},
             )] if arrow else []
         ),
-        style={"display": "flex", "alignItems": "center", "gap": "6px", "padding": "4px 0"},
+        style={"display": "flex", "alignItems": "center", "gap": "5px", "padding": "2px 0"},
     )
 
 
@@ -4485,16 +4651,16 @@ def _explanation_item(term: str, desc: str, maps_to: str = "") -> rx.Component:
     """A single glossary entry in the explanations panel."""
     return rx.el.div(
         rx.el.div(
-            rx.el.span(term, style={"fontWeight": "700", "color": "#f8fafc", "fontSize": "0.95rem"}),
+            rx.el.span(term, style={"fontWeight": "800", "color": "#f8fafc", "fontSize": "0.82rem"}),
             *(
                 [rx.el.span(
                     f"  {maps_to}",
-                    style={"fontWeight": "600", "color": "#7c3aed", "fontSize": "0.9rem", "marginLeft": "6px"},
+                    style={"fontWeight": "800", "color": "#c4b5fd", "fontSize": "0.78rem", "marginLeft": "4px"},
                 )] if maps_to else []
             ),
         ),
-        rx.el.p(desc, style={"color": "#cbd5e1", "margin": "2px 0 0 0", "lineHeight": "1.5", "fontSize": "0.9rem"}),
-        style={"padding": "6px 0", "borderBottom": "1px solid rgba(148, 163, 184, 0.18)"},
+        rx.el.p(desc, style={"color": "#cbd5e1", "margin": "2px 0 0 0", "lineHeight": "1.35", "fontSize": "0.78rem"}),
+        style={"padding": "7px 8px", "borderRadius": "8px", "background": "rgba(15, 23, 42, 0.46)"},
     )
 
 
@@ -4507,19 +4673,14 @@ def _explanations_panel() -> rx.Component:
                 rx.el.div(
                     fomantic_icon("dna", size=14, color="#27ae60"),
                     rx.el.span(
-                        " Name: ",
+                        "Name: ",
                         style={"fontWeight": "600", "color": "#94a3b8"},
                     ),
                     rx.el.span(
                         ComposeState.input_personal_tag,
-                        style={"fontWeight": "700", "color": "#f8fafc", "fontSize": "1.05rem"},
+                        style={"fontWeight": "800", "color": "#f8fafc", "fontSize": "0.9rem"},
                     ),
                     style={"display": "flex", "alignItems": "center", "gap": "4px"},
-                ),
-                rx.el.p(
-                    "Your name is hashed (CRC32) and XORed with your category bitmask "
-                    "to produce a unique seed — the number that makes every 3D model unrepeatable.",
-                    style={"color": "#cbd5e1", "margin": "2px 0 0 0", "lineHeight": "1.5", "fontSize": "0.92rem"},
                 ),
                 rx.el.div(
                     rx.el.span("CRC32 ", style={"color": "#9ca3af"}),
@@ -4528,67 +4689,105 @@ def _explanations_panel() -> rx.Component:
                     rx.el.span(ComposeState.input_bitmask, style={"fontWeight": "600"}),
                     rx.el.span(" = seed ", style={"color": "#7c3aed"}),
                     rx.el.span(ComposeState.param_seed, style={"fontWeight": "700", "color": "#7c3aed"}),
-                    style={"fontSize": "0.93rem", "color": "#e5e7eb", "marginTop": "4px"},
+                    style={"fontSize": "0.78rem", "color": "#e5e7eb"},
                 ),
-                style={"padding": "6px 0", "borderBottom": "1px solid rgba(148, 163, 184, 0.18)"},
+                style={
+                    "display": "flex",
+                    "gap": "10px",
+                    "flexWrap": "wrap",
+                    "alignItems": "center",
+                    "padding": "8px",
+                    "borderRadius": "8px",
+                    "background": "rgba(15, 23, 42, 0.58)",
+                },
             ),
             _explanation_item(
                 "Gene pool",
-                "Total number of genes with measured properties in your selected categories. "
-                "Combined with your name hash, determines the unique seed.",
+                "selected genes with measured model data",
                 maps_to="-> seed",
             ),
             _explanation_item(
                 "Protein mass (kDa)",
-                "Median molecular weight of the selected proteins. "
-                "Heavier proteins produce wider 3D models with larger circle radii.",
+                "median selected protein weight",
                 maps_to="-> radius",
             ),
             _explanation_item(
                 "Exon sum",
-                "Total exon count across all selected genes. Exons are the protein-coding "
-                "segments of DNA — more exons means more structural complexity, "
-                "mapped to the vertical spacing between layers.",
+                "total coding segments across selected genes",
                 maps_to="-> spacing",
             ),
             _explanation_item(
                 "System size",
-                "How many genes cooperate in each selected biological system. "
-                "Larger cooperative networks produce more Voronoi seed points "
-                "and finer surface detail.",
+                "selected biological network size",
                 maps_to="-> points",
             ),
             _explanation_item(
                 "GRAVY score",
-                "Grand Average of Hydropathy — measures how water-loving (negative) or "
-                "fat-loving (positive) the proteins are. "
-                "Controls how deeply the Voronoi cells are extruded into the surface.",
+                "water/fat balance of selected proteins",
                 maps_to="-> extrusion",
             ),
             _explanation_item(
                 "Disorder %",
-                "Percentage of intrinsically disordered residues — floppy, unstructured "
-                "regions that lack a fixed 3D shape. This value is recorded in the "
-                "reproducibility data; Scale X is currently fixed for print safety.",
+                "recorded for reproducibility; scale X stays print-safe",
                 maps_to="recorded",
             ),
             _explanation_item(
                 "Isoelectric point (pI)",
-                "The pH at which the protein carries zero net electric charge. "
-                "Low pI = acidic protein, high pI = basic protein. This value is "
-                "recorded in the reproducibility data; Scale Y is currently fixed for print safety.",
+                "recorded for reproducibility; scale Y stays print-safe",
                 maps_to="recorded",
             ),
             style={
-                "padding": "12px 16px",
-                "borderRadius": "6px",
-                "backgroundColor": "rgba(15, 23, 42, 0.72)",
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fit, minmax(180px, 1fr))",
+                "gap": "6px",
+                "padding": "8px",
+                "borderRadius": "10px",
+                "backgroundColor": "rgba(15, 23, 42, 0.56)",
                 "border": "1px solid rgba(148, 163, 184, 0.24)",
-                "marginBottom": "12px",
-                "fontSize": "0.95rem",
+                "marginBottom": "8px",
             },
         ),
         rx.fragment(),
+    )
+
+
+def _selected_model_values_panel() -> rx.Component:
+    """User-selected values that feed the generated model."""
+    return rx.el.div(
+        rx.el.div(
+            rx.el.span("Selected by visitor", style={"fontSize": "0.74rem", "fontWeight": "900", "color": "#c4b5fd", "letterSpacing": "0.07em", "textTransform": "uppercase"}),
+            rx.el.span(
+                ComposeState.export_categories_csv,
+                style={"fontSize": "0.84rem", "color": "#f8fafc", "fontWeight": "800"},
+            ),
+            style={"display": "flex", "flexDirection": "column", "gap": "2px"},
+        ),
+        rx.el.div(
+            rx.el.span(
+                ComposeState.export_gene_names_csv,
+                style={
+                    "display": "block",
+                    "fontSize": "0.82rem",
+                    "lineHeight": "1.35",
+                    "color": "#cbd5e1",
+                    "whiteSpace": "nowrap",
+                    "overflow": "hidden",
+                    "textOverflow": "ellipsis",
+                },
+            ),
+            style={"minWidth": "0"},
+        ),
+        style={
+            "display": "grid",
+            "gridTemplateColumns": "minmax(180px, 0.7fr) minmax(0, 1.3fr)",
+            "gap": "10px",
+            "alignItems": "center",
+            "padding": "8px 10px",
+            "borderRadius": "10px",
+            "background": "rgba(20, 83, 45, 0.22)",
+            "border": "1px solid rgba(34, 197, 94, 0.22)",
+            "marginBottom": "8px",
+        },
     )
 
 
@@ -4597,7 +4796,7 @@ def _gene_inputs_panel() -> rx.Component:
     return rx.el.div(
         rx.el.label(
             "Gene inputs",
-            style={"fontSize": "0.92rem", "fontWeight": "600", "color": "#cbd5e1", "marginBottom": "6px", "display": "block"},
+            style={"fontSize": "0.8rem", "fontWeight": "800", "color": "#cbd5e1", "marginBottom": "4px", "display": "block"},
         ),
         rx.el.div(
             _input_row("Gene pool", ComposeState.param_pool_size, "genes", arrow=True),
@@ -4608,8 +4807,8 @@ def _gene_inputs_panel() -> rx.Component:
             _input_row("Disorder", ComposeState.input_disorder_median, "%", arrow=True),
             _input_row("Isoelectric pI", ComposeState.input_pi_median, "", arrow=True),
             style={
-                "padding": "10px 14px",
-                "borderRadius": "6px",
+                "padding": "8px 10px",
+                "borderRadius": "8px",
                 "backgroundColor": "rgba(20, 83, 45, 0.24)",
                 "border": "1px solid rgba(34, 197, 94, 0.32)",
             },
@@ -4623,7 +4822,7 @@ def _sculpture_params_panel() -> rx.Component:
     return rx.el.div(
         rx.el.label(
             "3D model parameters",
-            style={"fontSize": "0.92rem", "fontWeight": "600", "color": "#cbd5e1", "marginBottom": "6px", "display": "block"},
+            style={"fontSize": "0.8rem", "fontWeight": "800", "color": "#cbd5e1", "marginBottom": "4px", "display": "block"},
         ),
         rx.el.div(
             _param_row("Seed", ComposeState.param_seed),
@@ -4634,8 +4833,8 @@ def _sculpture_params_panel() -> rx.Component:
             _param_row("Scale X", ComposeState.param_scale_x),
             _param_row("Scale Y", ComposeState.param_scale_y),
             style={
-                "padding": "10px 14px",
-                "borderRadius": "6px",
+                "padding": "8px 10px",
+                "borderRadius": "8px",
                 "backgroundColor": "rgba(76, 29, 149, 0.25)",
                 "border": "1px solid rgba(167, 139, 250, 0.32)",
             },
@@ -4690,211 +4889,83 @@ def _model_generation_story_panel() -> rx.Component:
         ComposeState.has_params,
         rx.el.div(
             rx.el.div(
-                fomantic_icon("magic", size=16, color="#a78bfa"),
+                fomantic_icon("magic", size=18, color="#c4b5fd"),
                 rx.el.div(
-                    rx.el.div(
-                        "Why your model has this shape",
-                        style={"fontSize": "1rem", "fontWeight": "950", "color": "#f8fafc"},
+                    rx.el.h3(
+                        "How this 3D model was generated",
+                        style={
+                            "margin": "0 0 6px 0",
+                            "color": "#f8fafc",
+                            "fontSize": "clamp(1.18rem, 1.8vw, 1.45rem)",
+                            "lineHeight": "1.15",
+                            "fontWeight": "950",
+                        },
                     ),
-                    rx.el.div(
-                        "Your gene choices become the size, layers, detail, and surface relief of the printable object.",
-                        style={"fontSize": "0.9rem", "lineHeight": "1.45", "color": "#cbd5e1", "marginTop": "2px"},
+                    rx.el.p(
+                        "The app takes ",
+                        rx.el.strong(ComposeState.param_pool_size, style={"color": "#ffffff"}),
+                        " selected genes with measured model data and turns them into a Voronoi-based printable shape. ",
+                        "Your name and category choices make the seed, so the same choices can recreate the same object later.",
+                        style={
+                            "margin": "0",
+                            "fontSize": "1rem",
+                            "lineHeight": "1.55",
+                            "color": "#dbeafe",
+                        },
                     ),
                     style={"minWidth": "0"},
                 ),
-                style={"display": "flex", "gap": "10px", "alignItems": "flex-start", "marginBottom": "10px"},
+                style={"display": "flex", "gap": "12px", "alignItems": "flex-start", "marginBottom": "12px"},
             ),
-            rx.el.div(
-                rx.el.div(
-                    rx.el.span("Character recipe #", style={"fontSize": "0.84rem", "color": "#cbd5e1", "fontWeight": "800"}),
-                    rx.el.span(ComposeState.param_seed, style={"fontSize": "0.94rem", "fontWeight": "950", "color": "#f8fafc"}),
-                    rx.el.span(" keeps this model reproducible.", style={"fontSize": "0.84rem", "color": "#cbd5e1"}),
-                    style={
-                        "padding": "8px 10px",
-                        "borderRadius": "8px",
-                        "background": "linear-gradient(135deg, rgba(124, 58, 237, 0.24), rgba(15, 23, 42, 0.70))",
-                    },
-                ),
-                _generation_story_metric(
-                    "Overall Size",
-                    "gene weight",
-                    ComposeState.input_mass_median,
-                    "kDa",
-                    "model width",
-                    ComposeState.param_radius,
-                    "mm",
-                    "sets how broad the printable form becomes",
-                ),
-                _generation_story_metric(
-                    "Layer Spacing",
-                    "gene sections",
-                    ComposeState.input_exon_sum,
-                    "",
-                    "layer gap",
-                    ComposeState.param_spacing,
-                    "mm",
-                    "sets how far the stacked slices sit apart",
-                ),
-                _generation_story_metric(
-                    "Surface Detail",
-                    "gene systems",
-                    ComposeState.input_system_sum,
-                    "genes",
-                    "detail points",
-                    ComposeState.param_points,
-                    "",
-                    "adds more visible cells and facets",
-                ),
-                _generation_story_metric(
-                    "Surface Relief",
-                    "water/fat balance",
-                    ComposeState.input_gravy_median,
-                    "",
-                    "relief depth",
-                    ComposeState.param_extrusion,
-                    "",
-                    "sets how deeply the surface is carved",
-                ),
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": "repeat(auto-fit, minmax(300px, 1fr))",
-                    "gap": "8px",
-                },
-            ),
-            rx.el.div(
-                "The exact technical values are still available in Model parameters below for printing and reproducibility.",
-                style={"fontSize": "0.75rem", "lineHeight": "1.3", "color": "#94a3b8", "marginTop": "6px"},
-            ),
-            style={
-                "minWidth": "280px",
-                "marginTop": "18px",
-            },
-        ),
-        rx.fragment(),
-    )
-
-
-def _model_reward_panel() -> rx.Component:
-    """Visitor-facing reward card for the generated printable object."""
-    return rx.el.div(
-        rx.el.div(
             rx.el.div(
                 rx.el.span(
-                    "Reward unlocked",
+                    "Inputs: protein mass, exon count, biological system size, GRAVY score, disorder, pI, name, and categories.",
                     style={
-                        "display": "inline-flex",
-                        "width": "fit-content",
-                        "padding": "5px 10px",
+                        "padding": "8px 10px",
                         "borderRadius": "999px",
-                        "background": "rgba(124, 58, 237, 0.32)",
-                        "color": "#ddd6fe",
-                        "fontSize": "0.82rem",
-                        "fontWeight": "950",
-                        "letterSpacing": "0.08em",
-                        "textTransform": "uppercase",
-                    },
-                ),
-                rx.el.h2(
-                    "Your genes became a 3D-printable artifact",
-                    style={
-                        "margin": "10px 0 8px",
-                        "color": "#f8fafc",
-                        "fontSize": "clamp(1.55rem, 2.4vw, 2.35rem)",
-                        "lineHeight": "1.05",
-                        "fontWeight": "950",
-                    },
-                ),
-                rx.el.p(
-                    "You picked the biology. The app turned those choices into a unique object you can hold, "
-                    "wear, display, or print again later.",
-                    style={
-                        "margin": "0",
-                        "color": "#dbeafe",
-                        "fontSize": "1.06rem",
-                        "lineHeight": "1.55",
-                        "maxWidth": "48rem",
-                    },
-                ),
-                rx.el.div(
-                    rx.el.div(
-                        rx.el.strong("1. Inspect it", style={"color": "#f8fafc", "fontSize": "1rem"}),
-                        rx.el.span(" Rotate the model below and see the shape your choices created.", style={"color": "#cbd5e1", "fontSize": "0.95rem"}),
-                        style={"padding": "10px 12px", "borderRadius": "12px", "background": "rgba(15, 23, 42, 0.46)"},
-                    ),
-                    rx.el.button(
-                        rx.el.strong("2. Download it", style={"color": "#f8fafc", "fontSize": "1rem"}),
-                        rx.el.span(" Save the 3D print file. A printer or maker space can use it.", style={"color": "#cbd5e1", "fontSize": "0.95rem"}),
-                        type="button",
-                        on_click=ComposeState.download_artifacts,
-                        style={
-                            "padding": "10px 12px",
-                            "borderRadius": "12px",
-                            "background": "rgba(124, 58, 237, 0.34)",
-                            "border": "0",
-                            "textAlign": "left",
-                            "cursor": "pointer",
-                            "font": "inherit",
-                        },
-                    ),
-                    rx.el.div(
-                        rx.el.strong("3. Show it off", style={"color": "#f8fafc", "fontSize": "1rem"}),
-                        rx.el.span(" Pair it with your personal report to explain which cool genes shaped it.", style={"color": "#cbd5e1", "fontSize": "0.95rem"}),
-                        style={"padding": "10px 12px", "borderRadius": "12px", "background": "rgba(15, 23, 42, 0.46)"},
-                    ),
-                    style={
-                        "display": "grid",
-                        "gridTemplateColumns": "repeat(auto-fit, minmax(180px, 1fr))",
-                        "gap": "10px",
-                        "marginTop": "16px",
-                    },
-                ),
-                _model_generation_story_panel(),
-                style={"flex": "1 1 520px", "minWidth": "260px"},
-            ),
-            rx.el.figure(
-                rx.el.img(
-                    src="/images/icons/showoff.jpg",
-                    alt="Visitor wearing a printed Materialized Enhancements model",
-                    loading="lazy",
-                    decoding="async",
-                    style={
-                        "width": "100%",
-                        "height": "min(360px, 42vw)",
-                        "minHeight": "240px",
-                        "objectFit": "cover",
-                        "objectPosition": "center",
-                        "display": "block",
-                        "borderRadius": "16px",
-                        "boxShadow": "0 18px 38px rgba(2, 6, 23, 0.34)",
-                    },
-                ),
-                rx.el.figcaption(
-                    "Example: a printed gene artifact as a wearable keepsake.",
-                    style={
-                        "marginTop": "8px",
+                        "background": "rgba(15, 23, 42, 0.58)",
                         "color": "#cbd5e1",
-                        "fontSize": "0.84rem",
-                        "fontWeight": "800",
+                        "fontSize": "0.9rem",
+                        "lineHeight": "1.35",
+                    },
+                ),
+                rx.el.span(
+                    "Outputs: seed, radius, layer spacing, Voronoi points, surface extrusion, and print-safe scale.",
+                    style={
+                        "padding": "8px 10px",
+                        "borderRadius": "999px",
+                        "background": "rgba(76, 29, 149, 0.28)",
+                        "color": "#ddd6fe",
+                        "fontSize": "0.9rem",
                         "lineHeight": "1.35",
                     },
                 ),
                 style={
-                    "flex": "0 1 260px",
+                    "display": "flex",
+                    "gap": "8px",
+                    "flexWrap": "wrap",
+                    "marginBottom": "10px",
+                },
+            ),
+            rx.el.p(
+                "Click the Model parameters accordion directly below to see the exact numbers and what each input controls.",
+                style={
                     "margin": "0",
+                    "fontSize": "0.92rem",
+                    "lineHeight": "1.45",
+                    "color": "#c4b5fd",
+                    "fontWeight": "800",
                 },
             ),
             style={
-                "display": "flex",
-                "alignItems": "stretch",
-                "justifyContent": "space-between",
-                "gap": "18px",
-                "flexWrap": "wrap",
+                "padding": "14px 16px",
+                "borderRadius": "14px 14px 6px 6px",
+                "background": "linear-gradient(135deg, rgba(15, 23, 42, 0.78), rgba(76, 29, 149, 0.30))",
+                "border": "1px solid rgba(196, 181, 253, 0.24)",
+                "boxShadow": "0 16px 34px rgba(2, 6, 23, 0.22)",
             },
         ),
-        style={
-            "padding": "4px 2px 14px",
-            "marginBottom": "8px",
-        },
+        rx.fragment(),
     )
 
 
@@ -5081,14 +5152,16 @@ def _model_parameters_accordion() -> rx.Component:
             rx.cond(
                 ComposeState.has_params,
                 rx.el.div(
+                    _selected_model_values_panel(),
                     _explanations_panel(),
                     rx.el.div(
                         _gene_inputs_panel(),
                         _sculpture_params_panel(),
                         style={
                             "display": "flex",
-                            "gap": "12px",
-                            "marginBottom": "12px",
+                            "gap": "8px",
+                            "flexWrap": "wrap",
+                            "marginBottom": "8px",
                         },
                     ),
                 ),
@@ -5107,13 +5180,41 @@ def _model_parameters_accordion() -> rx.Component:
             icon_name="sparkles",
             title="Model parameters",
             on_toggle=ComposeState.toggle_sculpture_expanded,
+            right_badge=rx.cond(
+                ComposeState.has_params,
+                rx.el.span(
+                    ComposeState.param_pool_size,
+                    rx.el.span(" genes", style={"marginLeft": "2px"}),
+                    class_name="ui mini violet label",
+                    style={"fontSize": "0.74rem", "fontWeight": "800"},
+                ),
+                rx.fragment(),
+            ),
         ),
         body,
-        style={**_COLLAPSIBLE_STYLE, "backgroundColor": "rgba(15, 23, 42, 0.38)"},
+        style={
+            **_COLLAPSIBLE_STYLE,
+            "backgroundColor": "rgba(15, 23, 42, 0.38)",
+            "marginTop": "0",
+            "marginBottom": "10px",
+        },
     )
 
 
 def _model_action_panel() -> rx.Component:
+    compact_button_style = {
+        "width": "100%",
+        "padding": "14px 20px",
+        "fontSize": "1.04rem",
+        "fontWeight": "900",
+        "whiteSpace": "nowrap",
+    }
+    action_cell_style = {
+        "flex": "0 1 300px",
+        "minWidth": "260px",
+        "maxWidth": "340px",
+    }
+
     return rx.el.div(
         rx.el.div(
             rx.el.strong(
@@ -5133,21 +5234,39 @@ def _model_action_panel() -> rx.Component:
             ),
             style={"marginBottom": "8px"},
         ),
-        rx.el.button(
-            fomantic_icon("download", size=14),
-            rx.el.span(" Download 3D print file", style={"marginLeft": "6px"}),
-            on_click=ComposeState.download_artifacts,
-            class_name="ui primary button",
-            style={"width": "100%", "padding": "13px", "fontSize": "1.05rem", "fontWeight": "900"},
-        ),
-        _email_send_form(ComposeState, button_label="Send print file + report"),
-        rx.cond(
-            ComposeState.artex_section_visible,
+        rx.el.div(
             rx.el.div(
-                artex_publish_button(ComposeState, ComposeState.create_artex_project),
-                style={"marginTop": "8px"},
+                rx.el.button(
+                    fomantic_icon("download", size=14),
+                    rx.el.span(" Download 3D print file", style={"marginLeft": "6px"}),
+                    on_click=ComposeState.download_artifacts,
+                    class_name="ui primary button",
+                    style=compact_button_style,
+                ),
+                style=action_cell_style,
             ),
-            rx.fragment(),
+            rx.el.div(
+                _email_send_form(ComposeState, button_label="Send print file + report"),
+                style={
+                    "flex": "1 1 440px",
+                    "minWidth": "340px",
+                    "maxWidth": "620px",
+                },
+            ),
+            rx.cond(
+                ComposeState.artex_section_visible,
+                rx.el.div(
+                    artex_publish_button(ComposeState, ComposeState.create_artex_project),
+                    style=action_cell_style,
+                ),
+                rx.fragment(),
+            ),
+            style={
+                "display": "flex",
+                "flexWrap": "wrap",
+                "gap": "10px",
+                "alignItems": "flex-start",
+            },
         ),
         style={
             "padding": "12px",
@@ -5164,7 +5283,6 @@ def _sculpture_section_body() -> rx.Component:
     return rx.cond(
         ComposeState.has_stl,
         rx.el.div(
-            _model_reward_panel(),
             rx.el.div(
                 rx.el.div(
                     rx.el.iframe(
@@ -5191,8 +5309,10 @@ def _sculpture_section_body() -> rx.Component:
                     "flexWrap": "wrap",
                 },
             ),
-            _model_action_panel(),
+            _model_generation_story_panel(),
             _model_parameters_accordion(),
+            _model_action_panel(),
+            _materialization_support_panel(),
         ),
         rx.el.p(
             rx.cond(
@@ -7297,7 +7417,7 @@ def index_page() -> rx.Component:
     title=_page_title("/materialization"),
     description=_page_description("/materialization"),
     meta=_SOCIAL_META,
-    on_load=[ComposeState.apply_saved_report, ComposeState.apply_shared_report, ComposeState.apply_artex_params],
+    on_load=[ComposeState.apply_artex_params, ComposeState.apply_saved_report, ComposeState.apply_shared_report],
 )
 def materialization_page() -> rx.Component:
     """Materialization — 3D output, viewer, report, and export actions."""

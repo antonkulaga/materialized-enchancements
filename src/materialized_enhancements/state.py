@@ -366,6 +366,11 @@ def _has_artex_integration_settings(api_url: str, api_token: str, display_id: st
     return bool(api_url.strip() and api_token.strip() and display_id.strip())
 
 
+def _has_artex_ui_context(from_kiosk: bool) -> bool:
+    """Show wall controls only in an ARTEX launch context."""
+    return from_kiosk
+
+
 def _html_escape(value: object) -> str:
     """Minimal HTML escape for email bodies (avoids importing html for one func)."""
     return (
@@ -941,8 +946,9 @@ class ComposeState(rx.State):
             self.report_params_url = ""
             self.viewer_expanded = True
             self.materialization_artifact_tab = "model"
+            redirect_url = "/materialization?from=ARTEX" if self.artex_from_kiosk else "/materialization"
 
-        yield rx.redirect("/materialization")
+        yield rx.redirect(redirect_url)
 
         try:
             loop = asyncio.get_event_loop()
@@ -1029,8 +1035,7 @@ class ComposeState(rx.State):
     def apply_artex_params(self) -> None:
         """Read ?from=ARTEX, ?token=, ?display_id=, ?redirect= from the URL on page load."""
         params = self.router.url.query_parameters
-        if str(params.get("from", "")).strip() == "ARTEX":
-            self.artex_from_kiosk = True
+        self.artex_from_kiosk = str(params.get("from", "")).strip() == "ARTEX"
         token = str(params.get("token", "")).strip()
         if token:
             self.artex_api_token = token
@@ -1111,11 +1116,14 @@ class ComposeState(rx.State):
 
     @rx.var
     def artex_section_visible(self) -> bool:
-        """Show ARTEX UI only when wall-publish settings are configured."""
-        return _has_artex_integration_settings(
-            self.artex_api_url,
-            self.artex_api_token,
-            self.artex_display_id,
+        """Show ARTEX UI only when wall publishing is available in this context."""
+        return (
+            _has_artex_ui_context(self.artex_from_kiosk)
+            and _has_artex_integration_settings(
+                self.artex_api_url,
+                self.artex_api_token,
+                self.artex_display_id,
+            )
         )
 
     def download_artifacts(self):  # type: ignore[return]
@@ -2407,8 +2415,7 @@ class JigsawState(rx.State):
     def apply_artex_params(self) -> None:
         """Read ?from=ARTEX, ?token=, ?display_id=, ?redirect= from the URL on page load."""
         params = self.router.url.query_parameters
-        if str(params.get("from", "")).strip() == "ARTEX":
-            self.artex_from_kiosk = True
+        self.artex_from_kiosk = str(params.get("from", "")).strip() == "ARTEX"
         token = str(params.get("token", "")).strip()
         if token:
             self.artex_api_token = token
@@ -2491,11 +2498,14 @@ class JigsawState(rx.State):
 
     @rx.var
     def artex_section_visible(self) -> bool:
-        """Show ARTEX UI only when wall-publish settings are configured."""
-        return _has_artex_integration_settings(
-            self.artex_api_url,
-            self.artex_api_token,
-            self.artex_display_id,
+        """Show ARTEX UI only when wall publishing is available in this context."""
+        return (
+            _has_artex_ui_context(self.artex_from_kiosk)
+            and _has_artex_integration_settings(
+                self.artex_api_url,
+                self.artex_api_token,
+                self.artex_display_id,
+            )
         )
 
     @rx.var
