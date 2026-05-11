@@ -528,3 +528,63 @@ def _build_animal_prices(animals: list[AnimalEntry]) -> dict[str, int]:
 
 
 ANIMAL_PRICES: dict[str, int] = _build_animal_prices(ANIMAL_LIBRARY)
+
+
+STL_REPORT_PATH = Path(__file__).resolve().parents[2] / "data" / "output" / "stl_report.csv"
+STL_DIR = Path(__file__).resolve().parents[2] / "data" / "output" / "stl"
+
+_DIFFICULTY_ORDER = {"easy": 0, "medium": 1, "hard": 2, "expert": 3}
+
+
+class StlReportEntry(TypedDict):
+    gene_id: str
+    gene: str
+    category: str
+    pdb_id: str
+    protein_id: str
+    structure_source: str
+    render_style: str
+    file: str
+    triangles: int
+    dimensions_mm: str
+    max_dim_mm: float
+    surface_area_cm2: float
+    shells: int
+    tiny_shells: int
+    watertight: bool
+    aspect_ratio: float
+    difficulty: str
+
+
+def _load_stl_report() -> dict[str, StlReportEntry]:
+    """Load STL report CSV keyed by gene display name."""
+    if not STL_REPORT_PATH.exists():
+        return {}
+    df = pl.read_csv(STL_REPORT_PATH).fill_null("")
+    lookup: dict[str, StlReportEntry] = {}
+    for row in df.to_dicts():
+        gene_name = str(row.get("gene", "")).strip()
+        if gene_name:
+            lookup[gene_name] = StlReportEntry(
+                gene_id=str(row.get("gene_id", "")),
+                gene=gene_name,
+                category=str(row.get("category", "")),
+                pdb_id=str(row.get("pdb_id", "")),
+                protein_id=str(row.get("protein_id", "")),
+                structure_source=str(row.get("structure_source", "")),
+                render_style=str(row.get("render_style", "")),
+                file=str(row.get("file", "")),
+                triangles=int(row.get("triangles", 0)),
+                dimensions_mm=str(row.get("dimensions_mm", "")),
+                max_dim_mm=float(row.get("max_dim_mm", 0)),
+                surface_area_cm2=float(row.get("surface_area_cm2", 0)),
+                shells=int(row.get("shells", 0)),
+                tiny_shells=int(row.get("tiny_shells", 0)),
+                watertight=str(row.get("watertight", "")).lower() == "true",
+                aspect_ratio=float(row.get("aspect_ratio", 0)),
+                difficulty=str(row.get("difficulty", "medium")),
+            )
+    return lookup
+
+
+STL_REPORT: dict[str, StlReportEntry] = _load_stl_report()

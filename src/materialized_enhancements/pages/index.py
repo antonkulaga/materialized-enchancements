@@ -741,8 +741,64 @@ def _category_button(category: str) -> rx.Component:
 
 
 def _budget_gauge() -> rx.Component:
-    """Sticky credit budget gauge — the core resource constraint, always visible."""
+    """Sticky credit budget gauge with integrated mission briefing."""
+    briefing = rx.cond(
+        ComposeState.show_mission_brief,
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon("crosshairs", size=14, color="#a78bfa"),
+                    rx.el.span(
+                        "MISSION BRIEFING",
+                        style={
+                            "fontSize": "0.65rem",
+                            "fontWeight": "900",
+                            "letterSpacing": "0.14em",
+                            "color": "#a78bfa",
+                        },
+                    ),
+                    style={"display": "flex", "alignItems": "center", "gap": "5px"},
+                ),
+                rx.el.span(
+                    fomantic_icon("times", size=11, color="#64748b"),
+                    on_click=ComposeState.dismiss_mission_brief,
+                    style={
+                        "cursor": "pointer",
+                        "opacity": "0.6",
+                        "padding": "3px",
+                        "borderRadius": "4px",
+                        "transition": "opacity 0.2s",
+                    },
+                    _hover={"opacity": "1"},
+                ),
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "marginBottom": "4px",
+                },
+            ),
+            rx.el.p(
+                "Design one enhanced human. You have ",
+                rx.el.strong(f"{DEFAULT_BUDGET} enhancement credits", style={"color": "#c4b5fd"}),
+                " and real genes from extraordinary organisms. "
+                "Every upgrade has a biological tradeoff — you cannot maximize everything.",
+                style={
+                    "fontSize": "0.82rem",
+                    "lineHeight": "1.45",
+                    "color": "#94a3b8",
+                    "margin": "0",
+                },
+            ),
+            style={
+                "padding": "0 0 8px",
+                "marginBottom": "8px",
+                "borderBottom": "1px solid rgba(167, 139, 250, 0.15)",
+            },
+        ),
+    )
     return rx.el.div(
+        briefing,
         rx.el.div(
             rx.el.div(
                 fomantic_icon("bolt", size=16, style={"color": ComposeState.budget_spent_color, "transition": "color 0.35s ease"}),
@@ -2112,14 +2168,14 @@ def _rpg_selected_gene_chip(gene_item: rx.Var) -> rx.Component:
 def _rpg_schema_hint_panel() -> rx.Component:
     return rx.el.details(
         rx.el.summary(
-            fomantic_icon("map outline", size=12, color="#22d3ee"),
+            fomantic_icon("map outline", size=18, color="#22d3ee"),
             rx.el.span(" How it works", style={"marginLeft": "7px"}),
             style={
                 "cursor": "pointer",
                 "listStyle": "none",
                 "display": "flex",
                 "alignItems": "center",
-                "fontSize": "0.8rem",
+                "fontSize": "1.2rem",
                 "fontWeight": "900",
                 "letterSpacing": "0.08em",
                 "textTransform": "uppercase",
@@ -2163,14 +2219,14 @@ def _rpg_schema_hint_panel() -> rx.Component:
 def _rpg_intro_video_panel() -> rx.Component:
     return rx.el.details(
         rx.el.summary(
-            fomantic_icon("video", size=12, color="#c4b5fd"),
+            fomantic_icon("video", size=18, color="#c4b5fd"),
             rx.el.span(" Project video", style={"marginLeft": "7px"}),
             style={
                 "cursor": "pointer",
                 "listStyle": "none",
                 "display": "flex",
                 "alignItems": "center",
-                "fontSize": "0.8rem",
+                "fontSize": "1.2rem",
                 "fontWeight": "900",
                 "letterSpacing": "0.08em",
                 "textTransform": "uppercase",
@@ -2212,7 +2268,6 @@ def _rpg_intro_video_panel() -> rx.Component:
             "border": "1px solid rgba(167, 139, 250, 0.24)",
             "background": "rgba(46, 16, 101, 0.2)",
         },
-        open=True,
     )
 
 
@@ -4022,6 +4077,7 @@ def _artifact_inventory_panel() -> rx.Component:
 
 def _rpg_materialization_output() -> rx.Component:
     return rx.el.div(
+        _pdb_viewer_scripts(),
         rx.el.textarea(
             value=ComposeState.stl_base64,
             id="stl-b64-data",
@@ -4763,6 +4819,42 @@ def _rpg_flow_css() -> rx.Component:
                 width: 58px !important;
                 height: 58px !important;
             }
+        }
+        .me-protein-stl-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+        @media (min-width: 900px) {
+            .me-protein-stl-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+        }
+        @media (min-width: 1400px) {
+            .me-protein-stl-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        details.me-protein-stl-card > summary::-webkit-details-marker {
+            display: none;
+        }
+        details.me-protein-stl-card > summary::marker {
+            content: "";
+        }
+        details.me-protein-stl-card > summary {
+            user-select: none;
+        }
+        details.me-protein-stl-card:hover > summary .me-protein-view3d-btn {
+            background-color: rgba(167, 139, 250, 0.22) !important;
+            border-color: rgba(167, 139, 250, 0.5) !important;
+        }
+        details.me-protein-stl-card[open] {
+            border-color: rgba(167, 139, 250, 0.28) !important;
+            background-color: rgba(15, 23, 42, 0.5) !important;
+        }
+        details.me-protein-stl-card[open] > summary .me-protein-view3d-btn {
+            display: none;
         }
         """
     )
@@ -5546,6 +5638,225 @@ def _model_action_panel() -> rx.Component:
     )
 
 
+def _protein_stl_row(entry: dict) -> rx.Component:
+    """Foldable card for a protein STL with embedded PDB viewer."""
+    diff = entry["difficulty"]
+    diff_color = rx.match(
+        diff,
+        ("easy", "#22c55e"),
+        ("medium", "#eab308"),
+        ("hard", "#f97316"),
+        ("expert", "#ef4444"),
+        "#9ca3af",
+    )
+    diff_icon = rx.match(
+        diff,
+        ("easy", "check circle"),
+        ("medium", "info circle"),
+        ("hard", "exclamation triangle"),
+        ("expert", "warning sign"),
+        "question circle",
+    )
+    has_structure = entry["structure_pdb"] != ""
+
+    view_3d_btn = rx.cond(
+        has_structure,
+        rx.el.div(
+            fomantic_icon("cube", size=11, color="#a78bfa"),
+            rx.el.span(" View 3D", style={"fontSize": "0.76rem", "fontWeight": "700"}),
+            class_name="me-protein-view3d-btn",
+            style={
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "3px",
+                "color": "#c4b5fd",
+                "padding": "3px 10px",
+                "borderRadius": "5px",
+                "border": "1px solid rgba(167, 139, 250, 0.35)",
+                "backgroundColor": "rgba(167, 139, 250, 0.12)",
+                "cursor": "pointer",
+                "transition": "background-color 0.15s, border-color 0.15s",
+            },
+        ),
+        rx.fragment(),
+    )
+
+    summary_row = rx.el.summary(
+        rx.el.div(
+            rx.el.div(
+                rx.el.span(
+                    entry["gene"],
+                    style={"fontWeight": "700", "fontSize": "0.92rem", "color": "#f1f5f9"},
+                ),
+                rx.el.div(
+                    fomantic_icon(diff_icon, size=12),
+                    rx.el.span(diff, style={"fontSize": "0.74rem", "textTransform": "capitalize"}),
+                    style={"color": diff_color, "display": "inline-flex", "alignItems": "center", "gap": "3px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "gap": "8px"},
+            ),
+            rx.el.div(
+                rx.el.span(
+                    entry["source_label"],
+                    style={"fontSize": "0.74rem", "color": "#94a3b8"},
+                ),
+                view_3d_btn,
+                rx.el.button(
+                    fomantic_icon("download", size=11),
+                    rx.el.span(" STL", style={"fontSize": "0.72rem", "fontWeight": "600"}),
+                    on_click=ComposeState.download_protein_stl(entry["gene"]),
+                    class_name="ui mini icon button",
+                    style={
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "gap": "2px",
+                        "padding": "3px 8px",
+                        "background": "rgba(124, 58, 237, 0.2)",
+                        "border": "1px solid rgba(124, 58, 237, 0.35)",
+                        "color": "#c4b5fd",
+                        "borderRadius": "5px",
+                        "cursor": "pointer",
+                        "flexShrink": "0",
+                    },
+                ),
+                style={"display": "flex", "alignItems": "center", "gap": "6px", "flexWrap": "wrap"},
+            ),
+            style={"display": "flex", "flexDirection": "column", "gap": "4px", "flex": "1", "minWidth": "0"},
+        ),
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "8px",
+            "padding": "8px 10px",
+            "cursor": "pointer",
+            "listStyle": "none",
+        },
+    )
+
+    viewer_panel = rx.cond(
+        has_structure,
+        rx.el.div(
+            rx.el.div(
+                class_name="me-pdb-viewer",
+                custom_attrs={"data-pdb-src": entry["pdb_src_url"]},
+                style={
+                    "width": "100%",
+                    "height": "240px",
+                    "borderRadius": "6px",
+                    "border": "1px solid rgba(167, 139, 250, 0.28)",
+                    "background": "#0f172a",
+                    "position": "relative",
+                    "overflow": "hidden",
+                },
+            ),
+            rx.el.p(
+                "Drag to rotate · Scroll to zoom",
+                style={"fontSize": "0.7rem", "color": "#64748b", "textAlign": "center", "margin": "3px 0 0"},
+            ),
+            style={"padding": "6px 8px 4px"},
+        ),
+        rx.el.div(
+            rx.el.span(
+                "3D preview not available",
+                style={"fontSize": "0.76rem", "color": "#64748b", "fontStyle": "italic"},
+            ),
+            style={"padding": "8px"},
+        ),
+    )
+
+    detail_row = rx.el.div(
+        rx.el.div(
+            rx.el.span(entry["triangles"].to(str) + " tris · " + entry["shells"].to(str) + " shells"),
+            style={"fontSize": "0.72rem", "color": "#64748b"},
+        ),
+        rx.el.div(
+            rx.el.span("Dimensions: ", style={"color": "#94a3b8"}),
+            rx.el.span(entry["dimensions_mm"], style={"color": "#cbd5e1"}),
+            style={"fontSize": "0.72rem"},
+        ),
+        rx.cond(
+            entry["watertight"],
+            rx.fragment(),
+            rx.el.div(
+                fomantic_icon("exclamation triangle", size=10, color="#f97316"),
+                rx.el.span(" May need mesh repair", style={"color": "#f97316"}),
+                style={"fontSize": "0.72rem", "display": "flex", "alignItems": "center"},
+            ),
+        ),
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "2px",
+            "padding": "4px 9px 7px",
+        },
+    )
+
+    return rx.el.details(
+        summary_row,
+        viewer_panel,
+        detail_row,
+        class_name="me-protein-stl-card",
+        style={
+            "borderRadius": "8px",
+            "backgroundColor": "rgba(15, 23, 42, 0.35)",
+            "border": "1px solid rgba(148, 163, 184, 0.1)",
+            "overflow": "hidden",
+        },
+    )
+
+
+def _protein_stl_panel() -> rx.Component:
+    """Panel listing downloadable protein structure STLs for the selected genes."""
+    return rx.cond(
+        ComposeState.protein_stl_entries.length() > 0,
+        rx.el.div(
+            rx.el.div(
+                fomantic_icon("dna", size=16),
+                rx.el.span(
+                    " Printable protein structures",
+                    style={"fontWeight": "600", "fontSize": "1.05rem", "color": "#f8fafc"},
+                ),
+                style={"display": "flex", "alignItems": "center", "gap": "6px", "marginBottom": "6px"},
+            ),
+            rx.el.div(
+                fomantic_icon("exclamation triangle", size=12),
+                rx.el.span(
+                    " You can also 3D print the individual protein structures included in your character. "
+                    "Be careful — unlike the sculpture above, some of these are hard to 3D print "
+                    "and may need mesh repair.",
+                    style={"fontSize": "0.84rem", "lineHeight": "1.45"},
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "flex-start",
+                    "gap": "6px",
+                    "padding": "8px 10px",
+                    "borderRadius": "6px",
+                    "backgroundColor": "rgba(234, 179, 8, 0.12)",
+                    "color": "#fbbf24",
+                    "marginBottom": "10px",
+                    "border": "1px solid rgba(234, 179, 8, 0.25)",
+                },
+            ),
+            rx.el.div(
+                rx.foreach(
+                    ComposeState.protein_stl_entries,
+                    _protein_stl_row,
+                ),
+                class_name="me-protein-stl-grid",
+            ),
+            style={
+                "padding": "14px",
+                "borderRadius": "10px",
+                "backgroundColor": "rgba(15, 23, 42, 0.46)",
+                "marginTop": "12px",
+                "border": "1px solid rgba(124, 58, 237, 0.2)",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
 def _sculpture_section_body() -> rx.Component:
     """Printable model contents without the outer accordion header."""
     return rx.cond(
@@ -5580,15 +5891,53 @@ def _sculpture_section_body() -> rx.Component:
             _model_generation_story_panel(),
             _model_parameters_accordion(),
             _model_action_panel(),
+            _protein_stl_panel(),
             _materialization_support_panel(),
         ),
-        rx.el.p(
-            rx.cond(
-                ComposeState.generating,
-                "Building your printable 3D model. The viewer will appear here as soon as it is ready.",
-                "Click Materialize from Character profile to build a printable 3D model.",
+        rx.cond(
+            ComposeState.generating,
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon("cog", size=28, style={"animation": "me-spin 2s linear infinite", "color": "#7c3aed"}),
+                    style={"textAlign": "center", "marginBottom": "16px"},
+                ),
+                rx.el.p(
+                    "Building your printable 3D model…",
+                    style={"color": "#e0d6f7", "fontSize": "1.05rem", "textAlign": "center", "marginBottom": "12px", "fontWeight": "500"},
+                ),
+                rx.el.div(
+                    rx.el.div(
+                        style={
+                            "height": "100%",
+                            "width": "40%",
+                            "borderRadius": "6px",
+                            "background": "linear-gradient(90deg, #7c3aed, #a78bfa, #7c3aed)",
+                            "backgroundSize": "200% 100%",
+                            "animation": "me-progress-slide 1.8s ease-in-out infinite",
+                        },
+                    ),
+                    style={
+                        "width": "280px",
+                        "height": "6px",
+                        "borderRadius": "6px",
+                        "backgroundColor": "rgba(124, 58, 237, 0.15)",
+                        "margin": "0 auto",
+                        "overflow": "hidden",
+                    },
+                ),
+                rx.el.p(
+                    "The viewer will appear here as soon as it is ready.",
+                    style={"color": "#9ca3af", "fontSize": "0.82rem", "textAlign": "center", "marginTop": "10px"},
+                ),
+                rx.el.style(
+                    "@keyframes me-progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }"
+                ),
+                style={"padding": "40px 12px"},
             ),
-            style={"color": "#9ca3af", "fontSize": "0.9rem", "textAlign": "center", "padding": "24px 12px"},
+            rx.el.p(
+                "Click Materialize from Character profile to build a printable 3D model.",
+                style={"color": "#9ca3af", "fontSize": "0.9rem", "textAlign": "center", "padding": "24px 12px"},
+            ),
         ),
     )
 

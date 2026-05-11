@@ -24,7 +24,10 @@ from materialized_enhancements.gene_data import (
     GENE_PRICES,
     SPECIES_GENE_IDS,
     SPECIES_LOOKUP,
+    STL_DIR,
+    STL_REPORT,
     UNIQUE_CATEGORIES,
+    _DIFFICULTY_ORDER,
     species_wikipedia_url,
 )
 from materialized_enhancements.puzzle import HUMAN_SPECIES_ID, build_jigsaw_svg
@@ -724,6 +727,7 @@ class ComposeState(rx.State):
     stl_filename: str = ""
     stl_download_path: str = ""
     pipeline_stats: Dict[str, Any] = {}
+    show_mission_brief: bool = True
     choice_expanded: bool = True
     sculpture_expanded: bool = False
     viewer_expanded: bool = True
@@ -986,6 +990,9 @@ class ComposeState(rx.State):
             self.report_expanded = True
             self.materialization_artifact_tab = "model"
 
+    def dismiss_mission_brief(self) -> None:
+        self.show_mission_brief = False
+
     def toggle_choice_expanded(self) -> None:
         self.choice_expanded = not self.choice_expanded
 
@@ -1146,6 +1153,43 @@ class ComposeState(rx.State):
             data=json.dumps(artifact, indent=2).encode("utf-8"),
             filename=json_name,
         )
+
+    @rx.var
+    def protein_stl_entries(self) -> list[dict[str, Any]]:
+        """STL report rows for included genes, sorted by print difficulty (hardest first)."""
+        entries: list[dict[str, Any]] = []
+        for gene_name in self.included_genes:
+            info = STL_REPORT.get(gene_name)
+            if info:
+                row = dict(info)
+                src = row.get("structure_source", "")
+                pdb = row.get("pdb_id", "")
+                row["source_label"] = "AlphaFold predicted" if src == "alphafold" else (f"PDB {pdb}" if pdb else "")
+                protein_id = row.get("protein_id", "")
+                if src == "alphafold" and protein_id:
+                    row["structure_pdb"] = f"{protein_id}_predicted.pdb"
+                    row["pdb_src_url"] = f"/structures/{protein_id}_predicted.pdb"
+                elif pdb:
+                    row["structure_pdb"] = f"{pdb}.pdb"
+                    row["pdb_src_url"] = f"/structures/{pdb}.pdb"
+                else:
+                    row["structure_pdb"] = ""
+                    row["pdb_src_url"] = ""
+                entries.append(row)
+        entries.sort(key=lambda r: _DIFFICULTY_ORDER.get(r.get("difficulty", "medium"), 1))
+        return entries
+
+    def download_protein_stl(self, gene_name: str):  # type: ignore[return]
+        """Download an individual protein structure STL file."""
+        info = STL_REPORT.get(gene_name)
+        if not info:
+            yield rx.toast.error(f"No STL data for {gene_name}")
+            return
+        stl_path = STL_DIR / info["file"]
+        if not stl_path.exists():
+            yield rx.toast.error(f"STL file not found: {info['file']}")
+            return
+        yield rx.download(data=stl_path.read_bytes(), filename=info["file"])
 
     @rx.var
     def can_publish_report(self) -> bool:

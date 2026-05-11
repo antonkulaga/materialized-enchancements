@@ -361,5 +361,212 @@ def generate(
         raise typer.Exit(1)
 
 
+GENE_PROPS_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "input" / "gene_properties.csv"
+STL_REPORT_PATH = Path("data/output/stl_report.csv")
+
+
+def _build_stl_gene_map(stl_dir: Path) -> dict[str, dict[str, str]]:
+    """Map STL filename stem → {gene_id, gene, pdb_id, protein_id, category} from gene_properties."""
+    import polars as pl
+
+    if not GENE_PROPS_PATH.exists():
+        return {}
+    df = pl.read_csv(GENE_PROPS_PATH)
+    lookup: dict[str, dict[str, str]] = {}
+    for row in df.to_dicts():
+        gene_id = row["gene_id"].strip()
+        gene = str(row.get("gene", "")).strip()
+        pdb_id = str(row.get("pdb_id") or "").strip()
+        protein_id = str(row.get("protein_id") or "").strip()
+        category = str(row.get("category") or "").strip()
+        has_af = str(row.get("has_alphafold") or "").strip().lower() == "true"
+
+        if pdb_id:
+            lookup[pdb_id] = {"gene_id": gene_id, "gene": gene, "pdb_id": pdb_id, "protein_id": protein_id, "category": category, "source": "rcsb"}
+        if has_af and protein_id:
+            lookup[f"{protein_id}_predicted"] = {"gene_id": gene_id, "gene": gene, "pdb_id": pdb_id, "protein_id": protein_id, "category": category, "source": "alphafold"}
+    return lookup
+
+
+class SortKey(str, Enum):
+    name = "name"
+    triangles = "triangles"
+    volume = "volume"
+    shells = "shells"
+    sa_vol = "sa_vol"
+    difficulty = "difficulty"
+
+
+def _analyze_stl(stl_path: Path) -> dict:
+    import trimesh
+
+    mesh = trimesh.load(stl_path, force="mesh")
+    bounds = mesh.bounds
+    dims = bounds[1] - bounds[0]
+    area = float(mesh.area)
+    parts = mesh.split(only_watertight=False)
+    shells = len(parts)
+    is_watertight = bool(mesh.is_watertight)
+    tri_count = len(mesh.faces)
+
+    max_dim = float(dims.max())
+    aspect = float(dims.max() / dims.min()) if dims.min() > 0 else float("inf")
+
+    tiny_shells = sum(1 for p in parts if len(p.faces) < 20)
+
+    # Difficulty scoring tuned for protein cartoon meshes:
+    # - shells dominate (disconnected parts = structural fragility)
+    # - triangle count affects slicer performance
+    # - dimensions determine print bed fit and minimum feature size
+    score = 0
+    if shells > 200:
+        score += 4
+    elif shells > 50:
+        score += 3
+    elif shells > 15:
+        score += 2
+    elif shells > 5:
+        score += 1
+
+    if tiny_shells > 20:
+        score += 2
+    elif tiny_shells > 5:
+        score += 1
+
+    if tri_count > 400_000:
+        score += 2
+    elif tri_count > 200_000:
+        score += 1
+
+    if max_dim > 1200:
+        score += 1
+
+    if aspect > 6:
+        score += 1
+
+    if score <= 1:
+        difficulty = "easy"
+    elif score <= 3:
+        difficulty = "medium"
+    elif score <= 5:
+        difficulty = "hard"
+    else:
+        difficulty = "expert"
+
+    return {
+        "file": stl_path.name,
+        "triangles": tri_count,
+        "dimensions_mm": f"{dims[0]:.1f} x {dims[1]:.1f} x {dims[2]:.1f}",
+        "surface_area_cm2": round(area / 100, 2),
+        "shells": shells,
+        "tiny_shells": tiny_shells,
+        "watertight": is_watertight,
+        "aspect_ratio": round(aspect, 1),
+        "max_dim_mm": round(max_dim, 1),
+        "difficulty": difficulty,
+        "_score": score,
+    }
+
+
+@app.command("check")
+def check(
+    stl_files: list[Path] = typer.Argument(None, help="STL file(s) to analyze."),
+    all_stls: bool = typer.Option(False, "--all", help="Analyze all STLs in data/output/stl/"),
+    sort_by: SortKey = typer.Option(SortKey.difficulty, "--sort", "-s", help="Sort results by metric"),
+    csv_out: bool = typer.Option(True, "--csv/--no-csv", help="Write joined CSV report"),
+    stl_dir: Path = typer.Option(OUTPUT_DIR, "--stl-dir", help="STL directory for --all"),
+) -> None:
+    """Evaluate print complexity of STL files and write a joined gene→PDB→STL report."""
+    if all_stls:
+        if not stl_dir.exists():
+            typer.echo(f"STL directory not found: {stl_dir}", err=True)
+            raise typer.Exit(1)
+        files = sorted(stl_dir.glob("*.stl"))
+    elif stl_files:
+        files = stl_files
+    else:
+        typer.echo("Provide STL file(s) or use --all.", err=True)
+        raise typer.Exit(1)
+
+    if not files:
+        typer.echo("No STL files found.", err=True)
+        raise typer.Exit(1)
+
+    gene_map = _build_stl_gene_map(stl_dir)
+
+    results: list[dict] = []
+    for stl in files:
+        if not stl.exists():
+            typer.echo(f"  SKIP {stl.name} (not found)")
+            continue
+        try:
+            info = _analyze_stl(stl)
+            stem = stl.stem
+            style_suffix = stem.rsplit("_", 1)[-1]
+            pdb_stem = stem[: -(len(style_suffix) + 1)] if "_" in stem else stem
+            gene_info = gene_map.get(pdb_stem, {})
+            info["gene_id"] = gene_info.get("gene_id", "")
+            info["gene"] = gene_info.get("gene", "")
+            info["pdb_id"] = gene_info.get("pdb_id", "")
+            info["protein_id"] = gene_info.get("protein_id", "")
+            info["category"] = gene_info.get("category", "")
+            info["structure_source"] = gene_info.get("source", "")
+            info["render_style"] = style_suffix
+            results.append(info)
+        except Exception as e:
+            typer.echo(f"  ERROR {stl.name}: {e}")
+
+    sort_map = {
+        SortKey.name: lambda r: r["file"],
+        SortKey.triangles: lambda r: r["triangles"],
+        SortKey.volume: lambda r: r["surface_area_cm2"],
+        SortKey.shells: lambda r: r["shells"],
+        SortKey.sa_vol: lambda r: r["max_dim_mm"],
+        SortKey.difficulty: lambda r: r["_score"],
+    }
+    results.sort(key=sort_map[sort_by], reverse=sort_by != SortKey.name)
+
+    diff_symbols = {"easy": "●", "medium": "◐", "hard": "◑", "expert": "○"}
+
+    header = (
+        f"{'Gene':<12} {'File':<40} {'Tris':>8} {'Max mm':>7} {'Shells':>6} "
+        f"{'Tiny':>5} {'SA cm²':>9} {'AR':>5} {'Difficulty':>12}"
+    )
+    typer.echo(header)
+    typer.echo("─" * len(header))
+
+    counts: dict[str, int] = {"easy": 0, "medium": 0, "hard": 0, "expert": 0}
+    for r in results:
+        d = r["difficulty"]
+        counts[d] = counts.get(d, 0) + 1
+        sym = diff_symbols.get(d, "?")
+        gene_label = (r["gene"] or r["gene_id"] or "?")[:11]
+        typer.echo(
+            f"{gene_label:<12} {r['file']:<40} {r['triangles']:>8,} {r['max_dim_mm']:>7.0f} {r['shells']:>6} "
+            f"{r['tiny_shells']:>5} {r['surface_area_cm2']:>9.1f} {r['aspect_ratio']:>5.1f} "
+            f"{sym} {d:>10}"
+        )
+
+    typer.echo(f"\n{len(results)} files analyzed")
+    for d in ("easy", "medium", "hard", "expert"):
+        if counts.get(d):
+            typer.echo(f"  {diff_symbols[d]} {d}: {counts[d]}")
+
+    if csv_out and results:
+        import polars as pl
+
+        csv_columns = [
+            "gene_id", "gene", "category", "pdb_id", "protein_id",
+            "structure_source", "render_style", "file",
+            "triangles", "dimensions_mm", "max_dim_mm", "surface_area_cm2",
+            "shells", "tiny_shells", "watertight", "aspect_ratio", "difficulty",
+        ]
+        rows = [{k: r.get(k, "") for k in csv_columns} for r in results]
+        df = pl.DataFrame(rows)
+        STL_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        df.write_csv(STL_REPORT_PATH)
+        typer.echo(f"\nCSV report: {STL_REPORT_PATH.resolve()}")
+
+
 def main() -> None:
     app()
