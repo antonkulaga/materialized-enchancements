@@ -283,8 +283,54 @@ def resolve(
         print("\n(dry-run mode — no files written)")
 
 
-STRUCTURES_DIR = DATA_DIR / "structures"
+STRUCTURES_DIR = Path(__file__).resolve().parents[2] / "assets" / "structures"
 RCSB_PDB_URL = "https://files.rcsb.org/download/{pdb_id}.pdb"
+RCSB_GRAPHQL = "https://data.rcsb.org/graphql"
+
+_CHAIN_QUERY = """{
+  entry(entry_id: "%s") {
+    polymer_entities {
+      entity_poly { pdbx_strand_id }
+      uniprots {
+        rcsb_uniprot_container_identifiers { uniprot_id }
+      }
+    }
+  }
+}"""
+
+
+def _resolve_chain(client: httpx.Client, pdb_id: str, uniprot_id: str) -> str | None:
+    """Find which PDB chain(s) map to a given UniProt accession via RCSB GraphQL."""
+    resp = client.post(RCSB_GRAPHQL, json={"query": _CHAIN_QUERY % pdb_id})
+    if resp.status_code != 200:
+        return None
+    entry = resp.json().get("data", {}).get("entry")
+    if not entry:
+        return None
+    for entity in entry["polymer_entities"]:
+        uniprots = entity.get("uniprots") or []
+        uids = [u["rcsb_uniprot_container_identifiers"]["uniprot_id"] for u in uniprots]
+        if uniprot_id in uids:
+            strand = entity["entity_poly"]["pdbx_strand_id"]
+            return strand.split(",")[0].strip()
+    return None
+
+
+def _filter_pdb_chain(pdb_text: str, chain_id: str) -> str:
+    """Keep only records belonging to a specific chain in PDB-format text."""
+    kept: list[str] = []
+    for line in pdb_text.splitlines(keepends=True):
+        rec = line[:6].rstrip()
+        if rec in ("ATOM", "HETATM", "TER", "ANISOU"):
+            if len(line) > 21 and line[21] == chain_id:
+                kept.append(line)
+        elif rec in ("MODEL", "ENDMDL", "END", "HEADER", "TITLE", "REMARK",
+                      "CRYST1", "SCALE1", "SCALE2", "SCALE3", "ORIGX1",
+                      "ORIGX2", "ORIGX3", "MASTER"):
+            kept.append(line)
+    if not kept or not kept[-1].startswith("END"):
+        kept.append("END\n")
+    return "".join(kept)
 
 
 def _alphafold_pdb_url(client: httpx.Client, accession: str) -> str | None:
@@ -301,12 +347,13 @@ def _alphafold_pdb_url(client: httpx.Client, accession: str) -> str | None:
 
 def download_structures(
     force: bool = typer.Option(False, "--force", help="Re-download even if file exists"),
+    single_chain: bool = typer.Option(True, "--single-chain/--full-complex", help="Extract only the gene's chain"),
 ) -> None:
     """Download PDB structure files for all resolved proteins.
 
-    Experimental structures come from RCSB PDB.  When no experimental
-    structure exists but AlphaFold has a prediction, that is downloaded
-    instead with a ``_predicted`` suffix.
+    Experimental structures come from RCSB PDB.  By default, only the chain
+    matching the gene's UniProt accession is kept (--single-chain).
+    AlphaFold predictions are already single-chain.
     """
     props_df = pl.read_csv(GENE_PROPS_PATH)
     STRUCTURES_DIR.mkdir(parents=True, exist_ok=True)
@@ -323,6 +370,7 @@ def download_structures(
             id_type = str(row.get("id_type") or "").strip()
             has_af = str(row.get("has_alphafold") or "").strip().lower() == "true"
 
+            is_alphafold = False
             if pdb_id:
                 dest = STRUCTURES_DIR / f"{pdb_id}.pdb"
                 url = RCSB_PDB_URL.format(pdb_id=pdb_id)
@@ -337,6 +385,7 @@ def download_structures(
                     continue
                 url = af_url
                 label = f"{gene_id} → AlphaFold {protein_id}"
+                is_alphafold = True
             else:
                 continue
 
@@ -346,21 +395,34 @@ def download_structures(
                 continue
 
             resp = client.get(url, follow_redirects=True)
-            if resp.status_code == 200:
-                dest.write_bytes(resp.content)
-                log.info("%-45s OK  %s  (%.1f KB)", label, dest.name, len(resp.content) / 1024)
-                downloaded += 1
-            else:
+            if resp.status_code != 200:
                 log.warning("%-45s FAILED  HTTP %d", label, resp.status_code)
                 failed.append(f"{label}: HTTP {resp.status_code}")
+                time.sleep(0.25)
+                continue
 
+            pdb_text = resp.text
+            chain_info = ""
+
+            if single_chain and pdb_id and not is_alphafold and protein_id:
+                chain = _resolve_chain(client, pdb_id, protein_id)
+                if chain:
+                    pdb_text = _filter_pdb_chain(pdb_text, chain)
+                    chain_info = f" [chain {chain}]"
+                else:
+                    chain_info = " [all chains — no UniProt match found]"
+
+            pdb_bytes = pdb_text.encode()
+            dest.write_bytes(pdb_bytes)
+            log.info("%-45s OK  %s  (%.1f KB)%s", label, dest.name, len(pdb_bytes) / 1024, chain_info)
+            downloaded += 1
             time.sleep(0.25)
 
     print(f"\n{'='*60}")
     print(f"Downloaded: {downloaded}  |  Skipped (exist): {skipped}  |  Failed: {len(failed)}")
     for f in failed:
         print(f"  {f}")
-    print(f"\nStructures directory: {STRUCTURES_DIR}")
+    print(f"\nStructures: {STRUCTURES_DIR}")
 
 
 resolve_app = typer.Typer()

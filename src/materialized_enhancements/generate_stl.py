@@ -23,7 +23,7 @@ import typer
 
 log = logging.getLogger(__name__)
 
-STRUCTURES_DIR = Path("data/input/structures")
+STRUCTURES_DIR = Path("assets/structures")
 OUTPUT_DIR = Path("data/output/stl")
 SCRIPT_PATH = Path(__file__).resolve().parent.parent.parent / "scripts" / "3dp_jmol" / "3DP-Jmol.v.alfa1.public"
 
@@ -278,7 +278,7 @@ def setup(
 @app.command("generate")
 def generate(
     pdb_files: list[Path] = typer.Argument(None, help="PDB file(s) to convert. Use --all for batch."),
-    all_structures: bool = typer.Option(False, "--all", help="Process all PDB files in data/input/structures/"),
+    all_structures: bool = typer.Option(False, "--all", help="Process all PDB files in assets/structures/"),
     style: RenderStyle = typer.Option(RenderStyle.cartoon, "--style", "-s", help="Rendering style"),
     scale: float = typer.Option(0, "--scale", help="Print scale (0 = auto-max, 0.3 = 30%%)"),
     hydrogen: bool = typer.Option(False, "--hydrogen/--no-hydrogen", help="Include hydrogen atoms"),

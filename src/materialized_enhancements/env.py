@@ -72,6 +72,7 @@ GENERATED_PUBLIC_DIR: Path = Path(
 GENERATED_URL_PREFIX: str = "/" + os.getenv("GENERATED_URL_PREFIX", "/generated").strip().strip("/")
 
 
+
 def ensure_generated_public_dirs() -> None:
     """Create generated public output folders for fresh clones and runtime use."""
     (GENERATED_PUBLIC_DIR / "reports").mkdir(parents=True, exist_ok=True)

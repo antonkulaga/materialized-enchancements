@@ -134,6 +134,7 @@ class SculptureSelectedGene(TypedDict):
     gene_url: str
     alphafold_url: str
     pdb_url: str
+    structure_pdb: str
     puzzle_svg: str
     puzzle_src: str
     species_page_url: str
@@ -1600,6 +1601,7 @@ class ComposeState(rx.State):
                 "gene_url": g.get("gene_url", ""),
                 "alphafold_url": g.get("alphafold_url", ""),
                 "pdb_url": g.get("pdb_url", ""),
+                "structure_pdb": g.get("structure_pdb", ""),
                 "puzzle_svg": g["puzzle_svg"],
                 "puzzle_src": f"/puzzle/{quote(g['puzzle_svg'])}" if g["puzzle_svg"] else "",
                 "species_page_url": g.get("species_page_url", ""),

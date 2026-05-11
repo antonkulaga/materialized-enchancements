@@ -1372,6 +1372,81 @@ def _gene_category_accent_color(category: rx.Var) -> rx.Var:
     )
 
 
+def _confidence_bar_count(confidence_value: rx.Var) -> rx.Var:
+    """Map confidence tier to number of lit bars (0–4)."""
+    val_lower = confidence_value.lower()
+    return rx.match(
+        val_lower,
+        ("very high", 4),
+        ("high", 3),
+        ("medium-high", 3),
+        ("medium", 2),
+        ("medium-low", 1),
+        ("low-medium", 1),
+        ("low", 1),
+        ("declining", 0),
+        ("n/a", 0),
+        0,
+    )
+
+
+def _confidence_bar_color(confidence_value: rx.Var) -> rx.Var:
+    """Color for lit bars — green for strong, amber for mid, red for weak."""
+    val_lower = confidence_value.lower()
+    return rx.match(
+        val_lower,
+        ("very high", "#10b981"),
+        ("high", "#10b981"),
+        ("medium-high", "#0ea5e9"),
+        ("medium", "#f59e0b"),
+        ("medium-low", "#ef4444"),
+        ("low-medium", "#ef4444"),
+        ("low", "#ef4444"),
+        ("declining", "#ef4444"),
+        ("n/a", "#64748b"),
+        "#64748b",
+    )
+
+
+def _confidence_signal_bars(confidence_value: rx.Var) -> rx.Component:
+    """Compact 4-bar signal-strength indicator for confidence tier."""
+    n_lit = _confidence_bar_count(confidence_value).to(int)
+    color = _confidence_bar_color(confidence_value)
+    dim = "rgba(148, 163, 184, 0.22)"
+
+    def _bar(index: int) -> rx.Component:
+        height = f"{5 + index * 3}px"
+        return rx.el.div(
+            style={
+                "width": "3px",
+                "height": height,
+                "borderRadius": "1px",
+                "backgroundColor": rx.cond(n_lit > index, color, dim),
+                "transition": "background-color 0.2s ease",
+            },
+        )
+
+    return rx.cond(
+        confidence_value != "",
+        rx.el.div(
+            _bar(0),
+            _bar(1),
+            _bar(2),
+            _bar(3),
+            title=confidence_value,
+            style={
+                "display": "inline-flex",
+                "alignItems": "flex-end",
+                "gap": "2px",
+                "marginLeft": "6px",
+                "flexShrink": "0",
+                "cursor": "default",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
 def _secondary_category_badge(cat_name: rx.Var) -> rx.Component:
     color = rx.match(
         cat_name,
@@ -2625,6 +2700,108 @@ def _rpg_gene_side_references(segments: rx.Var) -> rx.Component:
     )
 
 
+_STRUCTURE_LINK_STYLE: dict = {
+    "display": "inline-flex",
+    "alignItems": "center",
+    "gap": "4px",
+    "padding": "6px 12px",
+    "borderRadius": "6px",
+    "border": "1px solid rgba(167, 139, 250, 0.38)",
+    "background": "rgba(124, 58, 237, 0.14)",
+    "color": "#c4b5fd",
+    "fontSize": "0.82rem",
+    "fontWeight": "700",
+    "textDecoration": "none",
+    "cursor": "pointer",
+    "_hover": {
+        "background": "rgba(124, 58, 237, 0.28)",
+        "color": "#e9d5ff",
+        "borderColor": "rgba(167, 139, 250, 0.6)",
+    },
+}
+
+
+def _gene_structure_viewer(gene_item: rx.Var) -> rx.Component:
+    """Interactive 3D protein structure viewer or fallback external links."""
+    has_local = gene_item["structure_pdb"] != ""
+    has_pdb_url = gene_item["pdb_url"] != ""
+    has_af_url = gene_item["alphafold_url"] != ""
+
+    link_row = rx.el.div(
+        rx.cond(
+            has_pdb_url,
+            rx.el.a(
+                fomantic_icon("database", size=13, color="#a78bfa"),
+                " RCSB PDB",
+                href=gene_item["pdb_url"],
+                target="_blank",
+                rel="noopener noreferrer",
+                title="View on RCSB PDB",
+                style=_STRUCTURE_LINK_STYLE,
+            ),
+            rx.fragment(),
+        ),
+        rx.cond(
+            has_af_url,
+            rx.el.a(
+                fomantic_icon("cube", size=13, color="#a78bfa"),
+                " AlphaFold",
+                href=gene_item["alphafold_url"],
+                target="_blank",
+                rel="noopener noreferrer",
+                title="View on AlphaFold DB",
+                style=_STRUCTURE_LINK_STYLE,
+            ),
+            rx.fragment(),
+        ),
+        style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
+    )
+
+    viewer_with_links = rx.el.div(
+        rx.el.div(
+            fomantic_icon("cube", size=14, color="#a78bfa"),
+            rx.el.span(
+                " Protein 3D Structure",
+                style={"marginLeft": "6px", "fontWeight": "700", "fontSize": "0.88rem"},
+            ),
+            style={"display": "flex", "alignItems": "center", "color": "#c4b5fd", "marginBottom": "8px"},
+        ),
+        rx.el.div(
+            class_name="me-pdb-viewer",
+            custom_attrs={"data-pdb-src": "/structures/" + gene_item["structure_pdb"]},
+            style={
+                "width": "100%",
+                "height": "320px",
+                "borderRadius": "8px",
+                "border": "1px solid rgba(167, 139, 250, 0.28)",
+                "background": "#0f172a",
+                "position": "relative",
+                "overflow": "hidden",
+            },
+        ),
+        rx.el.div(
+            link_row,
+            style={"marginTop": "6px"},
+        ),
+        style={
+            "padding": "10px",
+            "borderRadius": "10px",
+            "border": "1px solid rgba(167, 139, 250, 0.22)",
+            "background": "rgba(15, 23, 42, 0.6)",
+        },
+    )
+
+    return rx.cond(
+        has_local,
+        viewer_with_links,
+        rx.cond(
+            has_pdb_url | has_af_url,
+            link_row,
+            rx.fragment(),
+        ),
+    )
+
+
 def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
     included = gene_item["included"]
     gene_sym = gene_item["gene"]
@@ -2707,6 +2884,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                                 },
                             ),
                         ),
+                        _confidence_signal_bars(gene_item["confidence_primary"]["value"]),
                         _manipulation_badge_dark(gene_item),
                         rx.el.span(
                             gene_item["price"],
@@ -2795,74 +2973,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                         _rpg_gene_side_references(gene_item["key_reference_segments"]),
                         rx.fragment(),
                     ),
-                    rx.cond(
-                        gene_item["pdb_url"] != "",
-                        rx.el.a(
-                            fomantic_icon("database", size=14, color="#a78bfa"),
-                            rx.el.span(
-                                " Experimental 3D Structure",
-                                style={"marginLeft": "4px"},
-                            ),
-                            href=gene_item["pdb_url"],
-                            target="_blank",
-                            rel="noopener noreferrer",
-                            title="View experimental structure on RCSB PDB",
-                            style={
-                                "display": "inline-flex",
-                                "alignItems": "center",
-                                "padding": "8px 14px",
-                                "borderRadius": "6px",
-                                "border": "1px solid rgba(167, 139, 250, 0.38)",
-                                "background": "rgba(124, 58, 237, 0.14)",
-                                "color": "#c4b5fd",
-                                "fontSize": "0.88rem",
-                                "fontWeight": "700",
-                                "textDecoration": "none",
-                                "cursor": "pointer",
-                                "marginTop": "4px",
-                                "_hover": {
-                                    "background": "rgba(124, 58, 237, 0.28)",
-                                    "color": "#e9d5ff",
-                                    "borderColor": "rgba(167, 139, 250, 0.6)",
-                                },
-                            },
-                        ),
-                        rx.fragment(),
-                    ),
-                    rx.cond(
-                        gene_item["alphafold_url"] != "",
-                        rx.el.a(
-                            fomantic_icon("cube", size=14, color="#a78bfa"),
-                            rx.el.span(
-                                " Predicted 3D Structure",
-                                style={"marginLeft": "4px"},
-                            ),
-                            href=gene_item["alphafold_url"],
-                            target="_blank",
-                            rel="noopener noreferrer",
-                            title="View AlphaFold predicted 3D structure",
-                            style={
-                                "display": "inline-flex",
-                                "alignItems": "center",
-                                "padding": "8px 14px",
-                                "borderRadius": "6px",
-                                "border": "1px solid rgba(167, 139, 250, 0.38)",
-                                "background": "rgba(124, 58, 237, 0.14)",
-                                "color": "#c4b5fd",
-                                "fontSize": "0.88rem",
-                                "fontWeight": "700",
-                                "textDecoration": "none",
-                                "cursor": "pointer",
-                                "marginTop": "4px",
-                                "_hover": {
-                                    "background": "rgba(124, 58, 237, 0.28)",
-                                    "color": "#e9d5ff",
-                                    "borderColor": "rgba(167, 139, 250, 0.6)",
-                                },
-                            },
-                        ),
-                        rx.fragment(),
-                    ),
+                    _gene_structure_viewer(gene_item),
                     style={
                         "display": "flex",
                         "flexDirection": "column",
@@ -3095,8 +3206,85 @@ def _rpg_gene_library_title() -> rx.Component:
     )
 
 
+def _pdb_viewer_scripts() -> rx.Component:
+    """Load 3Dmol.js from CDN and auto-initialize viewers as they appear in the DOM."""
+    return rx.fragment(
+        rx.script(src="https://cdn.jsdelivr.net/npm/3dmol@2.4.2/build/3Dmol-min.js"),
+        rx.script(
+            """
+            (() => {
+                if (window.__mePdbViewerInstalled) return;
+                window.__mePdbViewerInstalled = true;
+
+                const pdbCache = {};
+
+                const initViewer = (el) => {
+                    if (el.dataset.pdbInit) return;
+                    const src = el.dataset.pdbSrc;
+                    if (!src || typeof $3Dmol === "undefined") return;
+                    el.dataset.pdbInit = "1";
+                    const viewer = $3Dmol.createViewer(el, {
+                        backgroundColor: "0x0f172a",
+                        antialias: true,
+                    });
+                    el.__me_viewer = viewer;
+                    const show = (pdb) => {
+                        viewer.addModel(pdb, "pdb");
+                        viewer.setStyle({}, {cartoon: {color: "spectrum"}});
+                        viewer.zoomTo();
+                        viewer.render();
+                        viewer.spin("y", 0.4);
+                    };
+                    const fail = () => {
+                        el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:0.82rem;">Structure unavailable</div>';
+                    };
+                    if (pdbCache[src]) { show(pdbCache[src]); }
+                    else { fetch(src).then(r => r.text()).then(pdb => { pdbCache[src] = pdb; show(pdb); }).catch(fail); }
+                };
+
+                const cleanupViewer = (el) => {
+                    if (el.__me_viewer) {
+                        try { el.__me_viewer.clear(); } catch(_) {}
+                        el.__me_viewer = null;
+                    }
+                };
+
+                const scanAll = () => {
+                    document.querySelectorAll(".me-pdb-viewer:not([data-pdb-init])").forEach(initViewer);
+                };
+
+                const tryInit = () => {
+                    if (typeof $3Dmol !== "undefined") {
+                        scanAll();
+                        const obs = new MutationObserver((mutations) => {
+                            for (const m of mutations) {
+                                for (const n of m.removedNodes) {
+                                    if (n.nodeType !== 1) continue;
+                                    if (n.classList && n.classList.contains("me-pdb-viewer")) cleanupViewer(n);
+                                    else if (n.querySelectorAll) n.querySelectorAll(".me-pdb-viewer").forEach(cleanupViewer);
+                                }
+                            }
+                            requestAnimationFrame(scanAll);
+                        });
+                        obs.observe(document.body, {childList: true, subtree: true});
+                    } else {
+                        setTimeout(tryInit, 200);
+                    }
+                };
+                if (document.readyState === "loading") {
+                    document.addEventListener("DOMContentLoaded", tryInit);
+                } else {
+                    tryInit();
+                }
+            })();
+            """
+        ),
+    )
+
+
 def _rpg_gene_library_panel() -> rx.Component:
     return rx.el.div(
+        _pdb_viewer_scripts(),
         _rpg_gene_library_anchor_script(),
         _rpg_gene_library_title(),
         rx.el.div(
@@ -5504,6 +5692,7 @@ def _report_gene_row(gene_item: rx.Var) -> rx.Component:
                     "display": "inline-block",
                 },
             ),
+            _confidence_signal_bars(gene_item["confidence_primary"]["value"]),
             rx.el.span(
                 gene_item["category_detail"],
                 style={
