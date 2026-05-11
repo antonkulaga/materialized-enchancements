@@ -2270,7 +2270,11 @@ def _rpg_materialization_leg_cta() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.el.span(ComposeState.budget_spent, style={"fontWeight": "950", "color": "#ffffff"}),
-            f" out of {DEFAULT_BUDGET} cr",
+            f" / {DEFAULT_BUDGET} cr",
+            rx.el.span(
+                " · Unlocks: character sheet, share link, 3D file",
+                style={"fontWeight": "700", "color": "#a78bfa", "letterSpacing": "0.02em"},
+            ),
             class_name="me-rpg-materialize-credit-line",
         ),
         rx.el.button(
@@ -3186,14 +3190,7 @@ def _rpg_gene_library_title() -> rx.Component:
             style={"display": "flex", "alignItems": "center"},
         ),
         rx.el.div(
-            "Pick individual genes after choosing functional systems on the body map. ",
-            rx.el.span(
-                ComposeState.budget_spent,
-                " out of ",
-                ComposeState.budget_total,
-                " cr used",
-                style={"fontWeight": "950", "color": "#f8fafc"},
-            ),
+            "Build your enhanced character from real genes. Tap a category to browse.",
             style={
                 "fontSize": "0.98rem",
                 "fontWeight": "800",
