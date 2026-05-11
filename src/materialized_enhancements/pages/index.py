@@ -740,56 +740,90 @@ def _category_button(category: str) -> rx.Component:
     )
 
 
-def _budget_bar() -> rx.Component:
-    """Budget indicator: enhancement credits (cr) spent / total with a progress bar."""
+def _budget_gauge() -> rx.Component:
+    """Sticky credit budget gauge — the core resource constraint, always visible."""
     return rx.el.div(
         rx.el.div(
-            rx.el.span(
-                "Enhancement credits (cr)",
-                style={"fontSize": "0.95rem", "fontWeight": "600", "color": "#4b5563"},
+            rx.el.div(
+                fomantic_icon("bolt", size=16, style={"color": ComposeState.budget_spent_color, "transition": "color 0.35s ease"}),
+                rx.el.span(
+                    "ENHANCEMENT CREDITS USED",
+                    style={
+                        "fontSize": "0.72rem",
+                        "fontWeight": "900",
+                        "letterSpacing": "0.12em",
+                        "color": ComposeState.budget_spent_color,
+                        "transition": "color 0.35s ease",
+                    },
+                ),
+                style={"display": "flex", "alignItems": "center", "gap": "6px"},
             ),
-            rx.el.span(
-                rx.el.span(ComposeState.budget_spent, style={"fontWeight": "700", "color": "#7c3aed"}),
-                f" / {DEFAULT_BUDGET} cr",
-                style={"fontSize": "0.98rem", "color": "#4b5563"},
+            rx.el.div(
+                rx.el.span(
+                    ComposeState.budget_spent,
+                    style={
+                        "fontSize": "1.55rem",
+                        "fontWeight": "950",
+                        "color": ComposeState.budget_spent_color,
+                        "lineHeight": "1",
+                        "transition": "color 0.35s ease",
+                    },
+                ),
+                rx.el.span(
+                    f" / {DEFAULT_BUDGET} cr",
+                    style={
+                        "fontSize": "1.0rem",
+                        "fontWeight": "700",
+                        "color": "#64748b",
+                        "lineHeight": "1",
+                    },
+                ),
+                style={"display": "flex", "alignItems": "baseline", "gap": "2px"},
             ),
-            style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "4px"},
+            style={
+                "display": "flex",
+                "justifyContent": "space-between",
+                "alignItems": "center",
+                "marginBottom": "6px",
+            },
         ),
         rx.el.div(
             rx.el.div(
                 style={
                     "height": "100%",
-                    "borderRadius": "4px",
-                    "backgroundColor": rx.cond(
-                        ComposeState.budget_remaining > 20, "#7c3aed", "#e74c3c",
+                    "borderRadius": "6px",
+                    "backgroundColor": ComposeState.budget_color,
+                    "width": f"{ComposeState.budget_pct}%",
+                    "transition": "width 0.35s cubic-bezier(.4,0,.2,1), background-color 0.35s ease",
+                    "boxShadow": rx.cond(
+                        ComposeState.budget_pct > 0,
+                        f"0 0 12px {ComposeState.budget_color}66",
+                        "none",
                     ),
-                    "width": rx.cond(
-                        ComposeState.budget_spent > 0,
-                        f"calc({ComposeState.budget_spent} * 100% / {DEFAULT_BUDGET})",
-                        "0%",
-                    ),
-                    "transition": "width 0.3s ease, background-color 0.3s ease",
                 },
             ),
             style={
-                "height": "6px",
-                "borderRadius": "4px",
-                "backgroundColor": "#f3f4f6",
+                "height": "10px",
+                "borderRadius": "6px",
+                "backgroundColor": "rgba(51, 65, 85, 0.5)",
                 "overflow": "hidden",
             },
         ),
         rx.el.div(
-            rx.el.span(ComposeState.budget_remaining, style={"fontWeight": "700"}),
-            " cr left",
-            style={"fontSize": "0.9rem", "color": "#6b7280", "textAlign": "right", "marginTop": "2px"},
+            rx.el.span(
+                ComposeState.budget_remaining,
+                style={"fontWeight": "900", "color": ComposeState.budget_color},
+            ),
+            " cr remaining",
+            style={
+                "fontSize": "0.82rem",
+                "fontWeight": "700",
+                "color": "#64748b",
+                "textAlign": "right",
+                "marginTop": "4px",
+            },
         ),
-        style={
-            "padding": "8px 12px",
-            "borderRadius": "6px",
-            "backgroundColor": "#f9f5ff",
-            "border": "1px solid #ede9fe",
-            "marginBottom": "12px",
-        },
+        class_name="me-budget-gauge",
     )
 
 
@@ -833,7 +867,7 @@ def _sculpture_left_pane() -> rx.Component:
                 "fontWeight": "700",
             },
         ),
-        _budget_bar(),
+        _budget_gauge(),
         rx.el.div(
             *[_category_button(cat) for cat in UNIQUE_CATEGORIES],
         ),
@@ -3906,6 +3940,20 @@ def _rpg_flow_css() -> rx.Component:
         .me-rpg-center-panel {
             min-width: 0;
         }
+        .me-budget-gauge {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            padding: 10px 14px 8px;
+            border-radius: 12px 12px 12px 12px;
+            background: rgba(15, 23, 42, 0.94);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(124, 58, 237, 0.32);
+            box-shadow: 0 4px 20px rgba(2, 6, 23, 0.5);
+            margin: 0 0 10px;
+            width: 100%;
+        }
         .me-rpg-body-map-panel {
             position: relative;
             display: flex;
@@ -4567,6 +4615,7 @@ def _rpg_active_genes_layout() -> rx.Component:
     return _rpg_shell(
         rx.el.div(
             rx.el.div(
+                _budget_gauge(),
                 _rpg_gene_library_panel(),
                 id="gene-library",
                 class_name="me-rpg-left-panel me-rpg-library-section",

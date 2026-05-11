@@ -1881,6 +1881,26 @@ class ComposeState(rx.State):
         return DEFAULT_BUDGET - self.budget_spent
 
     @rx.var
+    def budget_pct(self) -> int:
+        return min(100, round(self.budget_spent * 100 / DEFAULT_BUDGET)) if DEFAULT_BUDGET > 0 else 0
+
+    @rx.var
+    def budget_color(self) -> str:
+        pct = self.budget_pct
+        if pct < 50:
+            return "#22c55e"
+        if pct < 80:
+            return "#f59e0b"
+        return "#ef4444"
+
+    @rx.var
+    def budget_spent_color(self) -> str:
+        """Spent number color: red (0%) → orange → yellow → green (100%)."""
+        pct = self.budget_pct
+        hue = round(pct * 120 / 100)
+        return f"hsl({hue}, 85%, 55%)"
+
+    @rx.var
     def affordable_categories(self) -> list[str]:
         remaining = DEFAULT_BUDGET - self.budget_spent
         return [
