@@ -20,6 +20,7 @@ start = "materialized_enhancements.run:main"
 serve = "materialized_enhancements.run:serve"
 preselect = "materialized_enhancements.run:preselect"
 resolve-proteins = "materialized_enhancements.resolve_proteins:main"
+download-structures = "materialized_enhancements.resolve_proteins:download_main"
 
 [build-system]
 requires = ["uv-build"]

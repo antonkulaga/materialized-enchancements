@@ -76,11 +76,42 @@ def _load_gene_species() -> dict[str, list[str]]:
     return result
 
 
-def _validate_uniprot(client: httpx.Client, accession: str) -> bool:
-    """Return True if a UniProt accession resolves to a real entry."""
+def _fetch_uniprot_entry(client: httpx.Client, accession: str) -> dict | None:
+    """Fetch the full UniProt entry JSON, or None if the accession is invalid."""
     url = UNIPROT_ENTRY.format(accession=accession)
     resp = client.get(url, follow_redirects=True)
-    return resp.status_code == 200
+    if resp.status_code == 200:
+        return resp.json()
+    return None
+
+
+def _extract_best_pdb(entry: dict) -> str:
+    """Pick the best experimental PDB ID from UniProt cross-references.
+
+    Prefers X-ray over Cryo-EM over other methods; within a method prefers
+    the lowest (best) resolution.  Returns empty string when no PDB exists.
+    """
+    xrefs = entry.get("uniProtKBCrossReferences", [])
+    pdbs: list[tuple[str, float]] = []
+    for xref in xrefs:
+        if xref.get("database") != "PDB":
+            continue
+        pdb_id = xref["id"]
+        props = {p["key"]: p["value"] for p in xref.get("properties", [])}
+        method = props.get("Method", "")
+        res_str = props.get("Resolution", "")
+        resolution = 999.0
+        if res_str and res_str not in ("-", ""):
+            try:
+                resolution = float(res_str.replace(" A", "").strip())
+            except ValueError:
+                pass
+        method_rank = 0 if "X-ray" in method else (1 if "EM" in method else 2)
+        pdbs.append((pdb_id, method_rank + resolution / 1000))
+    if not pdbs:
+        return ""
+    pdbs.sort(key=lambda x: x[1])
+    return pdbs[0][0]
 
 
 def _check_alphafold(client: httpx.Client, accession: str) -> bool:
@@ -134,17 +165,18 @@ def _gene_search_names(gene_id: str, gene_display: str) -> list[str]:
     return [primary]
 
 
-app = typer.Typer()
-
-
-@app.command()
 def resolve(
     dry_run: bool = typer.Option(False, "--dry-run", help="Print changes without writing CSV"),
 ) -> None:
-    """Resolve and validate UniProt protein IDs for all genes."""
+    """Resolve and validate UniProt protein IDs and PDB structures for all genes."""
     props_df = pl.read_csv(GENE_PROPS_PATH)
     species_lookup = _load_species_lookup()
     gene_species = _load_gene_species()
+
+    if "pdb_id" not in props_df.columns:
+        props_df = props_df.with_columns(pl.lit("").alias("pdb_id"))
+    if "has_alphafold" not in props_df.columns:
+        props_df = props_df.with_columns(pl.lit("").alias("has_alphafold"))
 
     rows = props_df.to_dicts()
     changes: list[str] = []
@@ -155,6 +187,8 @@ def resolve(
             gene_display = str(row.get("gene", "")).strip()
             existing_pid = str(row.get("protein_id") or "").strip()
             existing_idt = str(row.get("id_type") or "").strip()
+            existing_pdb = str(row.get("pdb_id") or "").strip()
+            existing_af = str(row.get("has_alphafold") or "").strip()
 
             if gene_id in _SKIP_GENES:
                 log.info("%-30s SKIP (non-protein gene)", gene_id)
@@ -164,15 +198,26 @@ def resolve(
             sci_names = [species_lookup[s] for s in sids if s in species_lookup]
 
             if existing_pid and existing_idt == "uniprot":
-                valid = _validate_uniprot(client, existing_pid)
-                if valid:
+                entry = _fetch_uniprot_entry(client, existing_pid)
+                if entry:
+                    pdb_id = _extract_best_pdb(entry)
                     has_af = _check_alphafold(client, existing_pid)
-                    log.info("%-30s VALID  %s  alphafold=%s", gene_id, existing_pid, has_af)
+                    af_val = "true" if has_af else ""
+                    if pdb_id != existing_pdb:
+                        changes.append(f"{gene_id}: pdb {existing_pdb or '(empty)'} → {pdb_id or '(none)'}")
+                    if af_val != existing_af:
+                        changes.append(f"{gene_id}: has_alphafold {existing_af or '(empty)'} → {af_val or '(false)'}")
+                    row["pdb_id"] = pdb_id
+                    row["has_alphafold"] = af_val
+                    log.info("%-30s VALID  %s  pdb=%s  alphafold=%s",
+                             gene_id, existing_pid, pdb_id or "none", has_af)
                 else:
                     log.warning("%-30s INVALID UniProt %s — clearing", gene_id, existing_pid)
                     changes.append(f"{gene_id}: cleared invalid UniProt {existing_pid}")
                     row["protein_id"] = ""
                     row["id_type"] = ""
+                    row["pdb_id"] = ""
+                    row["has_alphafold"] = ""
                 time.sleep(0.3)
                 continue
 
@@ -201,20 +246,27 @@ def resolve(
                         break
 
             if resolved:
-                valid = _validate_uniprot(client, resolved)
-                if valid:
+                entry = _fetch_uniprot_entry(client, resolved)
+                if entry:
+                    pdb_id = _extract_best_pdb(entry)
                     has_af = _check_alphafold(client, resolved)
-                    log.info("%-30s RESOLVED %s via %s (%s)  alphafold=%s",
-                             gene_id, resolved, winning_query, sci_names[0] if sci_names else "?", has_af)
-                    changes.append(f"{gene_id}: resolved → {resolved}")
+                    log.info("%-30s RESOLVED %s via %s (%s)  pdb=%s  alphafold=%s",
+                             gene_id, resolved, winning_query,
+                             sci_names[0] if sci_names else "?",
+                             pdb_id or "none", has_af)
+                    changes.append(f"{gene_id}: resolved → {resolved}, pdb={pdb_id or 'none'}")
                     row["protein_id"] = resolved
                     row["id_type"] = "uniprot"
+                    row["pdb_id"] = pdb_id
+                    row["has_alphafold"] = "true" if has_af else ""
                 else:
                     log.warning("%-30s resolved %s but validation failed", gene_id, resolved)
             else:
                 log.warning("%-30s NOT FOUND (tried %s in %s)", gene_id, search_names, sci_names)
                 row["protein_id"] = ""
                 row["id_type"] = ""
+                row["pdb_id"] = ""
+                row["has_alphafold"] = ""
 
             time.sleep(0.3)
 
@@ -231,5 +283,96 @@ def resolve(
         print("\n(dry-run mode — no files written)")
 
 
+STRUCTURES_DIR = DATA_DIR / "structures"
+RCSB_PDB_URL = "https://files.rcsb.org/download/{pdb_id}.pdb"
+
+
+def _alphafold_pdb_url(client: httpx.Client, accession: str) -> str | None:
+    """Query AlphaFold prediction API for the actual PDB download URL."""
+    url = ALPHAFOLD_API.format(accession=accession)
+    resp = client.get(url, follow_redirects=True)
+    if resp.status_code != 200:
+        return None
+    entries = resp.json()
+    if entries and isinstance(entries, list):
+        return entries[0].get("pdbUrl")
+    return None
+
+
+def download_structures(
+    force: bool = typer.Option(False, "--force", help="Re-download even if file exists"),
+) -> None:
+    """Download PDB structure files for all resolved proteins.
+
+    Experimental structures come from RCSB PDB.  When no experimental
+    structure exists but AlphaFold has a prediction, that is downloaded
+    instead with a ``_predicted`` suffix.
+    """
+    props_df = pl.read_csv(GENE_PROPS_PATH)
+    STRUCTURES_DIR.mkdir(parents=True, exist_ok=True)
+
+    downloaded = 0
+    skipped = 0
+    failed: list[str] = []
+
+    with httpx.Client(timeout=30.0, headers={"User-Agent": "materialized-enhancements/1.0"}) as client:
+        for row in props_df.to_dicts():
+            gene_id = row["gene_id"].strip()
+            pdb_id = str(row.get("pdb_id") or "").strip()
+            protein_id = str(row.get("protein_id") or "").strip()
+            id_type = str(row.get("id_type") or "").strip()
+            has_af = str(row.get("has_alphafold") or "").strip().lower() == "true"
+
+            if pdb_id:
+                dest = STRUCTURES_DIR / f"{pdb_id}.pdb"
+                url = RCSB_PDB_URL.format(pdb_id=pdb_id)
+                label = f"{gene_id} → PDB {pdb_id}"
+            elif has_af and id_type == "uniprot" and protein_id:
+                dest = STRUCTURES_DIR / f"{protein_id}_predicted.pdb"
+                af_url = _alphafold_pdb_url(client, protein_id)
+                if not af_url:
+                    log.warning("%-45s AlphaFold API returned no pdbUrl", f"{gene_id} → AlphaFold {protein_id}")
+                    failed.append(f"{gene_id}: AlphaFold API returned no pdbUrl for {protein_id}")
+                    time.sleep(0.25)
+                    continue
+                url = af_url
+                label = f"{gene_id} → AlphaFold {protein_id}"
+            else:
+                continue
+
+            if dest.exists() and not force:
+                log.info("%-45s EXISTS  %s", label, dest.name)
+                skipped += 1
+                continue
+
+            resp = client.get(url, follow_redirects=True)
+            if resp.status_code == 200:
+                dest.write_bytes(resp.content)
+                log.info("%-45s OK  %s  (%.1f KB)", label, dest.name, len(resp.content) / 1024)
+                downloaded += 1
+            else:
+                log.warning("%-45s FAILED  HTTP %d", label, resp.status_code)
+                failed.append(f"{label}: HTTP {resp.status_code}")
+
+            time.sleep(0.25)
+
+    print(f"\n{'='*60}")
+    print(f"Downloaded: {downloaded}  |  Skipped (exist): {skipped}  |  Failed: {len(failed)}")
+    for f in failed:
+        print(f"  {f}")
+    print(f"\nStructures directory: {STRUCTURES_DIR}")
+
+
+resolve_app = typer.Typer()
+resolve_app.command()(resolve)
+
+download_app = typer.Typer()
+download_app.command()(download_structures)
+
+
 def main() -> None:
-    app()
+    resolve_app()
+
+
+def download_main() -> None:
+    download_app()

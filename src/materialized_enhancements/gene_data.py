@@ -60,6 +60,7 @@ class GeneEntry(TypedDict):
     paper_url: str
     gene_url: str
     alphafold_url: str
+    pdb_url: str
     puzzle_svg: str
     species_page_url: str
     testing_entries: list[dict[str, str]]
@@ -114,39 +115,64 @@ _PROTEIN_DB_URLS: dict[str, str] = {
 }
 
 
-def _load_protein_id_lookup(path: Path = DATA_DIR / "gene_properties.csv") -> dict[str, tuple[str, str]]:
-    """Load gene_id → (protein_id, id_type) from gene_properties.csv."""
-    df = pl.read_csv(path).select(["gene_id", "protein_id", "id_type"])
-    lookup: dict[str, tuple[str, str]] = {}
+class _ProteinInfo:
+    __slots__ = ("protein_id", "id_type", "pdb_id", "has_alphafold")
+
+    def __init__(self, protein_id: str, id_type: str, pdb_id: str, has_alphafold: bool) -> None:
+        self.protein_id = protein_id
+        self.id_type = id_type
+        self.pdb_id = pdb_id
+        self.has_alphafold = has_alphafold
+
+
+def _load_protein_id_lookup(path: Path = DATA_DIR / "gene_properties.csv") -> dict[str, _ProteinInfo]:
+    """Load gene_id → _ProteinInfo from gene_properties.csv."""
+    df = pl.read_csv(path)
+    cols = ["gene_id", "protein_id", "id_type"]
+    has_pdb_col = "pdb_id" in df.columns
+    has_af_col = "has_alphafold" in df.columns
+    if has_pdb_col:
+        cols.append("pdb_id")
+    if has_af_col:
+        cols.append("has_alphafold")
+    df = df.select(cols)
+    lookup: dict[str, _ProteinInfo] = {}
     for row in df.to_dicts():
         pid = str(row.get("protein_id") or "").strip()
         idt = str(row.get("id_type") or "").strip()
+        pdb = str(row.get("pdb_id") or "").strip() if has_pdb_col else ""
+        has_af = str(row.get("has_alphafold") or "").strip().lower() == "true" if has_af_col else False
         if pid and idt:
-            lookup[row["gene_id"].strip()] = (pid, idt)
+            lookup[row["gene_id"].strip()] = _ProteinInfo(pid, idt, pdb, has_af)
     return lookup
 
 
-PROTEIN_ID_LOOKUP: dict[str, tuple[str, str]] = _load_protein_id_lookup()
+PROTEIN_ID_LOOKUP: dict[str, _ProteinInfo] = _load_protein_id_lookup()
 
 
 def _gene_protein_url(gene_id: str, gene_display: str) -> str:
     """Direct protein DB URL when accession is known; empty string otherwise."""
-    entry = PROTEIN_ID_LOOKUP.get(gene_id)
-    if entry:
-        pid, idt = entry
-        template = _PROTEIN_DB_URLS.get(idt)
+    info = PROTEIN_ID_LOOKUP.get(gene_id)
+    if info:
+        template = _PROTEIN_DB_URLS.get(info.id_type)
         if template:
-            return template.format(id=url_quote(pid))
+            return template.format(id=url_quote(info.protein_id))
     return ""
 
 
 def _gene_alphafold_url(gene_id: str) -> str:
-    """AlphaFold entry URL when UniProt accession is known; empty string otherwise."""
-    entry = PROTEIN_ID_LOOKUP.get(gene_id)
-    if entry:
-        pid, idt = entry
-        if idt == "uniprot" and pid:
-            return f"https://alphafold.ebi.ac.uk/entry/{url_quote(pid)}"
+    """AlphaFold entry URL when confirmed available; empty string otherwise."""
+    info = PROTEIN_ID_LOOKUP.get(gene_id)
+    if info and info.id_type == "uniprot" and info.protein_id and info.has_alphafold:
+        return f"https://alphafold.ebi.ac.uk/entry/{url_quote(info.protein_id)}"
+    return ""
+
+
+def _gene_pdb_url(gene_id: str) -> str:
+    """RCSB PDB structure URL when a PDB ID is known; empty string otherwise."""
+    info = PROTEIN_ID_LOOKUP.get(gene_id)
+    if info and info.pdb_id:
+        return f"https://www.rcsb.org/structure/{url_quote(info.pdb_id)}"
     return ""
 
 
@@ -242,6 +268,7 @@ def load_gene_library(path: Path = DATA_PATH) -> list[GeneEntry]:
         row["species_page_url"] = (first_sp["url"] if first_sp and first_sp["url"] else species_wikipedia_url(scientific_names[0] if scientific_names else ""))
         row["gene_url"] = _gene_protein_url(gid, row["gene"])
         row["alphafold_url"] = _gene_alphafold_url(gid)
+        row["pdb_url"] = _gene_pdb_url(gid)
         conf_list = [dict(c) for c in GENE_CONFIDENCE_MAP.get(gid, [])]
         row["confidence_entries"] = conf_list
         primaries = [c for c in conf_list if c["primary"]]

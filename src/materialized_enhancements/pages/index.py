@@ -2762,17 +2762,51 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                         rx.fragment(),
                     ),
                     rx.cond(
+                        gene_item["pdb_url"] != "",
+                        rx.el.a(
+                            fomantic_icon("database", size=14, color="#a78bfa"),
+                            rx.el.span(
+                                " Experimental 3D Structure",
+                                style={"marginLeft": "4px"},
+                            ),
+                            href=gene_item["pdb_url"],
+                            target="_blank",
+                            rel="noopener noreferrer",
+                            title="View experimental structure on RCSB PDB",
+                            style={
+                                "display": "inline-flex",
+                                "alignItems": "center",
+                                "padding": "8px 14px",
+                                "borderRadius": "6px",
+                                "border": "1px solid rgba(167, 139, 250, 0.38)",
+                                "background": "rgba(124, 58, 237, 0.14)",
+                                "color": "#c4b5fd",
+                                "fontSize": "0.88rem",
+                                "fontWeight": "700",
+                                "textDecoration": "none",
+                                "cursor": "pointer",
+                                "marginTop": "4px",
+                                "_hover": {
+                                    "background": "rgba(124, 58, 237, 0.28)",
+                                    "color": "#e9d5ff",
+                                    "borderColor": "rgba(167, 139, 250, 0.6)",
+                                },
+                            },
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
                         gene_item["alphafold_url"] != "",
                         rx.el.a(
                             fomantic_icon("cube", size=14, color="#a78bfa"),
                             rx.el.span(
-                                " AlphaFold 3D Structure",
+                                " Predicted 3D Structure",
                                 style={"marginLeft": "4px"},
                             ),
                             href=gene_item["alphafold_url"],
                             target="_blank",
                             rel="noopener noreferrer",
-                            title="View predicted 3D structure on AlphaFold",
+                            title="View AlphaFold predicted 3D structure",
                             style={
                                 "display": "inline-flex",
                                 "alignItems": "center",

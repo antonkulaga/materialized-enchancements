@@ -222,6 +222,8 @@ tools/
 
 # Repo-local runtime state / caches
 data/interim/
+# Local PDB coordinates (large; keep on disk but do not commit)
+data/input/structures/*.pdb
 data/output/
 data/output/public/
 data/module_specs/
