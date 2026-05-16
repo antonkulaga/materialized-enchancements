@@ -4,6 +4,7 @@ import argparse
 import base64
 import json
 import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -198,10 +199,10 @@ def preselect() -> None:
                         help="Number of categories to include")
     parser.add_argument("--genes-per-category", type=int, default=2,
                         help="Max cheapest genes to pick per category")
-    parser.add_argument("--frontend-port", type=int, default=3000,
-                        help="Frontend port to use and open")
-    parser.add_argument("--backend-port", type=int, default=8000,
-                        help="Backend port to use")
+    parser.add_argument("--frontend-port", type=int, default=None,
+                        help="Frontend port to use and open (default: auto)")
+    parser.add_argument("--backend-port", type=int, default=None,
+                        help="Backend port to use (default: auto)")
     parser.add_argument("--backend-host", default=None,
                         help="Backend bind host, defaults to Reflex config / .env")
     parser.add_argument("--url-only", action="store_true", help="Print URL and exit without starting server")
@@ -213,7 +214,7 @@ def preselect() -> None:
             categories=parsed.categories,
             genes_per_category=parsed.genes_per_category,
             host="localhost",
-            port=parsed.frontend_port,
+            port=parsed.frontend_port or 3000,
         )
         return
 
@@ -224,15 +225,17 @@ def preselect() -> None:
     from reflex_base.config import environment
 
     config = get_config()
+    explicit_frontend = parsed.frontend_port is not None
+    explicit_backend = parsed.backend_port is not None
     frontend_port = processes.handle_port(
         "frontend",
         parsed.frontend_port or config.frontend_port or constants.DefaultPorts.FRONTEND_PORT,
-        auto_increment=not bool(parsed.frontend_port or config.frontend_port),
+        auto_increment=not explicit_frontend,
     )
     backend_port = processes.handle_port(
         "backend",
         parsed.backend_port or config.backend_port or constants.DefaultPorts.BACKEND_PORT,
-        auto_increment=not bool(parsed.backend_port or config.backend_port),
+        auto_increment=not explicit_backend,
     )
 
     _spawn_open_when_ready(
@@ -249,3 +252,42 @@ def preselect() -> None:
         backend_port=backend_port,
         backend_host=parsed.backend_host,
     )
+
+
+def kill_ports() -> None:
+    """Show and kill processes on ports 3000 and 8000.
+
+    Usage::
+
+        uv run kill-ports            # show and kill both
+        uv run kill-ports 3000       # only port 3000
+        uv run kill-ports 3000 8000  # explicit list
+    """
+    ports = [int(p) for p in sys.argv[1:]] if len(sys.argv) > 1 else [3000, 8000]
+    killed_any = False
+    for port in ports:
+        try:
+            out = subprocess.check_output(
+                ["lsof", "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL,
+            ).strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            out = ""
+        if not out:
+            print(f"Port {port}: free")
+            continue
+        pids = [int(p) for p in out.split()]
+        for pid in pids:
+            try:
+                cmd = subprocess.check_output(
+                    ["ps", "-p", str(pid), "-o", "comm="], text=True, stderr=subprocess.DEVNULL,
+                ).strip()
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                cmd = "?"
+            print(f"Port {port}: killing PID {pid} ({cmd})")
+            try:
+                os.kill(pid, signal.SIGKILL)
+                killed_any = True
+            except OSError as exc:
+                print(f"  failed: {exc}")
+    if not killed_any:
+        print("Nothing to kill — ports are free.")

@@ -309,9 +309,18 @@ def generate_sculpture(
     """Full pipeline: compute params → build config → run pipeline → export STL.
 
     Returns (stl_path, sculpture_params, pipeline_stats).
+    Reuses an existing STL if the deterministic filename already exists on disk.
     """
     params = compute_sculpture_params(name, selected_categories, all_categories, gene_library)
     config = build_pipeline_config(params)
+
+    tag = name.strip().lower().replace(" ", "_")[:20] or "anon"
+    suffix = f"_{tag}_s{params['seed']}"
+    cached_path = export_dir / f"compass_web{suffix}.stl"
+
+    if cached_path.exists() and cached_path.stat().st_size > 0:
+        logger.info("STL cache hit: %s (%.1f KB)", cached_path, cached_path.stat().st_size / 1024)
+        return cached_path, params, {"cached": True}
 
     logger.info(
         "Running sculpture pipeline: seed=%d, radius=%.1f, %d circles, %d voronoi points",
@@ -322,8 +331,6 @@ def generate_sculpture(
         config, max_attempts=max_attempts, verbose=True,
     )
 
-    tag = name.strip().lower().replace(" ", "_")[:20] or "anon"
-    suffix = f"_{tag}_s{params['seed']}"
     stl_path = export_stl(result, export_dir, suffix=suffix)
 
     final_config = pipeline_config_to_dict(used_config)

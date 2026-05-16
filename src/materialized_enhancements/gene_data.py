@@ -61,6 +61,7 @@ class GeneEntry(TypedDict):
     gene_url: str
     alphafold_url: str
     pdb_url: str
+    structure_pdb: str
     puzzle_svg: str
     species_page_url: str
     testing_entries: list[dict[str, str]]
@@ -176,6 +177,32 @@ def _gene_pdb_url(gene_id: str) -> str:
     return ""
 
 
+ASSETS_STRUCTURES_DIR = Path(__file__).resolve().parents[2] / "assets" / "structures"
+STRUCTURES_DIRS = [ASSETS_STRUCTURES_DIR, DATA_DIR / "structures"]
+
+
+def resolve_structure_pdb(gene_id: str) -> str:
+    """Return the local PDB filename for a gene, or empty string if none exists.
+
+    Prefers experimental PDB files (e.g. 1MKK.pdb), falls back to AlphaFold
+    predicted files (e.g. P04002_predicted.pdb). Checks assets/structures/ first,
+    then data/input/structures/.
+    """
+    info = PROTEIN_ID_LOOKUP.get(gene_id)
+    if not info:
+        return ""
+    candidates: list[str] = []
+    if info.pdb_id:
+        candidates.append(f"{info.pdb_id}.pdb")
+    if info.has_alphafold and info.protein_id:
+        candidates.append(f"{info.protein_id}_predicted.pdb")
+    for fname in candidates:
+        for d in STRUCTURES_DIRS:
+            if (d / fname).is_file():
+                return fname
+    return ""
+
+
 def species_wikipedia_url(scientific_name: str) -> str:
     if not scientific_name:
         return ""
@@ -269,6 +296,7 @@ def load_gene_library(path: Path = DATA_PATH) -> list[GeneEntry]:
         row["gene_url"] = _gene_protein_url(gid, row["gene"])
         row["alphafold_url"] = _gene_alphafold_url(gid)
         row["pdb_url"] = _gene_pdb_url(gid)
+        row["structure_pdb"] = resolve_structure_pdb(gid)
         conf_list = [dict(c) for c in GENE_CONFIDENCE_MAP.get(gid, [])]
         row["confidence_entries"] = conf_list
         primaries = [c for c in conf_list if c["primary"]]
@@ -500,3 +528,63 @@ def _build_animal_prices(animals: list[AnimalEntry]) -> dict[str, int]:
 
 
 ANIMAL_PRICES: dict[str, int] = _build_animal_prices(ANIMAL_LIBRARY)
+
+
+STL_DIR = Path(__file__).resolve().parents[2] / "assets" / "stl"
+STL_REPORT_PATH = STL_DIR / "stl_report.csv"
+
+_DIFFICULTY_ORDER = {"easy": 0, "medium": 1, "hard": 2, "expert": 3}
+
+
+class StlReportEntry(TypedDict):
+    gene_id: str
+    gene: str
+    category: str
+    pdb_id: str
+    protein_id: str
+    structure_source: str
+    render_style: str
+    file: str
+    triangles: int
+    dimensions_mm: str
+    max_dim_mm: float
+    surface_area_cm2: float
+    shells: int
+    tiny_shells: int
+    watertight: bool
+    aspect_ratio: float
+    difficulty: str
+
+
+def _load_stl_report() -> dict[str, StlReportEntry]:
+    """Load STL report CSV keyed by gene display name."""
+    if not STL_REPORT_PATH.exists():
+        return {}
+    df = pl.read_csv(STL_REPORT_PATH).fill_null("")
+    lookup: dict[str, StlReportEntry] = {}
+    for row in df.to_dicts():
+        gene_name = str(row.get("gene", "")).strip()
+        if gene_name:
+            lookup[gene_name] = StlReportEntry(
+                gene_id=str(row.get("gene_id", "")),
+                gene=gene_name,
+                category=str(row.get("category", "")),
+                pdb_id=str(row.get("pdb_id", "")),
+                protein_id=str(row.get("protein_id", "")),
+                structure_source=str(row.get("structure_source", "")),
+                render_style=str(row.get("render_style", "")),
+                file=str(row.get("file", "")),
+                triangles=int(row.get("triangles", 0)),
+                dimensions_mm=str(row.get("dimensions_mm", "")),
+                max_dim_mm=float(row.get("max_dim_mm", 0)),
+                surface_area_cm2=float(row.get("surface_area_cm2", 0)),
+                shells=int(row.get("shells", 0)),
+                tiny_shells=int(row.get("tiny_shells", 0)),
+                watertight=str(row.get("watertight", "")).lower() == "true",
+                aspect_ratio=float(row.get("aspect_ratio", 0)),
+                difficulty=str(row.get("difficulty", "medium")),
+            )
+    return lookup
+
+
+STL_REPORT: dict[str, StlReportEntry] = _load_stl_report()

@@ -13,6 +13,7 @@ dependencies = [
   "dotenv>=0.9.9",
   "pillow>=12.2.0",
   "fast-simplification>=0.1.13",
+  "trimesh>=4.11.5",
 ]
 
 [project.scripts]
@@ -22,6 +23,7 @@ preselect = "materialized_enhancements.run:preselect"
 resolve-proteins = "materialized_enhancements.resolve_proteins:main"
 download-structures = "materialized_enhancements.resolve_proteins:download_main"
 stl = "materialized_enhancements.generate_stl:main"
+kill-ports = "materialized_enhancements.run:kill_ports"
 
 [build-system]
 requires = ["uv-build"]

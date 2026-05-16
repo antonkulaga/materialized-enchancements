@@ -61,15 +61,33 @@ def public_app_url() -> str:
     return "http://localhost:3000"
 
 
-# Module-level constant kept for the report-canonical-base hidden input rendered
-# by pages/index.py (Reflex renders it at compile time, not per-request).
-PUBLIC_APP_URL: str = public_app_url()
+def _explicit_deploy_url() -> str:
+    """Return DEPLOY_URL or PUBLIC_APP_URL if explicitly configured, else empty.
+
+    Used for the report-canonical-base hidden input: when empty the JS
+    falls back to window.location.origin, which is correct for dev and
+    avoids baking http://localhost:3000 into share links.
+    """
+    deploy = os.getenv("DEPLOY_URL", "").strip().rstrip("/")
+    if deploy:
+        return deploy
+    public = os.getenv("PUBLIC_APP_URL", "").strip().rstrip("/")
+    if public:
+        return public
+    return ""
+
+
+# Module-level constant for the report-canonical-base hidden input rendered
+# by pages/index.py. Empty when no explicit deploy URL is configured — the
+# client-side JS falls back to window.location.origin automatically.
+PUBLIC_APP_URL: str = _explicit_deploy_url()
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GENERATED_PUBLIC_DIR: Path = Path(
     os.getenv("GENERATED_PUBLIC_DIR", str(REPO_ROOT / "data" / "output" / "public"))
 ).expanduser()
 GENERATED_URL_PREFIX: str = "/" + os.getenv("GENERATED_URL_PREFIX", "/generated").strip().strip("/")
+
 
 
 def ensure_generated_public_dirs() -> None:
@@ -83,7 +101,20 @@ def generated_public_path(*parts: str) -> Path:
 
 
 def generated_public_url(relative_path: str) -> str:
-    """Return an absolute public URL for a generated artifact."""
+    """Return a root-relative path for a generated artifact.
+
+    Returns e.g. ``/generated/reports/slug/index.html`` so the browser
+    resolves it from its own origin — works on any port/hostname.
+    """
+    path = relative_path.strip().lstrip("/")
+    return f"{GENERATED_URL_PREFIX}/{path}"
+
+
+def generated_public_absolute_url(relative_path: str) -> str:
+    """Return an absolute URL for a generated artifact (for OG tags, emails).
+
+    Uses ``public_app_url()`` so the URL is reachable by external crawlers.
+    """
     path = relative_path.strip().lstrip("/")
     return f"{public_app_url()}{GENERATED_URL_PREFIX}/{path}"
 

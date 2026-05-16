@@ -8,10 +8,14 @@ This document outlines the coding standards and practices for **materialized-enh
 
 ```
 materialized-enhancements/          ← repo root
+├── .gitattributes                  ← Git LFS tracking (*.pdb, *.stl)
 ├── pyproject.toml                  ← project deps & scripts
 ├── rxconfig.py                     ← Reflex configuration (app_name = "materialized_enhancements")
 ├── README.md
 ├── AGENTS.md
+├── assets/
+│   ├── structures/                 ← PDB protein structures (Git LFS)
+│   └── stl/                        ← 3D-printable protein STLs + stl_report.csv (Git LFS)
 ├── data/
 │   ├── input/
 │   │   ├── gene_library.csv        ← canonical gene data (source of truth)
@@ -160,6 +164,70 @@ Species silhouette SVGs come from two sources:
 
 ---
 
+## Protein Structure Viewing (PDB + 3Dmol.js)
+
+Each gene can have an associated protein structure displayed as an interactive 3D viewer.
+
+### PDB File Resolution
+
+- `gene_data.py:resolve_structure_pdb()` resolves `gene_id` → local PDB filename
+- **Priority**: experimental PDB (`{PDB_ID}.pdb`, e.g., `1MKK.pdb`) preferred over AlphaFold predictions (`{UNIPROT_ID}_predicted.pdb`, e.g., `Q92819_predicted.pdb`)
+- **Search directories** (in order): `assets/structures/` → `data/input/structures/`
+- Protein metadata (PDB IDs, UniProt IDs) comes from `data/input/gene_properties.csv`
+- The resolved filename is stored as `structure_pdb` on `GeneEntry` at load time
+- Files in `assets/structures/` are tracked via Git LFS and served by Reflex at `/structures/`
+
+### 3Dmol.js Viewer
+
+- Loaded from CDN: `https://cdn.jsdelivr.net/npm/3dmol@2.4.2/build/3Dmol-min.js` via `rx.script(src=...)`
+- Viewer divs use class `.me-pdb-viewer` with `data-pdb-src="/structures/{filename}"`
+- A `MutationObserver` in `pages/index.py:_pdb_viewer_scripts()` auto-initializes new `.me-pdb-viewer` divs when they appear in the DOM
+- Rendering: cartoon style with spectrum coloring, dark background (`#0f172a`), slow Y-axis spin
+- PDB text is cached per URL to avoid refetches; removed viewers are cleaned up automatically
+- On fetch failure the div shows "Structure unavailable" in gray
+
+---
+
+## STL 3D Model Generation (Sculpture Pipeline)
+
+Visitors unlock a unique printable 3D model based on their selected gene categories.
+
+### Generation Pipeline (`sculpture.py`)
+
+1. `compute_sculpture_params()` — aggregates biophysical gene properties into 7 sculpture parameters:
+   - **Seed**: CRC32 of visitor name XOR category bitmask (deterministic)
+   - **Radius**: median protein mass (kDa), rescaled to 5.5–67.5 mm
+   - **Spacing**: median exon count (mod 18), rescaled to 4.4–19.29 mm
+   - **Points**: sum of system gene counts (mod 299) + 2, rescaled to 2.2–270
+   - **Extrusion**: median GRAVY hydropathy score, rescaled to -0.35 to -0.05
+   - **Scale X/Y**: fixed at 0.5 (compass-web default)
+   - **Radii (8 circles)**: base radius + Gaussian variation per seed
+2. `build_pipeline_config()` — converts params to compass-web `PipelineConfig`
+3. `run_pipeline_with_retry()` — executes compass-web pipeline (up to 10 attempts)
+4. `export_stl()` — writes binary STL to `data/output/sculptures/`
+5. Output filename: `{suffix}_{tag}_s{seed}.stl`
+
+### Per-Gene Protein STL Files
+
+- Individual protein STL files live in `assets/stl/` (tracked via Git LFS)
+- Metadata in `assets/stl/stl_report.csv` → loaded as `STL_REPORT: dict[str, StlReportEntry]` (keyed by gene display name)
+- Report fields: `triangles`, `dimensions_mm`, `max_dim_mm`, `surface_area_cm2`, `watertight`, `difficulty`, etc.
+- Downloaded via `ComposeState.download_protein_stl(gene_name)` using `rx.download()`
+
+### Interactive STL Viewer (`assets/sculpture_viewer/`)
+
+- **`index.html`** — Three.js interactive viewer with OrbitControls (rotate, zoom, pan)
+  - Reads base64-encoded STL from parent iframe's `<textarea id="stl-b64-data">`
+  - Material: `MeshPhysicalMaterial` (purple `#9b8cff`, 25% metalness, 35% roughness, 30% clearcoat)
+  - UI controls: "Reset view" and "Wireframe" toggle; displays face count + dimensions
+  - `?preset=jigsaw` adjusts camera angle for jigsaw models
+- **`capture.html`** — headless 3-view renderer for report PDFs
+  - Renders front/side/back views and posts them as data URLs to parent via `postMessage`
+  - Stored in `window.__reportViews` for use by `me_report.js` cover page renderer
+- **Nonce mechanism**: `ComposeState.viewer_nonce` is incremented on each new STL generation; appended as `?nonce=N` to force iframe reload and avoid cache
+
+---
+
 ## Reflex UI Patterns
 
 The app uses **Reflex** with **Fomantic UI** (White Mirror light theme). Key patterns inherited from just-dna-lite:
@@ -224,14 +292,14 @@ Old `?tab=<key>` URLs are redirected by `AppState.redirect_legacy_tab` on the `/
   - `ComposeState.share_url` is the deterministic recreate URL (`/materialization?report=1&name=<b64>&cats=<bitmask>&genes=<b64-json-list>`). The `genes` parameter preserves the exact checked gene selection; without it, shared reports fall back to all genes in selected categories.
   - `ComposeState.report_public_url` is the published static landing page under `/generated/reports/<slug>/index.html` with Open Graph/Twitter metadata for social previews.
 - Generated public report files are written under `GENERATED_PUBLIC_DIR` (default `data/output/public`) and served by `app.py` at `GENERATED_URL_PREFIX` (default `/generated`).
-- A published report folder contains `index.html`, `model.stl`, `params.json`, `report.png`, and `report.pdf`. These are runtime artifacts and must remain gitignored.
-- `assets/vendor/me_report.js` builds the browser-only PNG/PDF bundle with `__meBuildReportBundleBase64()`; do not add Python image dependencies for this path.
+- A published report folder contains `index.html`, `model.stl`, `params.json`, `report.webp`, and `report.pdf`. These are runtime artifacts and must remain gitignored.
+- `assets/vendor/me_report.js` builds the browser-only WebP/PDF bundle with `__meBuildReportBundleBase64()`; do not add Python image dependencies for this path.
 - The report QR/copy/social controls are intentionally gated: before the user clicks **Create public link**, show explanatory placeholder text instead of a working QR/share link. After generation succeeds, those controls use `report_public_url`.
 - The PDF should always contain a usable URL: while publishing, use the pending public report URL; after publishing, use `report_public_url`; before publishing, fall back to `ComposeState.share_url`.
 - In split dev mode (`uv run start`), the frontend is `http://localhost:3000` while backend static serving is on `http://localhost:8000`; mirror generated reports into `.web/public/generated/` and resolve public report links from `window.location.origin` so local `/generated/...` URLs work from the frontend origin. Localhost links should use `http` unless TLS is explicitly configured.
 - Optional report portraits/user pictures are uploaded via Reflex upload into `ComposeState.report_portrait_data_url` and consumed by the browser-side PNG/PDF exporters. Keep this in-browser/data-URL path; do not add Python image processing dependencies for it.
 - The optional free-text field is named "Character note"; it is a short visitor-authored explanation/dedication/story for the profile and should be included in report card, PNG, PDF, params JSON, and regenerated public report links.
-- Social shares must target the generated `index.html` landing page, not the raw `report.png`. The landing page uses `report.png` as `og:image` and should expose both "Make your own character" (`/`) and "Open this exact character" (`ComposeState.share_url`) actions.
+- Social shares must target the generated `index.html` landing page, not the raw `report.webp`. The landing page uses `report.webp` as `og:image` and should expose both "Make your own character" (`/`) and "Open this exact character" (`ComposeState.share_url`) actions.
 
 ---
 
@@ -314,6 +382,6 @@ Category icon mapping lives in `state.py → CATEGORY_ICONS` (Fomantic UI icon n
 - The recreate URL encodes state as `/materialization?report=1&name=<b64>&cats=<bitmask>&genes=<b64-json-list>`; exact model reproduction requires `genes`, the same input CSVs, and the same generation code, while generated `params.json` is the strongest saved reproduction artifact.
 - Published generated reports are stored under `data/output/public/reports/<slug>/` and served at `/generated/reports/<slug>/`. The folder contains public download files plus a crawler-friendly `index.html`; never commit generated contents.
 - PDF export: do not rasterize `#me-report-pdf-long` per A4 page (balloons file size). Use jsPDF `text()` / `splitTextToSize()` from DOM rows; page 1 is built in `renderCoverPageA4()` from hidden inputs and `window.__reportViews`, and report JS should use canonical origin only for public share URLs while loading local static assets from the current browser origin.
-- For browser testing Materialization flows, use `uv run preselect` to start the app with a representative preselected report URL; test that generated `/materialization?report=1...` route instead of an empty selection.
+- **Testing the Materialization page always requires `uv run preselect`** — it starts the server AND opens a URL with pre-filled genes, categories, and a personal tag. Without pre-filled selections there is nothing to share/export/generate. Never test share, report, or model features with `uv run start` (empty selection). Use `uv run preselect --dev` for dev mode.
 - Gene/sculpture inputs use `data/input/gene_library.csv`, `data/input/species.csv`, `data/input/gene_species.csv`, and `data/input/gene_properties.csv` (see `gene_data.py` / `sculpture.py`); the whole `data/input/` tree is gitignored, and there is no in-repo command that generates `gene_properties*`.
 - Dev server / LAN: `python-dotenv` loads repo-root `.env` in `rxconfig.py` and `src/materialized_enhancements/run.py` before config. Backend bind defaults to `0.0.0.0` via `BACKEND_BIND_HOST` (or `REFLEX_BACKEND_HOST` when set). `vite_allowed_hosts` is permissive by default so `http://<LAN-IP>:3000` works; optionally restrict with `BACKEND_VITE_ALLOWED_HOSTS`. For phones on Wi‑Fi, `API_URL` may need the machine LAN IP and backend port, not `localhost`; mobile browsers are forced to a `width=1440` desktop viewport, so phone-specific CSS usually needs orientation/height rules rather than narrow `max-width` breakpoints.

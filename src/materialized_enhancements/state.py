@@ -7,7 +7,6 @@ import json
 import logging
 import re
 import shutil
-import uuid
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, TypedDict
 from urllib.parse import quote
@@ -24,7 +23,10 @@ from materialized_enhancements.gene_data import (
     GENE_PRICES,
     SPECIES_GENE_IDS,
     SPECIES_LOOKUP,
+    STL_DIR,
+    STL_REPORT,
     UNIQUE_CATEGORIES,
+    _DIFFICULTY_ORDER,
     species_wikipedia_url,
 )
 from materialized_enhancements.puzzle import HUMAN_SPECIES_ID, build_jigsaw_svg
@@ -53,6 +55,7 @@ from materialized_enhancements.env import (
     RESEND_API_KEY,
     REPO_ROOT,
     ensure_generated_public_dirs,
+    generated_public_absolute_url,
     generated_public_path,
     generated_public_url,
     public_app_url,
@@ -134,6 +137,7 @@ class SculptureSelectedGene(TypedDict):
     gene_url: str
     alphafold_url: str
     pdb_url: str
+    structure_pdb: str
     puzzle_svg: str
     puzzle_src: str
     species_page_url: str
@@ -383,10 +387,19 @@ def _html_escape(value: object) -> str:
     )
 
 
+def _replace_state_js(url: str) -> str:
+    """Build a safe history.replaceState JS snippet that uses the path only."""
+    url_js = json.dumps(url)
+    return (
+        f"try {{ var _u = new URL({url_js}, window.location.origin); "
+        f"history.replaceState({{}}, '', _u.pathname + _u.search); }} catch(_e) {{}}"
+    )
+
+
 def _safe_report_slug(name: str, seed: object) -> str:
-    """Stable-ish readable folder name plus random suffix to avoid collisions."""
+    """Deterministic readable folder name from visitor name + sculpture seed."""
     tag = re.sub(r"[^a-zA-Z0-9_-]+", "-", name.strip().lower()).strip("-")[:36] or "anonymous"
-    return f"{tag}-s{seed}-{uuid.uuid4().hex[:10]}"
+    return f"{tag}-s{seed}"
 
 
 def _is_safe_report_slug(value: str) -> bool:
@@ -456,6 +469,7 @@ def _build_report_landing_html(
   <meta property="og:description" content="{escaped_description}">
   <meta property="og:url" content="{escaped_page_url}">
   <meta property="og:image" content="{escaped_image_url}">
+  <meta property="og:image:type" content="image/webp">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{escaped_title}">
   <meta name="twitter:description" content="{escaped_description}">
@@ -723,12 +737,17 @@ class ComposeState(rx.State):
     stl_filename: str = ""
     stl_download_path: str = ""
     pipeline_stats: Dict[str, Any] = {}
+    show_mission_brief: bool = True
     choice_expanded: bool = True
     sculpture_expanded: bool = False
     viewer_expanded: bool = True
     materialization_artifact_tab: str = "model"
     stl_base64: str = ""
     viewer_nonce: int = 0
+
+    # Share card (in-memory preview, no disk write)
+    share_card_data_url: str = ""
+    share_card_generating: bool = False
 
     # Share & Report section
     report_expanded: bool = True
@@ -746,6 +765,7 @@ class ComposeState(rx.State):
     report_portrait_data_url: str = ""
     report_portrait_filename: str = ""
     report_portrait_error: str = ""
+    share_card_mode: str = "model"
     shared_report_slug: str = ""
     shared_report_error: str = ""
 
@@ -944,6 +964,8 @@ class ComposeState(rx.State):
             self.report_png_url = ""
             self.report_pdf_url = ""
             self.report_params_url = ""
+            self.share_card_data_url = ""
+            self.share_card_generating = False
             self.viewer_expanded = True
             self.materialization_artifact_tab = "model"
             redirect_url = "/materialization?from=ARTEX" if self.artex_from_kiosk else "/materialization"
@@ -985,6 +1007,9 @@ class ComposeState(rx.State):
             self.report_expanded = True
             self.materialization_artifact_tab = "model"
 
+    def dismiss_mission_brief(self) -> None:
+        self.show_mission_brief = False
+
     def toggle_choice_expanded(self) -> None:
         self.choice_expanded = not self.choice_expanded
 
@@ -1011,6 +1036,38 @@ class ComposeState(rx.State):
 
     def show_jigsaw_artifact_tab(self) -> None:
         self.materialization_artifact_tab = "jigsaw"
+
+    def show_share_artifact_tab(self):  # type: ignore[return]
+        self.materialization_artifact_tab = "share"
+        if self.report_public_url:
+            yield rx.call_script(_replace_state_js(self.report_public_url))
+        if self.stl_download_path and not self.share_card_data_url and not self.share_card_generating:
+            self.share_card_generating = True
+            yield rx.call_script(
+                "window.__meGenerateShareCard ? "
+                "window.__meGenerateShareCard(6000) : "
+                "JSON.stringify({error: 'Share card builder not loaded.'})",
+                callback=ComposeState.receive_share_card,
+            )
+
+    def receive_share_card(self, payload: str) -> None:  # type: ignore[return]
+        """Receive generated share card WebP data URL from browser, then auto-publish."""
+        self.share_card_generating = False
+        try:
+            data = json.loads(payload) if payload else {}
+        except (ValueError, TypeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        err = str(data.get("error", "")).strip()
+        if err:
+            logger.warning("Share card generation failed: %s", err)
+            return
+        data_url = str(data.get("data_url", "")).strip()
+        if data_url and len(data_url) > 200:
+            self.share_card_data_url = data_url
+            if not self.report_public_url and not self.report_publishing:
+                yield type(self).start_report_publish
 
     def show_support_artifact_tab(self) -> None:
         self.materialization_artifact_tab = "support"
@@ -1147,8 +1204,49 @@ class ComposeState(rx.State):
         )
 
     @rx.var
+    def protein_stl_entries(self) -> list[dict[str, Any]]:
+        """STL report rows for included genes, sorted by print difficulty (hardest first)."""
+        entries: list[dict[str, Any]] = []
+        for gene_name in self.included_genes:
+            info = STL_REPORT.get(gene_name)
+            if info:
+                row = dict(info)
+                src = row.get("structure_source", "")
+                pdb = row.get("pdb_id", "")
+                row["source_label"] = "AlphaFold predicted" if src == "alphafold" else (f"PDB {pdb}" if pdb else "")
+                protein_id = row.get("protein_id", "")
+                if src == "alphafold" and protein_id:
+                    row["structure_pdb"] = f"{protein_id}_predicted.pdb"
+                    row["pdb_src_url"] = f"/structures/{protein_id}_predicted.pdb"
+                elif pdb:
+                    row["structure_pdb"] = f"{pdb}.pdb"
+                    row["pdb_src_url"] = f"/structures/{pdb}.pdb"
+                else:
+                    row["structure_pdb"] = ""
+                    row["pdb_src_url"] = ""
+                entries.append(row)
+        entries.sort(key=lambda r: _DIFFICULTY_ORDER.get(r.get("difficulty", "medium"), 1))
+        return entries
+
+    def download_protein_stl(self, gene_name: str):  # type: ignore[return]
+        """Download an individual protein structure STL file."""
+        info = STL_REPORT.get(gene_name)
+        if not info:
+            yield rx.toast.error(f"No STL data for {gene_name}")
+            return
+        stl_path = STL_DIR / info["file"]
+        if not stl_path.exists():
+            yield rx.toast.error(f"STL file not found: {info['file']}")
+            return
+        yield rx.download(data=stl_path.read_bytes(), filename=info["file"])
+
+    @rx.var
     def can_publish_report(self) -> bool:
         return len(self.stl_download_path) > 0 and not self.report_publishing
+
+    @rx.var
+    def has_share_card(self) -> bool:
+        return len(self.share_card_data_url) > 200
 
     @rx.var
     def has_published_report(self) -> bool:
@@ -1163,6 +1261,21 @@ class ComposeState(rx.State):
         return len(self.report_portrait_data_url) > 0
 
     @rx.var
+    def is_character_card(self) -> bool:
+        return self.share_card_mode == "character"
+
+    def toggle_share_card_mode(self) -> None:  # type: ignore[return]
+        self.share_card_mode = "model" if self.share_card_mode == "character" else "character"
+        self.share_card_data_url = ""
+        self.share_card_generating = True
+        yield rx.call_script(
+            "window.__meGenerateShareCard ? "
+            "window.__meGenerateShareCard(6000) : "
+            "JSON.stringify({error: 'Share card builder not loaded.'})",
+            callback=ComposeState.receive_share_card,
+        )
+
+    @rx.var
     def has_report_character_note(self) -> bool:
         return len(self.report_character_note.strip()) > 0
 
@@ -1174,6 +1287,7 @@ class ComposeState(rx.State):
         self.report_png_url = ""
         self.report_pdf_url = ""
         self.report_params_url = ""
+        self.share_card_data_url = ""
 
     async def upload_report_portrait(self, files: list[rx.UploadFile]) -> None:
         """Attach an optional user photo to the personal report."""
@@ -1275,7 +1389,7 @@ class ComposeState(rx.State):
         out_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            png_bytes = _decode_base64_payload(str(data.get("png_base64", "")), expected_label="PNG")
+            png_bytes = _decode_base64_payload(str(data.get("png_base64", "")), expected_label="WebP")
             pdf_bytes = _decode_base64_payload(str(data.get("pdf_base64", "")), expected_label="PDF")
         except (ValueError, binascii.Error) as exc:
             self.report_publishing = False
@@ -1285,20 +1399,29 @@ class ComposeState(rx.State):
 
         model_path = out_dir / "model.stl"
         params_path = out_dir / "params.json"
-        png_path = out_dir / "report.png"
+        png_path = out_dir / "report.webp"
         pdf_path = out_dir / "report.pdf"
         html_path = out_dir / "index.html"
 
         relative_model = f"{rel_dir}/model.stl"
         relative_params = f"{rel_dir}/params.json"
-        relative_png = f"{rel_dir}/report.png"
+        relative_png = f"{rel_dir}/report.webp"
         relative_pdf = f"{rel_dir}/report.pdf"
 
+        # Relative paths for browser UI (resolved from window.location.origin)
         public_url = generated_public_url(f"{rel_dir}/index.html")
         model_url = generated_public_url(relative_model)
         params_url = generated_public_url(relative_params)
         png_url = generated_public_url(relative_png)
         pdf_url = generated_public_url(relative_pdf)
+
+        # Absolute URLs for OG tags in published HTML (crawlers need full URLs)
+        og_page_url = generated_public_absolute_url(f"{rel_dir}/index.html")
+        og_image_url = generated_public_absolute_url(relative_png)
+        og_pdf_url = generated_public_absolute_url(relative_pdf)
+        og_model_url = generated_public_absolute_url(relative_model)
+        og_params_url = generated_public_absolute_url(relative_params)
+
         recreate_url = self.share_url
         make_own_url = f"{public_app_url()}/"
 
@@ -1322,15 +1445,22 @@ class ComposeState(rx.State):
             params_path.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
             png_path.write_bytes(png_bytes)
             pdf_path.write_bytes(pdf_bytes)
+            if self.report_portrait_data_url:
+                portrait_bytes = _decode_base64_payload(
+                    self.report_portrait_data_url.split(",", 1)[-1] if "," in self.report_portrait_data_url else "",
+                    expected_label="portrait",
+                )
+                if portrait_bytes:
+                    (out_dir / "portrait.webp").write_bytes(portrait_bytes)
             html_path.write_text(
                 _build_report_landing_html(
                     title=title,
                     description=description,
-                    page_url=public_url,
-                    image_url=png_url,
-                    pdf_url=pdf_url,
-                    stl_url=model_url,
-                    params_url=params_url,
+                    page_url=og_page_url,
+                    image_url=og_image_url,
+                    pdf_url=og_pdf_url,
+                    stl_url=og_model_url,
+                    params_url=og_params_url,
                     recreate_url=recreate_url,
                     make_own_url=make_own_url,
                 ),
@@ -1347,11 +1477,13 @@ class ComposeState(rx.State):
         self.report_publishing = False
         self.report_publish_error = ""
         self.report_public_slug = slug
-        self.report_public_url = public_url
+        self.report_public_url = generated_public_absolute_url(f"{rel_dir}/index.html")
         self.report_model_url = model_url
         self.report_png_url = png_url
         self.report_pdf_url = pdf_url
         self.report_params_url = params_url
+        self.materialization_artifact_tab = "share"
+        yield rx.call_script(_replace_state_js(self.report_public_url))
         yield rx.call_script(
             "setTimeout(function(){ "
             "if (window.__meUsePublishedPdfInPage) window.__meUsePublishedPdfInPage(); "
@@ -1600,6 +1732,7 @@ class ComposeState(rx.State):
                 "gene_url": g.get("gene_url", ""),
                 "alphafold_url": g.get("alphafold_url", ""),
                 "pdb_url": g.get("pdb_url", ""),
+                "structure_pdb": g.get("structure_pdb", ""),
                 "puzzle_svg": g["puzzle_svg"],
                 "puzzle_src": f"/puzzle/{quote(g['puzzle_svg'])}" if g["puzzle_svg"] else "",
                 "species_page_url": g.get("species_page_url", ""),
@@ -1802,19 +1935,27 @@ class ComposeState(rx.State):
         self.report_public_slug = slug
         self.report_public_url = generated_public_url(f"{rel_dir}/index.html")
         self.report_model_url = generated_public_url(f"{rel_dir}/model.stl")
-        self.report_png_url = generated_public_url(f"{rel_dir}/report.png")
+        self.report_png_url = generated_public_url(f"{rel_dir}/report.webp")
         self.report_pdf_url = generated_public_url(f"{rel_dir}/report.pdf")
         self.report_params_url = generated_public_url(f"{rel_dir}/params.json")
         self.report_character_note = str(artifact.get("character_note", "")).strip()
         self.report_portrait_error = ""
         self.generation_error = ""
+        portrait_path = out_dir / "portrait.webp"
+        if portrait_path.exists():
+            portrait_data = portrait_path.read_bytes()
+            self.report_portrait_data_url = f"data:image/webp;base64,{base64.b64encode(portrait_data).decode('ascii')}"
+            self.report_portrait_filename = str(artifact.get("report_portrait_filename", "portrait.webp"))
         self.generating = False
 
     def apply_shared_report(self):  # type: ignore[return]
         """Decode ?report=1&name=<b64>&cats=<bitmask> and regenerate the same sculpture.
 
-        Runs as page on_load handler. No-op when the query params aren't present.
+        Runs as page on_load handler. No-op when the query params aren't present
+        or when a sculpture is already generated (prevents re-trigger from replaceState).
         """
+        if self.stl_download_path or self.generating:
+            return
         params = self.router.url.query_parameters
         if str(params.get("report", "")) != "1":
             return

@@ -196,11 +196,17 @@ Your name is hashed and XORed with your category bitmask to produce a unique see
 ## Running
 
 ```bash
+git lfs install        # one-time: enable Git LFS (PDB + STL files)
+git lfs pull           # fetch binary assets if cloned without LFS
 uv run start           # development mode (hot-reload)
 uv run serve           # production mode (single-port, Reflex 0.9+)
 ```
 
 Copy `.env.template` to `.env` to override defaults (email delivery, deploy URL, kiosk settings). For production, set `DEPLOY_URL` to your public domain so QR codes, report links, and social shares use absolute URLs.
+
+### Binary assets (Git LFS)
+
+Protein structure files (`assets/structures/*.pdb`) and 3D-printable STL meshes (`assets/stl/*.stl`) are tracked with [Git LFS](https://git-lfs.com/). After cloning, run `git lfs pull` to download them. To regenerate STLs from PDB sources: `uv run stl generate --all`.
 
 ---
 
@@ -277,7 +283,7 @@ Exports stay local until the visitor clicks **Create public link**. That action 
 - `index.html` — crawler-friendly page with Open Graph/Twitter metadata
 - `model.stl` — the printable sculpture
 - `params.json` — strongest saved reproduction artifact, including selected categories, checked genes, sculpture parameters, and the recreate URL
-- `report.png` — square social preview card
+- `report.webp` — square social preview card (WebP for smaller size with transparency)
 - `report.pdf` — A4 personal enhancement report
 
 QR, copy, and social sharing buttons use the public report link after it exists. Before publication, the PDF still embeds the recreate URL so the character selection can be opened again. Reports are generated in the browser using vendored JS (`html-to-image`, `jsPDF`, `qrcode`) — no server-side image dependencies.

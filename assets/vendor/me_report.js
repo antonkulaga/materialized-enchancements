@@ -40,7 +40,7 @@
     return origin + '/' + (p.charAt(0) === '?' ? '' : '') + p;
   }
   function reportTargetUrl() {
-    return generatedShareUrl();
+    return generatedShareUrl() || absoluteShareUrl();
   }
   function reportPdfTargetUrl() {
     return reportTargetUrl() || absoluteShareUrl();
@@ -148,6 +148,7 @@
       ['png-view-front',    v.front],
       ['png-view-side',     v.side],
       ['png-view-back',     v.back],
+      ['char-view-front',   v.front],
     ];
     var painted = 0;
     for (var i = 0; i < ids.length; i++) {
@@ -209,7 +210,7 @@
         var n = mutations[i].target;
         while (n && n !== document.body) {
           if (n.id === 'report-qr' ||
-              n.id === 'me-report-pdf-long' || n.id === 'me-report-png-card' ||
+              n.id === 'me-report-pdf-long' || n.id === 'me-report-png-card' || n.id === 'me-report-png-card-character' ||
               n.id === 'report-export-animals-json' ||
               n.id === 'report-export-composition-genes-json') return;
           n = n.parentNode;
@@ -373,7 +374,8 @@
     await waitImages(node);
     await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
     try {
-      return await htmlToImage.toPng(node, h2iOptions(options));
+      var canvas = await htmlToImage.toCanvas(node, h2iOptions(options));
+      return canvas.toDataURL('image/webp', 0.92);
     } finally {
       node.style.cssText = savedCss;
     }
@@ -396,10 +398,16 @@
 
   /* --------------------------------------------- button action handlers */
 
+  function activeCardId() {
+    var el = document.getElementById('report-card-mode');
+    var mode = el && el.value ? String(el.value).trim() : 'model';
+    return mode === 'character' ? 'me-report-png-card-character' : 'me-report-png-card';
+  }
+
   window.__meDownloadPng = function () {
     console.info('[materialized] __meDownloadPng clicked');
     if (typeof htmlToImage === 'undefined') { missingLib('html-to-image'); return; }
-    var node = document.getElementById('me-report-png-card');
+    var node = document.getElementById(activeCardId());
     if (!node) { console.warn('[materialized] png card not mounted'); feedback('PNG card not mounted.', '#b91c1c'); return; }
     withExportMode(async function () {
       var dataUrl = await snapshotNode(node, {
@@ -409,15 +417,15 @@
         canvasHeight: 1080,
         pixelRatio: 1,
       });
-      if (!dataUrl || dataUrl.length < 200) throw new Error('empty PNG');
-      downloadDataUrl(dataUrl, 'materialized_' + safeName() + '_s' + safeSeed() + '.png');
-      feedback('PNG saved (1080\u00d71080)!');
+      if (!dataUrl || dataUrl.length < 200) throw new Error('empty WebP');
+      downloadDataUrl(dataUrl, 'materialized_' + safeName() + '_s' + safeSeed() + '.webp');
+      feedback('WebP saved (1080\u00d71080)!');
     });
   };
 
   async function buildReportPngDataUrl() {
     if (typeof htmlToImage === 'undefined') throw new Error('html-to-image library not loaded.');
-    var node = document.getElementById('me-report-png-card');
+    var node = document.getElementById(activeCardId());
     if (!node) throw new Error('PNG card not mounted.');
     var dataUrl = await snapshotNode(node, {
       width: 1080,
@@ -426,9 +434,29 @@
       canvasHeight: 1080,
       pixelRatio: 1,
     });
-    if (!dataUrl || dataUrl.length < 200) throw new Error('empty PNG');
+    if (!dataUrl || dataUrl.length < 200) throw new Error('empty WebP');
     return dataUrl;
   }
+
+  window.__meGenerateShareCard = async function (timeoutMs) {
+    timeoutMs = timeoutMs || 6000;
+    if (typeof htmlToImage === 'undefined') {
+      return JSON.stringify({ error: 'html-to-image library not loaded.' });
+    }
+    stopObserver();
+    try {
+      await waitReportMounted(timeoutMs);
+      window.__mePaintReport();
+      await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
+      var dataUrl = await buildReportPngDataUrl();
+      return JSON.stringify({ data_url: dataUrl });
+    } catch (err) {
+      console.error('[materialized] __meGenerateShareCard failed', err);
+      return JSON.stringify({ error: (err && err.message) ? err.message : String(err) });
+    } finally {
+      startObserver();
+    }
+  };
 
   /** Extract gene rows from the hidden `#me-report-pdf-long` DOM subtree.
    * Each row in that element is laid out as
@@ -1451,8 +1479,8 @@
       var pdf = await buildReportPdf();
       var pdfDataUri = pdf.output('datauristring');
       return JSON.stringify({
-        png_filename: 'materialized_' + safeName() + '_s' + safeSeed() + '.png',
-        png_base64: dataUrlBase64(pngDataUrl, 'PNG'),
+        png_filename: 'materialized_' + safeName() + '_s' + safeSeed() + '.webp',
+        png_base64: dataUrlBase64(pngDataUrl, 'WebP'),
         pdf_filename: 'materialized_' + safeName() + '_s' + safeSeed() + '.pdf',
         pdf_base64: dataUrlBase64(pdfDataUri, 'PDF'),
         share_url: reportTargetUrl(),
@@ -1467,9 +1495,9 @@
   };
 
   window.__meCopyShareLink = async function () {
-    var url = reportTargetUrl();
+    var url = reportTargetUrl() || absoluteShareUrl();
     if (!url) {
-      feedback('Create a public link first.', '#b45309');
+      feedback('No share URL available.', '#b45309');
       return;
     }
     try {
@@ -1486,9 +1514,9 @@
   };
 
   window.__meShareIntent = function (network) {
-    var rawUrl = reportTargetUrl();
+    var rawUrl = reportTargetUrl() || absoluteShareUrl();
     if (!rawUrl) {
-      feedback('Create a public link first.', '#b45309');
+      feedback('No share URL available.', '#b45309');
       return;
     }
     var url = encodeURIComponent(rawUrl);

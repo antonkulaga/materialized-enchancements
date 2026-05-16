@@ -5,7 +5,6 @@ import reflex as rx
 from materialized_enhancements.components.layout import fomantic_icon, template
 from materialized_enhancements.artex import artex_publish_button
 from materialized_enhancements.crawler_assets import PUBLIC_ROUTES
-from materialized_enhancements.env import PUBLIC_APP_URL
 from materialized_enhancements.gene_data import (
     CATEGORY_COUNTS,
     CATEGORY_PRICES,
@@ -30,6 +29,7 @@ _CONTENT_STYLE: dict = {
 _ROUTE_METADATA = {route.path: route for route in PUBLIC_ROUTES}
 _SITE_TITLE = "Materialized Enhancements"
 _REPORT_PORTRAIT_UPLOAD_ID = "report-portrait-upload"
+_HERO_PORTRAIT_UPLOAD_ID = "hero-portrait-upload"
 _SOCIAL_META: list[dict[str, str]] = [
     {"name": "robots", "content": "index, follow"},
     {"property": "og:type", "content": "website"},
@@ -741,8 +741,64 @@ def _category_button(category: str) -> rx.Component:
 
 
 def _budget_gauge() -> rx.Component:
-    """Sticky credit budget gauge — the core resource constraint, always visible."""
+    """Sticky credit budget gauge with integrated mission briefing."""
+    briefing = rx.cond(
+        ComposeState.show_mission_brief,
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon("crosshairs", size=14, color="#a78bfa"),
+                    rx.el.span(
+                        "MISSION BRIEFING",
+                        style={
+                            "fontSize": "0.65rem",
+                            "fontWeight": "900",
+                            "letterSpacing": "0.14em",
+                            "color": "#a78bfa",
+                        },
+                    ),
+                    style={"display": "flex", "alignItems": "center", "gap": "5px"},
+                ),
+                rx.el.span(
+                    fomantic_icon("times", size=11, color="#64748b"),
+                    on_click=ComposeState.dismiss_mission_brief,
+                    style={
+                        "cursor": "pointer",
+                        "opacity": "0.6",
+                        "padding": "3px",
+                        "borderRadius": "4px",
+                        "transition": "opacity 0.2s",
+                    },
+                    _hover={"opacity": "1"},
+                ),
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "marginBottom": "4px",
+                },
+            ),
+            rx.el.p(
+                "Design one enhanced human. You have ",
+                rx.el.strong(f"{DEFAULT_BUDGET} enhancement credits", style={"color": "#c4b5fd"}),
+                " and real genes from extraordinary organisms. "
+                "Every upgrade has a biological tradeoff — you cannot maximize everything.",
+                style={
+                    "fontSize": "0.82rem",
+                    "lineHeight": "1.45",
+                    "color": "#94a3b8",
+                    "margin": "0",
+                },
+            ),
+            style={
+                "padding": "0 0 8px",
+                "marginBottom": "8px",
+                "borderBottom": "1px solid rgba(167, 139, 250, 0.15)",
+            },
+        ),
+    )
     return rx.el.div(
+        briefing,
         rx.el.div(
             rx.el.div(
                 fomantic_icon("bolt", size=16, style={"color": ComposeState.budget_spent_color, "transition": "color 0.35s ease"}),
@@ -1369,6 +1425,81 @@ def _gene_category_accent_color(category: rx.Var) -> rx.Var:
         ("Perception", "#e84393"),
         ("Expression", "#8e44ad"),
         "#7c3aed",
+    )
+
+
+def _confidence_bar_count(confidence_value: rx.Var) -> rx.Var:
+    """Map confidence tier to number of lit bars (0–4)."""
+    val_lower = confidence_value.lower()
+    return rx.match(
+        val_lower,
+        ("very high", 4),
+        ("high", 3),
+        ("medium-high", 3),
+        ("medium", 2),
+        ("medium-low", 1),
+        ("low-medium", 1),
+        ("low", 1),
+        ("declining", 0),
+        ("n/a", 0),
+        0,
+    )
+
+
+def _confidence_bar_color(confidence_value: rx.Var) -> rx.Var:
+    """Color for lit bars — green for strong, amber for mid, red for weak."""
+    val_lower = confidence_value.lower()
+    return rx.match(
+        val_lower,
+        ("very high", "#10b981"),
+        ("high", "#10b981"),
+        ("medium-high", "#0ea5e9"),
+        ("medium", "#f59e0b"),
+        ("medium-low", "#ef4444"),
+        ("low-medium", "#ef4444"),
+        ("low", "#ef4444"),
+        ("declining", "#ef4444"),
+        ("n/a", "#64748b"),
+        "#64748b",
+    )
+
+
+def _confidence_signal_bars(confidence_value: rx.Var) -> rx.Component:
+    """Compact 4-bar signal-strength indicator for confidence tier."""
+    n_lit = _confidence_bar_count(confidence_value).to(int)
+    color = _confidence_bar_color(confidence_value)
+    dim = "rgba(148, 163, 184, 0.22)"
+
+    def _bar(index: int) -> rx.Component:
+        height = f"{5 + index * 3}px"
+        return rx.el.div(
+            style={
+                "width": "3px",
+                "height": height,
+                "borderRadius": "1px",
+                "backgroundColor": rx.cond(n_lit > index, color, dim),
+                "transition": "background-color 0.2s ease",
+            },
+        )
+
+    return rx.cond(
+        confidence_value != "",
+        rx.el.div(
+            _bar(0),
+            _bar(1),
+            _bar(2),
+            _bar(3),
+            title=confidence_value,
+            style={
+                "display": "inline-flex",
+                "alignItems": "flex-end",
+                "gap": "2px",
+                "marginLeft": "6px",
+                "flexShrink": "0",
+                "cursor": "default",
+            },
+        ),
+        rx.fragment(),
     )
 
 
@@ -2037,14 +2168,14 @@ def _rpg_selected_gene_chip(gene_item: rx.Var) -> rx.Component:
 def _rpg_schema_hint_panel() -> rx.Component:
     return rx.el.details(
         rx.el.summary(
-            fomantic_icon("map outline", size=12, color="#22d3ee"),
+            fomantic_icon("map outline", size=18, color="#22d3ee"),
             rx.el.span(" How it works", style={"marginLeft": "7px"}),
             style={
                 "cursor": "pointer",
                 "listStyle": "none",
                 "display": "flex",
                 "alignItems": "center",
-                "fontSize": "0.8rem",
+                "fontSize": "1.2rem",
                 "fontWeight": "900",
                 "letterSpacing": "0.08em",
                 "textTransform": "uppercase",
@@ -2088,14 +2219,14 @@ def _rpg_schema_hint_panel() -> rx.Component:
 def _rpg_intro_video_panel() -> rx.Component:
     return rx.el.details(
         rx.el.summary(
-            fomantic_icon("video", size=12, color="#c4b5fd"),
+            fomantic_icon("video", size=18, color="#c4b5fd"),
             rx.el.span(" Project video", style={"marginLeft": "7px"}),
             style={
                 "cursor": "pointer",
                 "listStyle": "none",
                 "display": "flex",
                 "alignItems": "center",
-                "fontSize": "0.8rem",
+                "fontSize": "1.2rem",
                 "fontWeight": "900",
                 "letterSpacing": "0.08em",
                 "textTransform": "uppercase",
@@ -2137,7 +2268,6 @@ def _rpg_intro_video_panel() -> rx.Component:
             "border": "1px solid rgba(167, 139, 250, 0.24)",
             "background": "rgba(46, 16, 101, 0.2)",
         },
-        open=True,
     )
 
 
@@ -2195,7 +2325,11 @@ def _rpg_materialization_leg_cta() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.el.span(ComposeState.budget_spent, style={"fontWeight": "950", "color": "#ffffff"}),
-            f" out of {DEFAULT_BUDGET} cr",
+            f" / {DEFAULT_BUDGET} cr",
+            rx.el.span(
+                " · Unlocks: character sheet, share link, 3D file",
+                style={"fontWeight": "700", "color": "#a78bfa", "letterSpacing": "0.02em"},
+            ),
             class_name="me-rpg-materialize-credit-line",
         ),
         rx.el.button(
@@ -2507,24 +2641,74 @@ def _rpg_body_map_panel() -> rx.Component:
                             "marginBottom": "6px",
                         },
                     ),
-                    rx.el.input(
-                        id="compose-personal-tag",
-                        placeholder="Enhanced <Name>",
-                        value=ComposeState.personal_tag,
-                        on_change=ComposeState.set_personal_tag,
+                    rx.el.div(
+                        rx.el.input(
+                            id="compose-personal-tag",
+                            placeholder="Enhanced <Name>",
+                            value=ComposeState.personal_tag,
+                            on_change=ComposeState.set_personal_tag,
+                            style={
+                                "flex": "1",
+                                "minWidth": "0",
+                                "padding": "15px 18px",
+                                "borderRadius": "14px",
+                                "border": "1px solid rgba(167, 139, 250, 0.45)",
+                                "fontSize": "1.18rem",
+                                "fontWeight": "800",
+                                "outline": "none",
+                                "backgroundColor": "rgba(15, 23, 42, 0.88)",
+                                "color": "#f8fafc",
+                                "boxSizing": "border-box",
+                                "boxShadow": "0 0 24px rgba(124, 58, 237, 0.45), 0 0 52px rgba(56, 189, 248, 0.20)",
+                            },
+                        ),
+                        rx.upload(
+                            rx.cond(
+                                ComposeState.has_report_portrait,
+                                rx.el.img(
+                                    src=ComposeState.report_portrait_data_url,
+                                    alt="Portrait",
+                                    style={
+                                        "width": "100%",
+                                        "height": "100%",
+                                        "objectFit": "cover",
+                                        "borderRadius": "999px",
+                                    },
+                                ),
+                                rx.el.div(
+                                    fomantic_icon("camera", size=18, color="#a78bfa"),
+                                    style={
+                                        "width": "100%",
+                                        "height": "100%",
+                                        "display": "flex",
+                                        "alignItems": "center",
+                                        "justifyContent": "center",
+                                        "borderRadius": "999px",
+                                    },
+                                ),
+                            ),
+                            id=_HERO_PORTRAIT_UPLOAD_ID,
+                            on_drop=ComposeState.upload_report_portrait(
+                                rx.upload_files(upload_id=_HERO_PORTRAIT_UPLOAD_ID)
+                            ),
+                            border="none",
+                            padding="0",
+                            style={
+                                "width": "52px",
+                                "height": "52px",
+                                "flexShrink": "0",
+                                "borderRadius": "999px",
+                                "border": "2px solid rgba(167, 139, 250, 0.52)",
+                                "backgroundColor": "rgba(15, 23, 42, 0.72)",
+                                "cursor": "pointer",
+                                "overflow": "hidden",
+                                "boxShadow": "0 0 16px rgba(124, 58, 237, 0.24)",
+                            },
+                        ),
                         style={
-                            "flex": "1",
-                            "minWidth": "0",
-                            "padding": "15px 18px",
-                            "borderRadius": "14px",
-                            "border": "1px solid rgba(167, 139, 250, 0.45)",
-                            "fontSize": "1.18rem",
-                            "fontWeight": "800",
-                            "outline": "none",
-                            "backgroundColor": "rgba(15, 23, 42, 0.88)",
-                            "color": "#f8fafc",
-                            "boxSizing": "border-box",
-                            "boxShadow": "0 0 24px rgba(124, 58, 237, 0.45), 0 0 52px rgba(56, 189, 248, 0.20)",
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "10px",
                         },
                     ),
                     style={
@@ -2625,6 +2809,108 @@ def _rpg_gene_side_references(segments: rx.Var) -> rx.Component:
     )
 
 
+_STRUCTURE_LINK_STYLE: dict = {
+    "display": "inline-flex",
+    "alignItems": "center",
+    "gap": "4px",
+    "padding": "6px 12px",
+    "borderRadius": "6px",
+    "border": "1px solid rgba(167, 139, 250, 0.38)",
+    "background": "rgba(124, 58, 237, 0.14)",
+    "color": "#c4b5fd",
+    "fontSize": "0.82rem",
+    "fontWeight": "700",
+    "textDecoration": "none",
+    "cursor": "pointer",
+    "_hover": {
+        "background": "rgba(124, 58, 237, 0.28)",
+        "color": "#e9d5ff",
+        "borderColor": "rgba(167, 139, 250, 0.6)",
+    },
+}
+
+
+def _gene_structure_viewer(gene_item: rx.Var) -> rx.Component:
+    """Interactive 3D protein structure viewer or fallback external links."""
+    has_local = gene_item["structure_pdb"] != ""
+    has_pdb_url = gene_item["pdb_url"] != ""
+    has_af_url = gene_item["alphafold_url"] != ""
+
+    link_row = rx.el.div(
+        rx.cond(
+            has_pdb_url,
+            rx.el.a(
+                fomantic_icon("database", size=13, color="#a78bfa"),
+                " RCSB PDB",
+                href=gene_item["pdb_url"],
+                target="_blank",
+                rel="noopener noreferrer",
+                title="View on RCSB PDB",
+                style=_STRUCTURE_LINK_STYLE,
+            ),
+            rx.fragment(),
+        ),
+        rx.cond(
+            has_af_url,
+            rx.el.a(
+                fomantic_icon("cube", size=13, color="#a78bfa"),
+                " AlphaFold",
+                href=gene_item["alphafold_url"],
+                target="_blank",
+                rel="noopener noreferrer",
+                title="View on AlphaFold DB",
+                style=_STRUCTURE_LINK_STYLE,
+            ),
+            rx.fragment(),
+        ),
+        style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
+    )
+
+    viewer_with_links = rx.el.div(
+        rx.el.div(
+            fomantic_icon("cube", size=14, color="#a78bfa"),
+            rx.el.span(
+                " Protein 3D Structure",
+                style={"marginLeft": "6px", "fontWeight": "700", "fontSize": "0.88rem"},
+            ),
+            style={"display": "flex", "alignItems": "center", "color": "#c4b5fd", "marginBottom": "8px"},
+        ),
+        rx.el.div(
+            class_name="me-pdb-viewer",
+            custom_attrs={"data-pdb-src": "/structures/" + gene_item["structure_pdb"]},
+            style={
+                "width": "100%",
+                "height": "320px",
+                "borderRadius": "8px",
+                "border": "1px solid rgba(167, 139, 250, 0.28)",
+                "background": "#0f172a",
+                "position": "relative",
+                "overflow": "hidden",
+            },
+        ),
+        rx.el.div(
+            link_row,
+            style={"marginTop": "6px"},
+        ),
+        style={
+            "padding": "10px",
+            "borderRadius": "10px",
+            "border": "1px solid rgba(167, 139, 250, 0.22)",
+            "background": "rgba(15, 23, 42, 0.6)",
+        },
+    )
+
+    return rx.cond(
+        has_local,
+        viewer_with_links,
+        rx.cond(
+            has_pdb_url | has_af_url,
+            link_row,
+            rx.fragment(),
+        ),
+    )
+
+
 def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
     included = gene_item["included"]
     gene_sym = gene_item["gene"]
@@ -2707,6 +2993,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                                 },
                             ),
                         ),
+                        _confidence_signal_bars(gene_item["confidence_primary"]["value"]),
                         _manipulation_badge_dark(gene_item),
                         rx.el.span(
                             gene_item["price"],
@@ -2795,74 +3082,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                         _rpg_gene_side_references(gene_item["key_reference_segments"]),
                         rx.fragment(),
                     ),
-                    rx.cond(
-                        gene_item["pdb_url"] != "",
-                        rx.el.a(
-                            fomantic_icon("database", size=14, color="#a78bfa"),
-                            rx.el.span(
-                                " Experimental 3D Structure",
-                                style={"marginLeft": "4px"},
-                            ),
-                            href=gene_item["pdb_url"],
-                            target="_blank",
-                            rel="noopener noreferrer",
-                            title="View experimental structure on RCSB PDB",
-                            style={
-                                "display": "inline-flex",
-                                "alignItems": "center",
-                                "padding": "8px 14px",
-                                "borderRadius": "6px",
-                                "border": "1px solid rgba(167, 139, 250, 0.38)",
-                                "background": "rgba(124, 58, 237, 0.14)",
-                                "color": "#c4b5fd",
-                                "fontSize": "0.88rem",
-                                "fontWeight": "700",
-                                "textDecoration": "none",
-                                "cursor": "pointer",
-                                "marginTop": "4px",
-                                "_hover": {
-                                    "background": "rgba(124, 58, 237, 0.28)",
-                                    "color": "#e9d5ff",
-                                    "borderColor": "rgba(167, 139, 250, 0.6)",
-                                },
-                            },
-                        ),
-                        rx.fragment(),
-                    ),
-                    rx.cond(
-                        gene_item["alphafold_url"] != "",
-                        rx.el.a(
-                            fomantic_icon("cube", size=14, color="#a78bfa"),
-                            rx.el.span(
-                                " Predicted 3D Structure",
-                                style={"marginLeft": "4px"},
-                            ),
-                            href=gene_item["alphafold_url"],
-                            target="_blank",
-                            rel="noopener noreferrer",
-                            title="View AlphaFold predicted 3D structure",
-                            style={
-                                "display": "inline-flex",
-                                "alignItems": "center",
-                                "padding": "8px 14px",
-                                "borderRadius": "6px",
-                                "border": "1px solid rgba(167, 139, 250, 0.38)",
-                                "background": "rgba(124, 58, 237, 0.14)",
-                                "color": "#c4b5fd",
-                                "fontSize": "0.88rem",
-                                "fontWeight": "700",
-                                "textDecoration": "none",
-                                "cursor": "pointer",
-                                "marginTop": "4px",
-                                "_hover": {
-                                    "background": "rgba(124, 58, 237, 0.28)",
-                                    "color": "#e9d5ff",
-                                    "borderColor": "rgba(167, 139, 250, 0.6)",
-                                },
-                            },
-                        ),
-                        rx.fragment(),
-                    ),
+                    _gene_structure_viewer(gene_item),
                     style={
                         "display": "flex",
                         "flexDirection": "column",
@@ -3075,14 +3295,7 @@ def _rpg_gene_library_title() -> rx.Component:
             style={"display": "flex", "alignItems": "center"},
         ),
         rx.el.div(
-            "Pick individual genes after choosing functional systems on the body map. ",
-            rx.el.span(
-                ComposeState.budget_spent,
-                " out of ",
-                ComposeState.budget_total,
-                " cr used",
-                style={"fontWeight": "950", "color": "#f8fafc"},
-            ),
+            "Build your enhanced character from real genes. Tap a category to browse.",
             style={
                 "fontSize": "0.98rem",
                 "fontWeight": "800",
@@ -3095,8 +3308,85 @@ def _rpg_gene_library_title() -> rx.Component:
     )
 
 
+def _pdb_viewer_scripts() -> rx.Component:
+    """Load 3Dmol.js from CDN and auto-initialize viewers as they appear in the DOM."""
+    return rx.fragment(
+        rx.script(src="https://cdn.jsdelivr.net/npm/3dmol@2.4.2/build/3Dmol-min.js"),
+        rx.script(
+            """
+            (() => {
+                if (window.__mePdbViewerInstalled) return;
+                window.__mePdbViewerInstalled = true;
+
+                const pdbCache = {};
+
+                const initViewer = (el) => {
+                    if (el.dataset.pdbInit) return;
+                    const src = el.dataset.pdbSrc;
+                    if (!src || typeof $3Dmol === "undefined") return;
+                    el.dataset.pdbInit = "1";
+                    const viewer = $3Dmol.createViewer(el, {
+                        backgroundColor: "0x0f172a",
+                        antialias: true,
+                    });
+                    el.__me_viewer = viewer;
+                    const show = (pdb) => {
+                        viewer.addModel(pdb, "pdb");
+                        viewer.setStyle({}, {cartoon: {color: "spectrum"}});
+                        viewer.zoomTo();
+                        viewer.render();
+                        viewer.spin("y", 0.4);
+                    };
+                    const fail = () => {
+                        el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:0.82rem;">Structure unavailable</div>';
+                    };
+                    if (pdbCache[src]) { show(pdbCache[src]); }
+                    else { fetch(src).then(r => r.text()).then(pdb => { pdbCache[src] = pdb; show(pdb); }).catch(fail); }
+                };
+
+                const cleanupViewer = (el) => {
+                    if (el.__me_viewer) {
+                        try { el.__me_viewer.clear(); } catch(_) {}
+                        el.__me_viewer = null;
+                    }
+                };
+
+                const scanAll = () => {
+                    document.querySelectorAll(".me-pdb-viewer:not([data-pdb-init])").forEach(initViewer);
+                };
+
+                const tryInit = () => {
+                    if (typeof $3Dmol !== "undefined") {
+                        scanAll();
+                        const obs = new MutationObserver((mutations) => {
+                            for (const m of mutations) {
+                                for (const n of m.removedNodes) {
+                                    if (n.nodeType !== 1) continue;
+                                    if (n.classList && n.classList.contains("me-pdb-viewer")) cleanupViewer(n);
+                                    else if (n.querySelectorAll) n.querySelectorAll(".me-pdb-viewer").forEach(cleanupViewer);
+                                }
+                            }
+                            requestAnimationFrame(scanAll);
+                        });
+                        obs.observe(document.body, {childList: true, subtree: true});
+                    } else {
+                        setTimeout(tryInit, 200);
+                    }
+                };
+                if (document.readyState === "loading") {
+                    document.addEventListener("DOMContentLoaded", tryInit);
+                } else {
+                    tryInit();
+                }
+            })();
+            """
+        ),
+    )
+
+
 def _rpg_gene_library_panel() -> rx.Component:
     return rx.el.div(
+        _pdb_viewer_scripts(),
         _rpg_gene_library_anchor_script(),
         _rpg_gene_library_title(),
         rx.el.div(
@@ -3290,12 +3580,28 @@ def _reward_artifact_choice(
     label: str,
     description: str,
     icon_name: str,
-    image_src: str,
-    image_alt: str,
     active: rx.Var,
     on_click: rx.EventSpec,
+    image_src: str = "",
+    image_alt: str = "",
+    preview: rx.Component | None = None,
 ) -> rx.Component:
     """Compact clickable artifact selector shown inside the reward card."""
+    if preview is None:
+        preview = rx.el.img(
+            src=image_src,
+            alt=image_alt,
+            loading="lazy",
+            decoding="async",
+            style={
+                "width": "100%",
+                "height": "100%",
+                "objectFit": "contain",
+                "objectPosition": "center",
+                "display": "block",
+                "filter": "saturate(1.08) contrast(1.04)",
+            },
+        )
     return rx.el.button(
         rx.el.div(
             rx.el.strong(label, style={"display": "block", "fontSize": "1.34rem", "lineHeight": "1.15"}),
@@ -3303,20 +3609,7 @@ def _reward_artifact_choice(
             style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 2px"},
         ),
         rx.el.div(
-            rx.el.img(
-                src=image_src,
-                alt=image_alt,
-                loading="lazy",
-                decoding="async",
-                style={
-                    "width": "100%",
-                    "height": "100%",
-                    "objectFit": "contain",
-                    "objectPosition": "center",
-                    "display": "block",
-                    "filter": "saturate(1.08) contrast(1.04)",
-                },
-            ),
+            preview,
             rx.el.div(
                 fomantic_icon(icon_name, size=20, color="#ffffff"),
                 style={
@@ -3375,10 +3668,52 @@ def _reward_artifact_choice(
     )
 
 
+def _share_card_preview() -> rx.Component:
+    """Social media icons preview for the Share & publish card."""
+    icon_circle_style: dict = {
+        "width": "54px",
+        "height": "54px",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "borderRadius": "999px",
+        "border": "2px solid rgba(196, 181, 253, 0.38)",
+        "boxShadow": "0 4px 18px rgba(124, 58, 237, 0.22)",
+    }
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon("twitter", size=26, color="#1DA1F2"),
+            style={**icon_circle_style, "background": "rgba(29, 161, 242, 0.15)"},
+        ),
+        rx.el.div(
+            fomantic_icon("facebook", size=26, color="#1877F2"),
+            style={**icon_circle_style, "background": "rgba(24, 119, 242, 0.15)"},
+        ),
+        rx.el.div(
+            fomantic_icon("linkedin", size=26, color="#0A66C2"),
+            style={**icon_circle_style, "background": "rgba(10, 102, 194, 0.15)"},
+        ),
+        rx.el.div(
+            fomantic_icon("linkify", size=26, color="#c4b5fd"),
+            style={**icon_circle_style, "background": "rgba(196, 181, 253, 0.15)"},
+        ),
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "gap": "18px",
+            "width": "100%",
+            "height": "100%",
+            "background": "radial-gradient(circle at 50% 50%, rgba(124, 58, 237, 0.18), rgba(15, 23, 42, 0.82) 70%)",
+        },
+    )
+
+
 def _materialization_reward_panel() -> rx.Component:
     """Visitor-facing reward card for all generated materialization outputs."""
-    model_active = ComposeState.materialization_artifact_tab != "report"
+    model_active = ComposeState.materialization_artifact_tab == "model"
     report_active = ComposeState.materialization_artifact_tab == "report"
+    share_active = ComposeState.materialization_artifact_tab == "share"
     return rx.cond(
         ComposeState.has_stl,
         rx.el.div(
@@ -3467,23 +3802,32 @@ def _materialization_reward_panel() -> rx.Component:
                     "Printable 3D model",
                     "Ready to inspect, download, and print.",
                     "cube",
-                    "/images/icons/shapes.jpg",
-                    "Printed Materialized Enhancements 3D shapes",
                     model_active,
                     ComposeState.show_model_artifact_tab,
+                    image_src="/images/icons/shapes.jpg",
+                    image_alt="Printed Materialized Enhancements 3D shapes",
                 ),
                 _reward_artifact_choice(
                     "Personal enhancement report",
-                    "Ready to share online or print.",
+                    "Ready to view and print.",
                     "file alternate",
-                    "/images/icons/report_icon.jpeg",
-                    "Personal enhancement report icon",
                     report_active,
                     ComposeState.show_report_artifact_tab,
+                    image_src="/images/icons/report_icon.jpeg",
+                    image_alt="Personal enhancement report icon",
+                ),
+                _reward_artifact_choice(
+                    "Share & publish",
+                    "Share on social media!",
+                    "share alternate",
+                    share_active,
+                    ComposeState.show_share_artifact_tab,
+                    image_src="/images/icons/share.jpg",
+                    image_alt="Share and publish icon",
                 ),
                 style={
                     "display": "grid",
-                    "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+                    "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
                     "gap": "16px",
                     "justifyContent": "stretch",
                     "alignItems": "stretch",
@@ -3807,12 +4151,12 @@ def _jigsaw_artifact_placeholder() -> rx.Component:
 
 
 def _artifact_inventory_panel() -> rx.Component:
-    report_active = ComposeState.materialization_artifact_tab == "report"
     return rx.el.div(
         rx.el.div(
-            rx.cond(
-                report_active,
-                _report_section_body(),
+            rx.match(
+                ComposeState.materialization_artifact_tab,
+                ("report", _report_section_body()),
+                ("share", _share_section_body()),
                 _sculpture_section_body(),
             ),
             class_name="me-artifact-active-panel",
@@ -3837,12 +4181,14 @@ def _artifact_inventory_panel() -> rx.Component:
 
 def _rpg_materialization_output() -> rx.Component:
     return rx.el.div(
+        _pdb_viewer_scripts(),
         rx.el.textarea(
             value=ComposeState.stl_base64,
             id="stl-b64-data",
             style={"display": "none"},
         ),
         _report_capture_iframe(),
+        _report_hidden_inputs(),
         _shared_report_banner(),
         _materialization_reward_panel(),
         _artifact_inventory_panel(),
@@ -4578,6 +4924,42 @@ def _rpg_flow_css() -> rx.Component:
                 width: 58px !important;
                 height: 58px !important;
             }
+        }
+        .me-protein-stl-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+        @media (min-width: 900px) {
+            .me-protein-stl-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+        }
+        @media (min-width: 1400px) {
+            .me-protein-stl-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        details.me-protein-stl-card > summary::-webkit-details-marker {
+            display: none;
+        }
+        details.me-protein-stl-card > summary::marker {
+            content: "";
+        }
+        details.me-protein-stl-card > summary {
+            user-select: none;
+        }
+        details.me-protein-stl-card:hover > summary .me-protein-view3d-btn {
+            background-color: rgba(167, 139, 250, 0.22) !important;
+            border-color: rgba(167, 139, 250, 0.5) !important;
+        }
+        details.me-protein-stl-card[open] {
+            border-color: rgba(167, 139, 250, 0.28) !important;
+            background-color: rgba(15, 23, 42, 0.5) !important;
+        }
+        details.me-protein-stl-card[open] > summary .me-protein-view3d-btn {
+            display: none;
         }
         """
     )
@@ -5361,6 +5743,225 @@ def _model_action_panel() -> rx.Component:
     )
 
 
+def _protein_stl_row(entry: dict) -> rx.Component:
+    """Foldable card for a protein STL with embedded PDB viewer."""
+    diff = entry["difficulty"]
+    diff_color = rx.match(
+        diff,
+        ("easy", "#22c55e"),
+        ("medium", "#eab308"),
+        ("hard", "#f97316"),
+        ("expert", "#ef4444"),
+        "#9ca3af",
+    )
+    diff_icon = rx.match(
+        diff,
+        ("easy", "check circle"),
+        ("medium", "info circle"),
+        ("hard", "exclamation triangle"),
+        ("expert", "warning sign"),
+        "question circle",
+    )
+    has_structure = entry["structure_pdb"] != ""
+
+    view_3d_btn = rx.cond(
+        has_structure,
+        rx.el.div(
+            fomantic_icon("cube", size=11, color="#a78bfa"),
+            rx.el.span(" View 3D", style={"fontSize": "0.76rem", "fontWeight": "700"}),
+            class_name="me-protein-view3d-btn",
+            style={
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "3px",
+                "color": "#c4b5fd",
+                "padding": "3px 10px",
+                "borderRadius": "5px",
+                "border": "1px solid rgba(167, 139, 250, 0.35)",
+                "backgroundColor": "rgba(167, 139, 250, 0.12)",
+                "cursor": "pointer",
+                "transition": "background-color 0.15s, border-color 0.15s",
+            },
+        ),
+        rx.fragment(),
+    )
+
+    summary_row = rx.el.summary(
+        rx.el.div(
+            rx.el.div(
+                rx.el.span(
+                    entry["gene"],
+                    style={"fontWeight": "700", "fontSize": "0.92rem", "color": "#f1f5f9"},
+                ),
+                rx.el.div(
+                    fomantic_icon(diff_icon, size=12),
+                    rx.el.span(diff, style={"fontSize": "0.74rem", "textTransform": "capitalize"}),
+                    style={"color": diff_color, "display": "inline-flex", "alignItems": "center", "gap": "3px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "gap": "8px"},
+            ),
+            rx.el.div(
+                rx.el.span(
+                    entry["source_label"],
+                    style={"fontSize": "0.74rem", "color": "#94a3b8"},
+                ),
+                view_3d_btn,
+                rx.el.button(
+                    fomantic_icon("download", size=11),
+                    rx.el.span(" STL", style={"fontSize": "0.72rem", "fontWeight": "600"}),
+                    on_click=ComposeState.download_protein_stl(entry["gene"]),
+                    class_name="ui mini icon button",
+                    style={
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "gap": "2px",
+                        "padding": "3px 8px",
+                        "background": "rgba(124, 58, 237, 0.2)",
+                        "border": "1px solid rgba(124, 58, 237, 0.35)",
+                        "color": "#c4b5fd",
+                        "borderRadius": "5px",
+                        "cursor": "pointer",
+                        "flexShrink": "0",
+                    },
+                ),
+                style={"display": "flex", "alignItems": "center", "gap": "6px", "flexWrap": "wrap"},
+            ),
+            style={"display": "flex", "flexDirection": "column", "gap": "4px", "flex": "1", "minWidth": "0"},
+        ),
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "8px",
+            "padding": "8px 10px",
+            "cursor": "pointer",
+            "listStyle": "none",
+        },
+    )
+
+    viewer_panel = rx.cond(
+        has_structure,
+        rx.el.div(
+            rx.el.div(
+                class_name="me-pdb-viewer",
+                custom_attrs={"data-pdb-src": entry["pdb_src_url"]},
+                style={
+                    "width": "100%",
+                    "height": "240px",
+                    "borderRadius": "6px",
+                    "border": "1px solid rgba(167, 139, 250, 0.28)",
+                    "background": "#0f172a",
+                    "position": "relative",
+                    "overflow": "hidden",
+                },
+            ),
+            rx.el.p(
+                "Drag to rotate · Scroll to zoom",
+                style={"fontSize": "0.7rem", "color": "#64748b", "textAlign": "center", "margin": "3px 0 0"},
+            ),
+            style={"padding": "6px 8px 4px"},
+        ),
+        rx.el.div(
+            rx.el.span(
+                "3D preview not available",
+                style={"fontSize": "0.76rem", "color": "#64748b", "fontStyle": "italic"},
+            ),
+            style={"padding": "8px"},
+        ),
+    )
+
+    detail_row = rx.el.div(
+        rx.el.div(
+            rx.el.span(entry["triangles"].to(str) + " tris · " + entry["shells"].to(str) + " shells"),
+            style={"fontSize": "0.72rem", "color": "#64748b"},
+        ),
+        rx.el.div(
+            rx.el.span("Dimensions: ", style={"color": "#94a3b8"}),
+            rx.el.span(entry["dimensions_mm"], style={"color": "#cbd5e1"}),
+            style={"fontSize": "0.72rem"},
+        ),
+        rx.cond(
+            entry["watertight"],
+            rx.fragment(),
+            rx.el.div(
+                fomantic_icon("exclamation triangle", size=10, color="#f97316"),
+                rx.el.span(" May need mesh repair", style={"color": "#f97316"}),
+                style={"fontSize": "0.72rem", "display": "flex", "alignItems": "center"},
+            ),
+        ),
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "2px",
+            "padding": "4px 9px 7px",
+        },
+    )
+
+    return rx.el.details(
+        summary_row,
+        viewer_panel,
+        detail_row,
+        class_name="me-protein-stl-card",
+        style={
+            "borderRadius": "8px",
+            "backgroundColor": "rgba(15, 23, 42, 0.35)",
+            "border": "1px solid rgba(148, 163, 184, 0.1)",
+            "overflow": "hidden",
+        },
+    )
+
+
+def _protein_stl_panel() -> rx.Component:
+    """Panel listing downloadable protein structure STLs for the selected genes."""
+    return rx.cond(
+        ComposeState.protein_stl_entries.length() > 0,
+        rx.el.div(
+            rx.el.div(
+                fomantic_icon("dna", size=16),
+                rx.el.span(
+                    " Printable protein structures",
+                    style={"fontWeight": "600", "fontSize": "1.05rem", "color": "#f8fafc"},
+                ),
+                style={"display": "flex", "alignItems": "center", "gap": "6px", "marginBottom": "6px"},
+            ),
+            rx.el.div(
+                fomantic_icon("exclamation triangle", size=12),
+                rx.el.span(
+                    " You can also 3D print the individual protein structures included in your character. "
+                    "Be careful — unlike the sculpture above, some of these are hard to 3D print "
+                    "and may need mesh repair.",
+                    style={"fontSize": "0.84rem", "lineHeight": "1.45"},
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "flex-start",
+                    "gap": "6px",
+                    "padding": "8px 10px",
+                    "borderRadius": "6px",
+                    "backgroundColor": "rgba(234, 179, 8, 0.12)",
+                    "color": "#fbbf24",
+                    "marginBottom": "10px",
+                    "border": "1px solid rgba(234, 179, 8, 0.25)",
+                },
+            ),
+            rx.el.div(
+                rx.foreach(
+                    ComposeState.protein_stl_entries,
+                    _protein_stl_row,
+                ),
+                class_name="me-protein-stl-grid",
+            ),
+            style={
+                "padding": "14px",
+                "borderRadius": "10px",
+                "backgroundColor": "rgba(15, 23, 42, 0.46)",
+                "marginTop": "12px",
+                "border": "1px solid rgba(124, 58, 237, 0.2)",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
 def _sculpture_section_body() -> rx.Component:
     """Printable model contents without the outer accordion header."""
     return rx.cond(
@@ -5395,15 +5996,53 @@ def _sculpture_section_body() -> rx.Component:
             _model_generation_story_panel(),
             _model_parameters_accordion(),
             _model_action_panel(),
+            _protein_stl_panel(),
             _materialization_support_panel(),
         ),
-        rx.el.p(
-            rx.cond(
-                ComposeState.generating,
-                "Building your printable 3D model. The viewer will appear here as soon as it is ready.",
-                "Click Materialize from Character profile to build a printable 3D model.",
+        rx.cond(
+            ComposeState.generating,
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon("cog", size=28, style={"animation": "me-spin 2s linear infinite", "color": "#7c3aed"}),
+                    style={"textAlign": "center", "marginBottom": "16px"},
+                ),
+                rx.el.p(
+                    "Building your printable 3D model…",
+                    style={"color": "#e0d6f7", "fontSize": "1.05rem", "textAlign": "center", "marginBottom": "12px", "fontWeight": "500"},
+                ),
+                rx.el.div(
+                    rx.el.div(
+                        style={
+                            "height": "100%",
+                            "width": "40%",
+                            "borderRadius": "6px",
+                            "background": "linear-gradient(90deg, #7c3aed, #a78bfa, #7c3aed)",
+                            "backgroundSize": "200% 100%",
+                            "animation": "me-progress-slide 1.8s ease-in-out infinite",
+                        },
+                    ),
+                    style={
+                        "width": "280px",
+                        "height": "6px",
+                        "borderRadius": "6px",
+                        "backgroundColor": "rgba(124, 58, 237, 0.15)",
+                        "margin": "0 auto",
+                        "overflow": "hidden",
+                    },
+                ),
+                rx.el.p(
+                    "The viewer will appear here as soon as it is ready.",
+                    style={"color": "#9ca3af", "fontSize": "0.82rem", "textAlign": "center", "marginTop": "10px"},
+                ),
+                rx.el.style(
+                    "@keyframes me-progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }"
+                ),
+                style={"padding": "40px 12px"},
             ),
-            style={"color": "#9ca3af", "fontSize": "0.9rem", "textAlign": "center", "padding": "24px 12px"},
+            rx.el.p(
+                "Click Materialize from Character profile to build a printable 3D model.",
+                style={"color": "#9ca3af", "fontSize": "0.9rem", "textAlign": "center", "padding": "24px 12px"},
+            ),
         ),
     )
 
@@ -5504,6 +6143,7 @@ def _report_gene_row(gene_item: rx.Var) -> rx.Component:
                     "display": "inline-block",
                 },
             ),
+            _confidence_signal_bars(gene_item["confidence_primary"]["value"]),
             rx.el.span(
                 gene_item["category_detail"],
                 style={
@@ -5627,6 +6267,7 @@ def _report_animal_row(animal_item: rx.Var) -> rx.Component:
                     "display": "block",
                     "marginRight": "8px",
                     "marginBottom": "2px",
+                    "filter": "brightness(0) invert(1)",
                 },
             ),
             text_block,
@@ -5948,12 +6589,8 @@ def _report_card() -> rx.Component:
         ),
         rx.el.div(
             rx.el.div(
-                "materialized-enhancements",
+                "enhancement.bio",
                 style={"fontSize": "0.9rem", "fontWeight": "900", "color": "#c4b5fd"},
-            ),
-            rx.el.div(
-                "GlucoseDAO \u00b7 Longevity Genie",
-                style={"fontSize": "0.75rem", "color": "#94a3b8", "marginTop": "2px"},
             ),
             style={
                 "paddingTop": "12px",
@@ -6015,6 +6652,7 @@ def _png_animal_row(animal_item: rx.Var) -> rx.Component:
                     "objectFit": "contain",
                     "marginRight": "4px",
                     "marginBottom": "2px",
+                    "filter": "brightness(0) invert(1)",
                 },
             ),
             text_block,
@@ -6319,12 +6957,8 @@ def _report_png_card() -> rx.Component:
     )
     footer = rx.el.div(
         rx.el.div(
-            "materialized-enhancements",
+            "enhancement.bio",
             style={"fontSize": "0.95rem", "fontWeight": "900", "color": "#c4b5fd"},
-        ),
-        rx.el.div(
-            "GlucoseDAO \u00b7 Longevity Genie",
-            style={"fontSize": "0.8rem", "color": "#94a3b8", "marginTop": "4px"},
         ),
         style={
             "paddingTop": "10px",
@@ -6363,6 +6997,332 @@ def _report_png_card() -> rx.Component:
             "width": "1080px",
             "height": "1080px",
             "padding": "40px",
+            "background": "linear-gradient(180deg, #111827 0%, #0b1020 100%)",
+            "border": "2px solid rgba(124, 58, 237, 0.62)",
+            "boxSizing": "border-box",
+            "overflow": "hidden",
+            "display": "flex",
+            "flexDirection": "column",
+            "fontFamily": "'Lato', 'Helvetica Neue', Arial, sans-serif",
+            "color": "#e5e7eb",
+        },
+    )
+
+
+def _char_body_marker(category: str, top: str, left: str) -> rx.Component:
+    """Static body-map marker for the character card — colored dot with count badge."""
+    color = CATEGORY_COLORS.get(category, "#7c3aed")
+    is_selected = ComposeState.selected_categories.contains(category)
+    count = ComposeState.active_gene_counts[category]
+    return rx.cond(
+        is_selected,
+        rx.el.div(
+            rx.el.div(
+                style={
+                    "width": "24px",
+                    "height": "24px",
+                    "borderRadius": "999px",
+                    "background": f"radial-gradient(circle, {color}, {color}88)",
+                    "border": f"2px solid {color}",
+                    "boxShadow": f"0 0 14px {color}, 0 0 28px {color}55",
+                },
+            ),
+            rx.el.div(
+                count,
+                style={
+                    "position": "absolute",
+                    "right": "-5px",
+                    "top": "-5px",
+                    "minWidth": "15px",
+                    "height": "15px",
+                    "padding": "0 3px",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "borderRadius": "999px",
+                    "background": color,
+                    "color": "#ffffff",
+                    "fontSize": "0.5rem",
+                    "fontWeight": "950",
+                    "lineHeight": "1",
+                },
+            ),
+            rx.el.div(
+                category,
+                style={
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "100%",
+                    "transform": "translateX(-50%)",
+                    "marginTop": "2px",
+                    "whiteSpace": "nowrap",
+                    "fontSize": "0.5rem",
+                    "fontWeight": "900",
+                    "color": color,
+                    "textShadow": "0 1px 6px rgba(0,0,0,0.9)",
+                },
+            ),
+            style={
+                "position": "absolute",
+                "top": top,
+                "left": left,
+                "transform": "translate(-50%, -50%)",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
+def _char_gene_row(gene_item: rx.Var) -> rx.Component:
+    """Gene entry for character card: colored name on first line, short description below."""
+    return rx.el.div(
+        rx.el.div(
+            rx.el.span(
+                gene_item["gene"],
+                style={
+                    "fontWeight": "900",
+                    "color": _gene_category_accent_color(gene_item["category"]),
+                    "fontSize": "0.6rem",
+                },
+            ),
+            rx.el.span(
+                " — ",
+                style={"color": "#64748b", "fontSize": "0.54rem"},
+            ),
+            rx.el.span(
+                gene_item["category_detail"],
+                style={"color": "#94a3b8", "fontSize": "0.52rem", "fontWeight": "600"},
+            ),
+        ),
+        rx.el.div(
+            gene_item["short_description"],
+            style={
+                "color": "#cbd5e1",
+                "fontSize": "0.5rem",
+                "lineHeight": "1.2",
+                "overflow": "hidden",
+                "display": "-webkit-box",
+                "WebkitLineClamp": "2",
+                "WebkitBoxOrient": "vertical",
+            },
+        ),
+        style={
+            "padding": "3px 0",
+            "borderBottom": "1px solid rgba(148, 163, 184, 0.12)",
+            "breakInside": "avoid",
+            "WebkitColumnBreakInside": "avoid",
+        },
+    )
+
+
+def _report_png_card_character() -> rx.Component:
+    """Character card 1080x1080 — body-map + front model view + nicely formatted gene list."""
+    body_map = rx.el.div(
+        rx.el.img(
+            src="/images/body_only.webp",
+            alt="Enhancement body map",
+            style={
+                "position": "absolute",
+                "left": "50%",
+                "top": "50%",
+                "transform": "translate(-50%, -50%)",
+                "height": "90%",
+                "width": "auto",
+                "objectFit": "contain",
+                "opacity": "0.5",
+                "filter": "brightness(1.4) contrast(0.9)",
+            },
+        ),
+        _char_body_marker("Expression", "14%", "22%"),
+        _char_body_marker("Perception", "14%", "78%"),
+        _char_body_marker("Longevity & Genome", "48%", "22%"),
+        _char_body_marker("Stress Resistance", "48%", "78%"),
+        _char_body_marker("Environmental Adaptation", "78%", "22%"),
+        _char_body_marker("Regeneration", "78%", "78%"),
+        style={
+            "position": "relative",
+            "flex": "1 1 0",
+            "minWidth": "0",
+            "height": "100%",
+            "background": "radial-gradient(ellipse at 50% 45%, rgba(124, 58, 237, 0.10), rgba(11, 11, 20, 0.96) 70%)",
+            "border": "1px solid rgba(124, 58, 237, 0.32)",
+            "borderRadius": "14px",
+            "overflow": "hidden",
+        },
+    )
+    model_view = rx.el.div(
+        rx.el.img(
+            id="char-view-front",
+            src=_TRANSPARENT_PX,
+            alt="3D model — front view",
+            style={"width": "100%", "height": "100%", "objectFit": "contain", "display": "block"},
+        ),
+        rx.el.div(
+            "FRONT",
+            style={
+                "position": "absolute",
+                "bottom": "6px",
+                "left": "8px",
+                "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace",
+                "fontSize": "0.6rem",
+                "fontWeight": "700",
+                "letterSpacing": "0.16em",
+                "color": "#c4b5fd",
+                "textShadow": "0 1px 2px rgba(0,0,0,0.8)",
+            },
+        ),
+        style={
+            "flex": "1 1 0",
+            "minWidth": "0",
+            "height": "100%",
+            "background": "radial-gradient(circle at 50% 38%, rgba(56, 189, 248, 0.14), rgba(11, 11, 20, 0.98) 64%)",
+            "border": "1px solid rgba(124, 58, 237, 0.52)",
+            "borderRadius": "14px",
+            "position": "relative",
+            "overflow": "hidden",
+        },
+    )
+    top_visuals = rx.el.div(
+        body_map,
+        model_view,
+        style={
+            "display": "flex",
+            "gap": "12px",
+            "height": "380px",
+            "flexShrink": "0",
+            "marginBottom": "14px",
+        },
+    )
+    info_row = rx.el.div(
+        _report_portrait(72),
+        rx.el.div(
+            rx.el.div("CHARACTER", style={"fontSize": "0.72rem", "color": "#94a3b8", "letterSpacing": "0.12em", "fontWeight": "800"}),
+            rx.el.div(ComposeState.input_personal_tag, style={"fontSize": "1.4rem", "fontWeight": "900", "color": "#f8fafc"}),
+            style={"flex": "2 1 200px", "minWidth": "140px"},
+        ),
+        rx.el.div(
+            rx.el.div("SEED", style={"fontSize": "0.72rem", "color": "#94a3b8", "letterSpacing": "0.12em", "fontWeight": "800"}),
+            rx.el.div(ComposeState.param_seed, style={"fontSize": "1.2rem", "fontWeight": "700", "color": "#7c3aed", "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace"}),
+            style={"flex": "0 0 80px"},
+        ),
+        rx.el.div(
+            rx.el.div("POINTS", style={"fontSize": "0.72rem", "color": "#94a3b8", "letterSpacing": "0.12em", "fontWeight": "800"}),
+            rx.el.div(ComposeState.param_points, style={"fontSize": "1.2rem", "fontWeight": "900", "color": "#f8fafc", "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace"}),
+            style={"flex": "0 0 70px"},
+        ),
+        style={"display": "flex", "gap": "14px", "marginBottom": "8px"},
+    )
+    categories_row = rx.el.div(
+        rx.foreach(ComposeState.selected_categories, _png_category_chip),
+        style={"display": "flex", "flexWrap": "wrap", "gap": "3px", "marginBottom": "8px"},
+    )
+    gene_list = rx.el.div(
+        rx.el.div(
+            "ENHANCEMENT GENES",
+            style={
+                "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace",
+                "fontSize": "0.62rem",
+                "letterSpacing": "0.14em",
+                "color": "#a78bfa",
+                "fontWeight": "900",
+                "marginBottom": "4px",
+                "flexShrink": "0",
+            },
+        ),
+        rx.el.div(
+            rx.foreach(ComposeState.included_composition_genes, _char_gene_row),
+            style={
+                "columnCount": "2",
+                "columnGap": "16px",
+                "columnFill": "balance",
+                "flex": "1 1 auto",
+                "minHeight": "0",
+                "overflow": "hidden",
+            },
+        ),
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "flex": "1 1 auto",
+            "minHeight": "0",
+            "overflow": "hidden",
+        },
+    )
+    footer = rx.el.div(
+        rx.el.div(
+            "enhancement.bio",
+            style={"fontSize": "0.9rem", "fontWeight": "900", "color": "#c4b5fd"},
+        ),
+        style={
+            "paddingTop": "8px",
+            "borderTop": "1px solid rgba(167, 139, 250, 0.28)",
+            "textAlign": "center",
+            "flexShrink": "0",
+        },
+    )
+    return rx.el.div(
+        rx.el.div(
+            rx.el.span("LOADOUT #", style={"fontSize": "0.85rem", "fontWeight": "800"}),
+            rx.el.span(ComposeState.param_seed, style={"fontSize": "1.2rem", "fontWeight": "950"}),
+            style={
+                "position": "absolute",
+                "top": "20px",
+                "right": "24px",
+                "padding": "5px 14px",
+                "border": "1px solid rgba(167, 139, 250, 0.52)",
+                "borderRadius": "10px",
+                "color": "#c4b5fd",
+                "background": "rgba(15, 23, 42, 0.82)",
+                "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace",
+                "letterSpacing": "0.1em",
+                "boxShadow": "0 0 18px rgba(124, 58, 237, 0.24)",
+                "zIndex": "2",
+            },
+        ),
+        rx.el.div(
+            rx.el.div(
+                "MATERIALIZED ENHANCEMENTS",
+                style={
+                    "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace",
+                    "fontSize": "0.78rem",
+                    "letterSpacing": "0.2em",
+                    "color": "#a78bfa",
+                    "fontWeight": "900",
+                },
+            ),
+            rx.el.div(
+                "Character profile",
+                style={
+                    "fontSize": "1.5rem",
+                    "fontWeight": "950",
+                    "color": "#f8fafc",
+                    "margin": "2px 0 0 0",
+                },
+            ),
+            style={
+                "borderBottom": "1px solid rgba(167, 139, 250, 0.36)",
+                "paddingBottom": "8px",
+                "paddingRight": "140px",
+                "marginBottom": "10px",
+            },
+        ),
+        top_visuals,
+        info_row,
+        categories_row,
+        _report_character_note_block("0.72rem"),
+        gene_list,
+        footer,
+        id="me-report-png-card-character",
+        style={
+            "position": "absolute",
+            "left": "-12000px",
+            "top": "0",
+            "width": "1080px",
+            "height": "1080px",
+            "padding": "32px 36px",
             "background": "linear-gradient(180deg, #111827 0%, #0b1020 100%)",
             "border": "2px solid rgba(124, 58, 237, 0.62)",
             "boxSizing": "border-box",
@@ -6666,6 +7626,7 @@ def _report_hidden_capture_content() -> rx.Component:
     return rx.el.div(
         _report_card(),
         _report_png_card(),
+        _report_png_card_character(),
         _report_pdf_long_content(),
         aria_hidden="true",
         style={
@@ -6929,21 +7890,53 @@ def _share_qr_panel() -> rx.Component:
             rx.el.div(
                 rx.cond(
                     ComposeState.has_published_report,
-                    "Public share folder",
-                    "Share link will appear here",
+                    "Public share link",
+                    "Shareable link",
                 ),
                 style={"fontSize": "0.82rem", "fontWeight": "700", "color": "#c4b5fd"},
             ),
-            rx.el.div(
-                id="report-share-url",
-                style={
-                    "fontSize": "0.78rem",
-                    "color": "#cbd5e1",
-                    "marginTop": "6px",
-                    "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace",
-                    "wordBreak": "break-all",
-                    "maxWidth": "100%",
-                },
+            rx.cond(
+                ComposeState.has_published_report,
+                rx.el.div(
+                    ComposeState.report_public_url,
+                    style={
+                        "fontSize": "0.72rem",
+                        "color": "#cbd5e1",
+                        "marginTop": "6px",
+                        "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace",
+                        "wordBreak": "break-all",
+                        "maxWidth": "100%",
+                    },
+                ),
+                rx.cond(
+                    ComposeState.report_publishing,
+                    rx.el.div(
+                        rx.el.div(
+                            class_name="ui active mini inline loader",
+                            style={"marginRight": "6px"},
+                        ),
+                        rx.el.span(
+                            "Generating public link...",
+                            style={"color": "#94a3b8", "fontSize": "0.78rem"},
+                        ),
+                        style={"display": "flex", "alignItems": "center", "marginTop": "6px"},
+                    ),
+                    rx.cond(
+                        ComposeState.share_url != "",
+                        rx.el.div(
+                            ComposeState.share_url,
+                            style={
+                                "fontSize": "0.72rem",
+                                "color": "#94a3b8",
+                                "marginTop": "6px",
+                                "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace",
+                                "wordBreak": "break-all",
+                                "maxWidth": "100%",
+                            },
+                        ),
+                        rx.fragment(),
+                    ),
+                ),
             ),
             style={"flex": "1", "minWidth": "180px", "overflow": "hidden"},
         ),
@@ -6960,180 +7953,296 @@ def _share_qr_panel() -> rx.Component:
     )
 
 
-def _report_action_bar() -> rx.Component:
+
+def _report_hidden_inputs() -> rx.Component:
+    """Hidden inputs feeding data to client-side JS (PDF/PNG/share). Always mounted."""
     return rx.el.div(
-        rx.el.div(
-            rx.el.div(
-                "Sharing",
-                style={
-                    "width": "100%",
-                    "fontSize": "0.78rem",
-                    "fontWeight": "700",
-                    "color": "#cbd5e1",
-                    "textTransform": "uppercase",
-                    "letterSpacing": "0.08em",
-                },
-            ),
-            rx.el.p(
-                rx.cond(
-                    ComposeState.has_published_report,
-                    "Your model and report are saved. QR, copy, and social buttons now use the public folder.",
-                    "Create a public link when you are ready to share this report. This saves the model and report, then turns on QR, copy, and social sharing.",
-                ),
-                style={"width": "100%", "margin": "0", "fontSize": "0.82rem", "color": "#9ca3af"},
-            ),
-            _generate_public_link_button(),
-            _share_qr_panel(),
-            rx.el.button(
-                fomantic_icon("copy", size=16),
-                rx.el.span(" Copy public link", style={"marginLeft": "2px"}),
-                on_click=rx.call_script("window.__meCopyShareLink && window.__meCopyShareLink()"),
-                disabled=rx.cond(ComposeState.has_published_report, False, True),
-                class_name=rx.cond(ComposeState.has_published_report, "ui button", "ui disabled button"),
-                style=_SOCIAL_BUTTON_STYLE,
-            ),
-            rx.el.button(
-                fomantic_icon("twitter", size=16),
-                rx.el.span(" Share on X", style={"marginLeft": "2px"}),
-                on_click=rx.call_script("window.__meShareIntent && window.__meShareIntent('twitter')"),
-                disabled=rx.cond(ComposeState.has_published_report, False, True),
-                class_name=rx.cond(ComposeState.has_published_report, "ui button", "ui disabled button"),
-                style=_SOCIAL_BUTTON_STYLE,
-            ),
-            rx.el.button(
-                fomantic_icon("facebook", size=16),
-                rx.el.span(" Share on Facebook", style={"marginLeft": "2px"}),
-                on_click=rx.call_script("window.__meShareIntent && window.__meShareIntent('facebook')"),
-                disabled=rx.cond(ComposeState.has_published_report, False, True),
-                class_name=rx.cond(ComposeState.has_published_report, "ui button", "ui disabled button"),
-                style=_SOCIAL_BUTTON_STYLE,
-            ),
-            rx.el.button(
-                fomantic_icon("linkedin", size=16),
-                rx.el.span(" Share on LinkedIn", style={"marginLeft": "2px"}),
-                on_click=rx.call_script("window.__meShareIntent && window.__meShareIntent('linkedin')"),
-                disabled=rx.cond(ComposeState.has_published_report, False, True),
-                class_name=rx.cond(ComposeState.has_published_report, "ui button", "ui disabled button"),
-                style=_SOCIAL_BUTTON_STYLE,
-            ),
-            style={"display": "flex", "gap": "10px", "flexWrap": "wrap", "marginTop": "12px"},
+        rx.el.input(
+            id="report-card-mode",
+            value=ComposeState.share_card_mode,
+            read_only=True,
+            style={"display": "none"},
         ),
-        rx.el.div(
-            id="report-copy-feedback",
-            style={
-                "fontSize": "0.82rem",
-                "color": "#16a085",
-                "textAlign": "center",
-                "marginTop": "8px",
-                "minHeight": "18px",
-                "fontWeight": "600",
-            },
+        rx.el.input(
+            id="report-canonical-base",
+            value="",
+            read_only=True,
+            style={"display": "none"},
         ),
-        rx.cond(
-            ComposeState.report_publish_error != "",
-            rx.el.div(
-                ComposeState.report_publish_error,
-                class_name="ui red message",
-                style={"fontSize": "0.82rem", "padding": "8px 10px", "marginTop": "8px"},
-            ),
-            rx.fragment(),
+        rx.el.input(
+            id="report-share-path",
+            value=ComposeState.share_url,
+            read_only=True,
+            style={"display": "none"},
         ),
-        _published_report_links(),
-        style={"marginTop": "6px"},
+        rx.el.input(
+            id="report-published-url",
+            value=ComposeState.report_public_url,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.input(
+            id="report-pdf-url",
+            value=ComposeState.report_pdf_url,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.input(
+            id="report-share-name",
+            value=ComposeState.input_personal_tag,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.input(
+            id="report-share-seed",
+            value=ComposeState.param_seed,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.input(
+            id="report-share-points",
+            value=ComposeState.param_points,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.input(
+            id="report-userpic-data-url",
+            value=ComposeState.report_portrait_data_url,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.textarea(
+            id="report-character-note",
+            value=ComposeState.report_character_note,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.input(
+            id="report-export-categories",
+            value=ComposeState.export_categories_csv,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.input(
+            id="report-export-animals",
+            value=ComposeState.export_animals_summary,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.textarea(
+            id="report-export-animals-json",
+            value=ComposeState.export_animals_json,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.textarea(
+            id="report-export-composition-genes-json",
+            value=ComposeState.export_composition_genes_json,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        rx.el.input(
+            id="report-export-genes",
+            value=ComposeState.export_gene_names_csv,
+            read_only=True,
+            style={"display": "none"},
+        ),
+        _report_hidden_capture_content(),
     )
 
 
-def _report_section_body() -> rx.Component:
-    """Report/export contents without the outer accordion header."""
+def _share_action_button(icon_name: str, label: str, bg: str, js_call: str) -> rx.Component:
+    _circle: dict = {
+        "width": "52px",
+        "height": "52px",
+        "borderRadius": "999px",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "cursor": "pointer",
+        "transition": "transform 0.15s, box-shadow 0.15s",
+        "boxShadow": "0 4px 14px rgba(0,0,0,0.25)",
+        "background": bg,
+    }
+    return rx.el.div(
+        rx.el.div(
+            fomantic_icon(icon_name, size=22, color="#ffffff"),
+            on_click=rx.call_script(js_call),
+            style=_circle,
+        ),
+        rx.el.div(
+            label,
+            style={
+                "fontSize": "0.68rem",
+                "color": "#cbd5e1",
+                "marginTop": "5px",
+                "textAlign": "center",
+                "fontWeight": "600",
+            },
+        ),
+        style={"display": "flex", "flexDirection": "column", "alignItems": "center"},
+        title=label,
+    )
+
+
+def _share_section_body() -> rx.Component:
+    """Share tab: auto-generated card image + social buttons, no gating."""
+    _card_image_style = {
+        "width": "auto",
+        "maxWidth": "100%",
+        "borderRadius": "14px",
+        "border": "2px solid rgba(196, 181, 253, 0.42)",
+        "boxShadow": "0 16px 40px rgba(15, 23, 42, 0.38)",
+        "display": "block",
+        "margin": "0 auto",
+    }
+    _spinner_box_style = {
+        "textAlign": "center",
+        "padding": "48px 16px",
+        "borderRadius": "14px",
+        "border": "1px dashed rgba(167, 139, 250, 0.35)",
+        "background": "rgba(15, 23, 42, 0.25)",
+        "marginBottom": "16px",
+    }
     return rx.el.div(
         rx.cond(
             ComposeState.has_stl,
             rx.el.div(
-                rx.el.input(
-                    id="report-canonical-base",
-                    value=PUBLIC_APP_URL,
-                    read_only=True,
-                    style={"display": "none"},
+                # ── Card image or spinner ────────────────────────────────
+                rx.cond(
+                    ComposeState.has_share_card,
+                    rx.el.div(
+                        rx.el.img(
+                            src=ComposeState.share_card_data_url,
+                            alt="Your shareable enhancement card",
+                            style=_card_image_style,
+                        ),
+                        # Card mode toggle
+                        rx.el.div(
+                            rx.el.button(
+                                fomantic_icon("exchange", size=14),
+                                rx.el.span(
+                                    rx.cond(
+                                        ComposeState.is_character_card,
+                                        " Switch to 3D model card",
+                                        " Switch to character card",
+                                    ),
+                                    style={"marginLeft": "4px"},
+                                ),
+                                on_click=ComposeState.toggle_share_card_mode,
+                                class_name="ui mini button",
+                                style={
+                                    "background": "rgba(124, 58, 237, 0.22)",
+                                    "color": "#c4b5fd",
+                                    "border": "1px solid rgba(167, 139, 250, 0.38)",
+                                    "borderRadius": "8px",
+                                    "cursor": "pointer",
+                                    "fontSize": "0.78rem",
+                                },
+                            ),
+                            style={"textAlign": "center", "marginTop": "8px"},
+                        ),
+                        style={"marginBottom": "18px"},
+                    ),
+                    rx.el.div(
+                        rx.cond(
+                            ComposeState.share_card_generating,
+                            rx.el.div(
+                                rx.el.div(
+                                    class_name="ui active small inline loader",
+                                    style={"marginRight": "10px"},
+                                ),
+                                rx.el.span(
+                                    "Preparing your share card...",
+                                    style={"color": "#c4b5fd", "fontSize": "0.95rem"},
+                                ),
+                                style={"display": "flex", "alignItems": "center", "justifyContent": "center"},
+                            ),
+                            rx.el.div(
+                                fomantic_icon("share alternate", size=28, color="#c4b5fd"),
+                                rx.el.p(
+                                    "Switch to this tab to generate your share card.",
+                                    style={"margin": "8px 0 0", "color": "#94a3b8", "fontSize": "0.88rem"},
+                                ),
+                            ),
+                        ),
+                        style=_spinner_box_style,
+                    ),
                 ),
-                rx.el.input(
-                    id="report-share-path",
-                    value=ComposeState.share_url,
-                    read_only=True,
-                    style={"display": "none"},
+                # ── Row 1: Save / Copy actions ─────────────────────────
+                rx.el.div(
+                    _share_action_button("download", "Save image", "#7c3aed",
+                                         "window.__meDownloadPng && window.__meDownloadPng()"),
+                    _share_action_button("copy", "Copy link", "#7c3aed",
+                                         "window.__meCopyShareLink && window.__meCopyShareLink()"),
+                    _share_action_button("file pdf outline", "Save PDF", "#7c3aed",
+                                         "window.__meDownloadPdf && window.__meDownloadPdf()"),
+                    style={
+                        "display": "flex",
+                        "gap": "18px",
+                        "justifyContent": "center",
+                        "marginTop": "4px",
+                    },
                 ),
-                rx.el.input(
-                    id="report-published-url",
-                    value=ComposeState.report_public_url,
-                    read_only=True,
-                    style={"display": "none"},
+                # ── Row 2: Social media share ─────────────────────────
+                rx.el.div(
+                    rx.el.div(
+                        "Share on social media",
+                        style={
+                            "fontSize": "0.72rem",
+                            "color": "#94a3b8",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "fontWeight": "700",
+                            "textAlign": "center",
+                            "marginBottom": "8px",
+                        },
+                    ),
+                    rx.el.div(
+                        _share_action_button("twitter", "X", "#1DA1F2",
+                                             "window.__meShareIntent && window.__meShareIntent('twitter')"),
+                        _share_action_button("facebook", "Facebook", "#1877F2",
+                                             "window.__meShareIntent && window.__meShareIntent('facebook')"),
+                        _share_action_button("linkedin", "LinkedIn", "#0A66C2",
+                                             "window.__meShareIntent && window.__meShareIntent('linkedin')"),
+                        style={
+                            "display": "flex",
+                            "gap": "18px",
+                            "justifyContent": "center",
+                        },
+                    ),
+                    style={"marginTop": "12px"},
                 ),
-                rx.el.input(
-                    id="report-pdf-url",
-                    value=ComposeState.report_pdf_url,
-                    read_only=True,
-                    style={"display": "none"},
+                rx.el.div(
+                    id="report-copy-feedback",
+                    style={
+                        "fontSize": "0.82rem",
+                        "color": "#16a085",
+                        "textAlign": "center",
+                        "marginTop": "8px",
+                        "minHeight": "18px",
+                        "fontWeight": "600",
+                    },
                 ),
-                rx.el.input(
-                    id="report-share-name",
-                    value=ComposeState.input_personal_tag,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.input(
-                    id="report-share-seed",
-                    value=ComposeState.param_seed,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.input(
-                    id="report-share-points",
-                    value=ComposeState.param_points,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.input(
-                    id="report-userpic-data-url",
-                    value=ComposeState.report_portrait_data_url,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.textarea(
-                    id="report-character-note",
-                    value=ComposeState.report_character_note,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.input(
-                    id="report-export-categories",
-                    value=ComposeState.export_categories_csv,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.input(
-                    id="report-export-animals",
-                    value=ComposeState.export_animals_summary,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.textarea(
-                    id="report-export-animals-json",
-                    value=ComposeState.export_animals_json,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.textarea(
-                    id="report-export-composition-genes-json",
-                    value=ComposeState.export_composition_genes_json,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                rx.el.input(
-                    id="report-export-genes",
-                    value=ComposeState.export_gene_names_csv,
-                    read_only=True,
-                    style={"display": "none"},
-                ),
-                _report_hidden_capture_content(),
+                # ── QR + share link panel ──────────────────────────────
+                _share_qr_panel(),
+                # ── Published report links (after Create public link) ──
+                _published_report_links(),
+            ),
+            rx.el.p(
+                "Generate a 3D model first, then come back here to share your enhancements.",
+                style={"color": "#9ca3af", "fontSize": "0.88rem", "textAlign": "center", "padding": "16px"},
+            ),
+        ),
+    )
+
+
+def _report_section_body() -> rx.Component:
+    """Report/export contents: PDF viewer, portrait upload, and report customization."""
+    return rx.el.div(
+        rx.cond(
+            ComposeState.has_stl,
+            rx.el.div(
                 rx.script(
                     """
                     setTimeout(function () {
@@ -7145,7 +8254,6 @@ def _report_section_body() -> rx.Component:
                 ),
                 _report_pdf_viewer_panel(),
                 _report_portrait_upload_panel(),
-                _report_action_bar(),
             ),
             rx.el.p(
                 "Generate a 3D model first, then come back here to build your personal enhancement report.",
@@ -7154,30 +8262,6 @@ def _report_section_body() -> rx.Component:
         ),
     )
 
-
-def _report_section() -> rx.Component:
-    """Collapsible 'Share & Report' section with the RPG loadout card and export buttons."""
-    body = rx.cond(
-        ComposeState.report_expanded,
-        _report_section_body(),
-        rx.fragment(),
-    )
-
-    return rx.el.div(
-        _section_header(
-            expanded=ComposeState.report_expanded,
-            icon_name="file alternate",
-            title="Share & Report",
-            on_toggle=ComposeState.toggle_report_expanded,
-            right_badge=rx.cond(
-                ComposeState.has_stl,
-                rx.el.span("Ready", class_name="ui mini green label"),
-                rx.fragment(),
-            ),
-        ),
-        body,
-        style=_COLLAPSIBLE_STYLE,
-    )
 
 
 _COLLAPSIBLE_STYLE: dict = {
@@ -7201,7 +8285,6 @@ def _sculpture_right_pane() -> rx.Component:
         _report_capture_iframe(),
         _choice_section(),
         _sculpture_section(),
-        _report_section(),
     )
 
 
