@@ -347,7 +347,7 @@ def _landing_tab() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.iframe(
-                            src="https://www.youtube.com/embed/adCYIcbR4Gs",
+                            src="https://www.youtube.com/embed/ev726lz5sLo",
                             title="Materialized Enhancements",
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
                             allow_full_screen=True,
@@ -2235,7 +2235,7 @@ def _rpg_intro_video_panel() -> rx.Component:
         ),
         rx.el.div(
             rx.el.iframe(
-                src="https://www.youtube.com/embed/adCYIcbR4Gs",
+                src="https://www.youtube.com/embed/ev726lz5sLo",
                 title="Materialized Enhancements project video",
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
                 allow_full_screen=True,

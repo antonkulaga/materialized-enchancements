@@ -4,7 +4,7 @@
 
 An RPG-style character creator for speculative human enhancement. Spend enhancement credits on real genes from extraordinary organisms, watch your profile light up by category, then materialize the result as a unique 3D-printable artifact and a personal enhancement report.
 
-**[Try it live](https://enhancement.bio/)** · [Project video](https://www.youtube.com/watch?v=adCYIcbR4Gs) · [Open source](https://github.com/winternewt/materialized-enchancements)
+**[Try it live](https://enhancement.bio/)** · [Project video](https://youtu.be/ev726lz5sLo) · [Open source](https://github.com/winternewt/materialized-enchancements)
 
 ---
 
