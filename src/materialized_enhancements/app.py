@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+import base64
+import binascii
+import json
+import logging
+import re
+
 import reflex as rx
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -14,6 +22,8 @@ from materialized_enhancements.env import (
     UMAMI_WEBSITE_ID,
     ensure_generated_public_dirs,
 )
+
+logger = logging.getLogger(__name__)
 
 
 ensure_generated_public_dirs()
@@ -35,12 +45,68 @@ if UMAMI_SCRIPT_URL and UMAMI_WEBSITE_ID:
     )
 
 
+_SLUG_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,200}$")
+_MAX_UPLOAD_BYTES = 40 * 1024 * 1024  # 40 MB
+
+
+async def _handle_upload_report_assets(scope: Scope, receive: Receive, send: Send) -> None:
+    """HTTP POST endpoint that receives report PNG+PDF via fetch(), bypassing WebSocket size limits."""
+    request = Request(scope, receive, send)
+    if request.method != "POST":
+        resp = JSONResponse({"error": "Method not allowed"}, status_code=405)
+        await resp(scope, receive, send)
+        return
+    try:
+        body = await request.body()
+        if len(body) > _MAX_UPLOAD_BYTES:
+            resp = JSONResponse({"error": "Payload too large"}, status_code=413)
+            await resp(scope, receive, send)
+            return
+        data = json.loads(body)
+        slug = str(data.get("slug", "")).strip()
+        if not slug or not _SLUG_RE.match(slug):
+            resp = JSONResponse({"error": "Invalid slug"}, status_code=400)
+            await resp(scope, receive, send)
+            return
+        png_b64 = str(data.get("png_base64", "")).strip()
+        pdf_b64 = str(data.get("pdf_base64", "")).strip()
+        if not png_b64 or not pdf_b64:
+            resp = JSONResponse({"error": "Missing png_base64 or pdf_base64"}, status_code=400)
+            await resp(scope, receive, send)
+            return
+        out_dir = GENERATED_PUBLIC_DIR / "reports" / slug
+        out_dir.mkdir(parents=True, exist_ok=True)
+        png_bytes = base64.b64decode(png_b64, validate=True)
+        pdf_bytes = base64.b64decode(pdf_b64, validate=True)
+        (out_dir / "report.webp").write_bytes(png_bytes)
+        (out_dir / "report.pdf").write_bytes(pdf_bytes)
+        portrait_b64 = str(data.get("portrait_base64", "")).strip()
+        if portrait_b64:
+            try:
+                (out_dir / "portrait.webp").write_bytes(base64.b64decode(portrait_b64, validate=True))
+            except (binascii.Error, ValueError):
+                pass
+        logger.info("Report assets uploaded for slug=%s (png=%d, pdf=%d bytes)", slug, len(png_bytes), len(pdf_bytes))
+        resp = JSONResponse({"status": "ok", "slug": slug})
+        await resp(scope, receive, send)
+    except (json.JSONDecodeError, binascii.Error, ValueError) as exc:
+        resp = JSONResponse({"error": str(exc)}, status_code=400)
+        await resp(scope, receive, send)
+    except OSError as exc:
+        logger.exception("Report asset upload I/O error")
+        resp = JSONResponse({"error": f"Server I/O error: {exc}"}, status_code=500)
+        await resp(scope, receive, send)
+
+
 def normalize_reflex_event_websocket_path(app: ASGIApp) -> ASGIApp:
-    """Route generated files and keep WebSocket scopes away from the static catch-all."""
+    """Route generated files, upload endpoint, and keep WebSocket scopes away from the static catch-all."""
 
     async def wrapped_app(scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http":
             path = str(scope.get("path", ""))
+            if path == "/_api/upload-report-assets":
+                await _handle_upload_report_assets(scope, receive, send)
+                return
             if path == GENERATED_URL_PREFIX or path.startswith(f"{GENERATED_URL_PREFIX}/"):
                 generated_path = path.removeprefix(GENERATED_URL_PREFIX) or "/"
                 static_scope = {
@@ -63,7 +129,6 @@ def normalize_reflex_event_websocket_path(app: ASGIApp) -> ASGIApp:
 
 
 app = rx.App(
-    theme=rx.theme(appearance="light"),
     head_components=_head_components,
     api_transformer=normalize_reflex_event_websocket_path,
 )

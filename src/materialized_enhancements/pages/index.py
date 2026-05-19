@@ -4150,15 +4150,32 @@ def _jigsaw_artifact_placeholder() -> rx.Component:
     )
 
 
+def _artifact_tab_wrapper(tab_key: str, content: rx.Component) -> rx.Component:
+    """Wrap a tab panel so it stays mounted but hidden when inactive.
+
+    JS (QR painter, report views) modifies DOM inside these panels via
+    innerHTML. Using rx.match to swap panels causes React removeChild
+    errors because React tries to unmount nodes that JS already replaced.
+    Keeping all panels mounted and toggling display avoids this.
+    """
+    return rx.el.div(
+        content,
+        style={
+            "display": rx.cond(
+                ComposeState.materialization_artifact_tab == tab_key,
+                "block",
+                "none",
+            ),
+        },
+    )
+
+
 def _artifact_inventory_panel() -> rx.Component:
     return rx.el.div(
         rx.el.div(
-            rx.match(
-                ComposeState.materialization_artifact_tab,
-                ("report", _report_section_body()),
-                ("share", _share_section_body()),
-                _sculpture_section_body(),
-            ),
+            _artifact_tab_wrapper("model", _sculpture_section_body()),
+            _artifact_tab_wrapper("report", _report_section_body()),
+            _artifact_tab_wrapper("share", _share_section_body()),
             class_name="me-artifact-active-panel",
             style={
                 "padding": "12px",
@@ -8175,7 +8192,7 @@ def _share_section_body() -> rx.Component:
                                          "window.__meDownloadPng && window.__meDownloadPng()"),
                     _share_action_button("copy", "Copy link", "#7c3aed",
                                          "window.__meCopyShareLink && window.__meCopyShareLink()"),
-                    _share_action_button("file pdf outline", "Save PDF", "#7c3aed",
+                    _share_action_button("file pdf outline", "Save PDF report", "#7c3aed",
                                          "window.__meDownloadPdf && window.__meDownloadPdf()"),
                     style={
                         "display": "flex",
@@ -8205,10 +8222,15 @@ def _share_section_body() -> rx.Component:
                                              "window.__meShareIntent && window.__meShareIntent('facebook')"),
                         _share_action_button("linkedin", "LinkedIn", "#0A66C2",
                                              "window.__meShareIntent && window.__meShareIntent('linkedin')"),
+                        _share_action_button("whatsapp", "WhatsApp", "#25D366",
+                                             "window.__meShareIntent && window.__meShareIntent('whatsapp')"),
+                        _share_action_button("telegram plane", "Telegram", "#26A5E4",
+                                             "window.__meShareIntent && window.__meShareIntent('telegram')"),
                         style={
                             "display": "flex",
                             "gap": "18px",
                             "justifyContent": "center",
+                            "flexWrap": "wrap",
                         },
                     ),
                     style={"marginTop": "12px"},

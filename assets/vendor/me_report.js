@@ -1461,7 +1461,7 @@
     }
   };
 
-  window.__meBuildReportBundleBase64 = async function (timeoutMs, publishedUrlOverride) {
+  window.__meBuildReportBundleBase64 = async function (timeoutMs, publishedUrlOverride, slug) {
     timeoutMs = timeoutMs || 8000;
     if (typeof jspdf === 'undefined') {
       return JSON.stringify({ error: 'jsPDF library not loaded.' });
@@ -1469,29 +1469,67 @@
     if (typeof htmlToImage === 'undefined') {
       return JSON.stringify({ error: 'html-to-image library not loaded.' });
     }
-    window.__mePendingPublishedReportUrl = canonicalAbsoluteUrl(publishedUrlOverride);
-    stopObserver();
-    try {
-      await waitReportMounted(timeoutMs);
-      window.__mePaintReport();
-      await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
-      var pngDataUrl = await buildReportPngDataUrl();
-      var pdf = await buildReportPdf();
-      var pdfDataUri = pdf.output('datauristring');
-      return JSON.stringify({
-        png_filename: 'materialized_' + safeName() + '_s' + safeSeed() + '.webp',
-        png_base64: dataUrlBase64(pngDataUrl, 'WebP'),
-        pdf_filename: 'materialized_' + safeName() + '_s' + safeSeed() + '.pdf',
-        pdf_base64: dataUrlBase64(pdfDataUri, 'PDF'),
-        share_url: reportTargetUrl(),
-      });
-    } catch (err) {
-      console.error('[materialized] __meBuildReportBundleBase64 failed', err);
-      return JSON.stringify({ error: (err && err.message) ? err.message : String(err) });
-    } finally {
-      if (!publishedReportUrl()) window.__mePendingPublishedReportUrl = '';
-      startObserver();
-    }
+    var overallTimeout = timeoutMs + 60000;
+    var work = new Promise(async function (resolve) {
+      window.__mePendingPublishedReportUrl = canonicalAbsoluteUrl(publishedUrlOverride);
+      stopObserver();
+      try {
+        await waitReportMounted(timeoutMs);
+        window.__mePaintReport();
+        await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
+        var pngDataUrl = await buildReportPngDataUrl();
+        var pdf = await buildReportPdf();
+        var pdfDataUri = pdf.output('datauristring');
+        var pngB64 = dataUrlBase64(pngDataUrl, 'WebP');
+        var pdfB64 = dataUrlBase64(pdfDataUri, 'PDF');
+        var portraitB64 = '';
+        var portraitEl = document.getElementById('report-userpic-data-url');
+        if (portraitEl && portraitEl.value) {
+          var pv = portraitEl.value;
+          portraitB64 = pv.indexOf(',') >= 0 ? pv.split(',')[1] : pv;
+        }
+        if (slug) {
+          var uploadBody = { slug: slug, png_base64: pngB64, pdf_base64: pdfB64 };
+          if (portraitB64) uploadBody.portrait_base64 = portraitB64;
+          var apiUrl = (window.location.port === '3000')
+            ? window.location.protocol + '//' + window.location.hostname + ':8000/_api/upload-report-assets'
+            : '/_api/upload-report-assets';
+          var resp = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(uploadBody),
+          });
+          var respData = await resp.json();
+          if (!resp.ok || respData.error) {
+            resolve(JSON.stringify({ error: respData.error || ('Upload failed: HTTP ' + resp.status) }));
+            return;
+          }
+          resolve(JSON.stringify({
+            status: 'uploaded',
+            slug: slug,
+            share_url: reportTargetUrl(),
+          }));
+        } else {
+          resolve(JSON.stringify({
+            png_base64: pngB64,
+            pdf_base64: pdfB64,
+            share_url: reportTargetUrl(),
+          }));
+        }
+      } catch (err) {
+        console.error('[materialized] __meBuildReportBundleBase64 failed', err);
+        resolve(JSON.stringify({ error: (err && err.message) ? err.message : String(err) }));
+      } finally {
+        if (!publishedReportUrl()) window.__mePendingPublishedReportUrl = '';
+        startObserver();
+      }
+    });
+    var deadline = new Promise(function (resolve) {
+      setTimeout(function () {
+        resolve(JSON.stringify({ error: 'Report generation timed out after ' + Math.round(overallTimeout / 1000) + 's.' }));
+      }, overallTimeout);
+    });
+    return Promise.race([work, deadline]);
   };
 
   window.__meCopyShareLink = async function () {
@@ -1525,6 +1563,8 @@
     if (network === 'twitter')       target = 'https://twitter.com/intent/tweet?text=' + text + '&url=' + url;
     else if (network === 'facebook') target = 'https://www.facebook.com/sharer/sharer.php?u=' + url;
     else if (network === 'linkedin') target = 'https://www.linkedin.com/sharing/share-offsite/?url=' + url;
+    else if (network === 'whatsapp') target = 'https://api.whatsapp.com/send?text=' + text + '%20' + url;
+    else if (network === 'telegram') target = 'https://t.me/share/url?url=' + url + '&text=' + text;
     if (target) window.open(target, '_blank', 'noopener,noreferrer,width=640,height=520');
   };
 

@@ -1345,12 +1345,17 @@ class ComposeState(rx.State):
         self.report_pdf_url = ""
         self.report_params_url = ""
         public_url_arg = json.dumps(public_path)
-        yield rx.call_script(
-            "window.__meBuildReportBundleBase64 ? "
-            f"window.__meBuildReportBundleBase64(8000, {public_url_arg}) : "
-            "JSON.stringify({error: 'Report bundle builder not loaded.'})",
-            callback=ComposeState.receive_report_bundle_and_publish,
+        slug_arg = json.dumps(slug)
+        js_expr = (
+            "(async function() { try { "
+            "var r = window.__meBuildReportBundleBase64 ? "
+            f"await window.__meBuildReportBundleBase64(8000, {public_url_arg}, {slug_arg}) : "
+            "JSON.stringify({error: 'Report bundle builder not loaded.'}); "
+            "return r; "
+            "} catch(e) { console.error('[materialized] publish call_script wrapper', e); "
+            "return JSON.stringify({error: (e && e.message) || String(e)}); } })()"
         )
+        yield rx.call_script(js_expr, callback=ComposeState.receive_report_bundle_and_publish)
 
     def receive_report_bundle_and_publish(self, payload: str):  # type: ignore[return]
         """Persist report PNG/PDF from the browser plus STL/params from the server."""
@@ -1380,6 +1385,8 @@ class ComposeState(rx.State):
             yield rx.toast.error(self.report_publish_error)
             return
 
+        uploaded_via_http = str(data.get("status", "")) == "uploaded"
+
         tag = self.personal_tag.strip() or "anonymous"
         seed = self.sculpture_params.get("seed", self.param_seed)
         slug = self.report_public_slug or _safe_report_slug(tag, seed)
@@ -1388,14 +1395,15 @@ class ComposeState(rx.State):
         out_dir = generated_public_path("reports", slug)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        try:
-            png_bytes = _decode_base64_payload(str(data.get("png_base64", "")), expected_label="WebP")
-            pdf_bytes = _decode_base64_payload(str(data.get("pdf_base64", "")), expected_label="PDF")
-        except (ValueError, binascii.Error) as exc:
-            self.report_publishing = False
-            self.report_publish_error = str(exc)
-            yield rx.toast.error(f"Could not publish report: {exc}")
-            return
+        if not uploaded_via_http:
+            try:
+                png_bytes = _decode_base64_payload(str(data.get("png_base64", "")), expected_label="WebP")
+                pdf_bytes = _decode_base64_payload(str(data.get("pdf_base64", "")), expected_label="PDF")
+            except (ValueError, binascii.Error) as exc:
+                self.report_publishing = False
+                self.report_publish_error = str(exc)
+                yield rx.toast.error(f"Could not publish report: {exc}")
+                return
 
         model_path = out_dir / "model.stl"
         params_path = out_dir / "params.json"
@@ -1408,14 +1416,12 @@ class ComposeState(rx.State):
         relative_png = f"{rel_dir}/report.webp"
         relative_pdf = f"{rel_dir}/report.pdf"
 
-        # Relative paths for browser UI (resolved from window.location.origin)
         public_url = generated_public_url(f"{rel_dir}/index.html")
         model_url = generated_public_url(relative_model)
         params_url = generated_public_url(relative_params)
         png_url = generated_public_url(relative_png)
         pdf_url = generated_public_url(relative_pdf)
 
-        # Absolute URLs for OG tags in published HTML (crawlers need full URLs)
         og_page_url = generated_public_absolute_url(f"{rel_dir}/index.html")
         og_image_url = generated_public_absolute_url(relative_png)
         og_pdf_url = generated_public_absolute_url(relative_pdf)
@@ -1443,15 +1449,16 @@ class ComposeState(rx.State):
         try:
             shutil.copyfile(stl_path, model_path)
             params_path.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
-            png_path.write_bytes(png_bytes)
-            pdf_path.write_bytes(pdf_bytes)
-            if self.report_portrait_data_url:
-                portrait_bytes = _decode_base64_payload(
-                    self.report_portrait_data_url.split(",", 1)[-1] if "," in self.report_portrait_data_url else "",
-                    expected_label="portrait",
-                )
-                if portrait_bytes:
-                    (out_dir / "portrait.webp").write_bytes(portrait_bytes)
+            if not uploaded_via_http:
+                png_path.write_bytes(png_bytes)
+                pdf_path.write_bytes(pdf_bytes)
+                if self.report_portrait_data_url:
+                    portrait_bytes = _decode_base64_payload(
+                        self.report_portrait_data_url.split(",", 1)[-1] if "," in self.report_portrait_data_url else "",
+                        expected_label="portrait",
+                    )
+                    if portrait_bytes:
+                        (out_dir / "portrait.webp").write_bytes(portrait_bytes)
             html_path.write_text(
                 _build_report_landing_html(
                     title=title,
@@ -1955,9 +1962,12 @@ class ComposeState(rx.State):
         or when a sculpture is already generated (prevents re-trigger from replaceState).
         """
         if self.stl_download_path or self.generating:
+            print(f"[DEBUG] apply_shared_report: skipped (stl_download_path={self.stl_download_path!r}, generating={self.generating})", flush=True)
             return
         params = self.router.url.query_parameters
+        print(f"[DEBUG] apply_shared_report: url={self.router.url!r} params={dict(params)}", flush=True)
         if str(params.get("report", "")) != "1":
+            print("[DEBUG] apply_shared_report: no report=1 param, returning", flush=True)
             return
         name_b64 = str(params.get("name", ""))
         cats_raw = str(params.get("cats", ""))
@@ -2001,6 +2011,7 @@ class ComposeState(rx.State):
                         if str(gene) in valid_genes
                     ]
 
+        logger.info("apply_shared_report: decoded tag=%s cats=%s genes=%s", tag, cats, selected_genes[:3] if selected_genes else "ALL")
         self.personal_tag = tag
         self.selected_categories = cats
         self.included_genes = selected_genes or [
