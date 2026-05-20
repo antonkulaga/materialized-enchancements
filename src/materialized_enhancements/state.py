@@ -1181,8 +1181,8 @@ class ComposeState(rx.State):
             )
         )
 
-    def download_artifacts(self):  # type: ignore[return]
-        """Download STL and reproducibility JSON in one click."""
+    def download_stl(self):  # type: ignore[return]
+        """Download the generated STL file."""
         if not self.stl_download_path:
             yield rx.toast.error("No sculpture generated yet.")
             return
@@ -1191,6 +1191,13 @@ class ComposeState(rx.State):
             yield rx.toast.error("STL file not found on disk.")
             return
         yield rx.download(data=p.read_bytes(), filename=self.stl_filename)
+
+    def download_params_json(self):  # type: ignore[return]
+        """Download the reproducibility params JSON."""
+        if not self.stl_download_path:
+            yield rx.toast.error("No sculpture generated yet.")
+            return
+        p = Path(self.stl_download_path)
         artifact: Dict[str, Any] = {
             "name": self.personal_tag,
             "selected_categories": self.selected_categories,
@@ -1224,6 +1231,10 @@ class ComposeState(rx.State):
                 else:
                     row["structure_pdb"] = ""
                     row["pdb_src_url"] = ""
+                style = row.get("render_style", "cartoon")
+                row["render_label"] = style.capitalize() if style else "Cartoon"
+                max_dim = row.get("max_dim_mm", 0.0)
+                row["print_size_label"] = f"{max_dim:.0f}mm" if max_dim > 0 else ""
                 entries.append(row)
         entries.sort(key=lambda r: _DIFFICULTY_ORDER.get(r.get("difficulty", "medium"), 1))
         return entries

@@ -178,7 +178,7 @@ var RefBondLength = 2.86;
 var AtomToBondDiamRatio = 0.78 / MinPrintedObjDimen ;
 var AtomToBondLengthRatio = (2 * MaxSpacefill) / MinBondLength;
 var AtomScalingFactor = 0.23; 
-var PrintBedMinDimension = 210.0 / JMolStlScale;
+var PrintBedMinDimension = 180.0 / JMolStlScale;
 var MaxPrintScaleFactor = PrintBedMinDimension / maxDim;
 var PrintScaleFactor = MaxPrintScaleFactor;  // Initialize PrintScaleFactor with MaxPrintScaleFactor
 

@@ -33,6 +33,15 @@ GENE_SPECIES_PATH = DATA_DIR / "gene_species.csv"
 UNIPROT_SEARCH = "https://rest.uniprot.org/uniprotkb/search"
 UNIPROT_ENTRY = "https://rest.uniprot.org/uniprotkb/{accession}.json"
 ALPHAFOLD_API = "https://alphafold.ebi.ac.uk/api/prediction/{accession}"
+RCSB_GRAPHQL = "https://data.rcsb.org/graphql"
+
+MIN_COVERAGE_FRACTION = 0.05
+
+COMMON_BUFFER_LIGANDS: set[str] = {
+    "HOH", "SO4", "PO4", "GOL", "EDO", "CL", "NA", "CA", "MG", "ZN",
+    "MN", "FE", "K", "ACT", "FMT", "BME", "DMS", "IOD", "BR", "SCN",
+    "NO3", "NH4", "PEG", "MPD", "PGE", "HG", "PEO", "CO", "NI", "CU",
+}
 
 _GENE_NAME_OVERRIDES: dict[str, list[str]] = {
     "smedwi": ["Smedwi-2", "piwi"],
@@ -85,14 +94,47 @@ def _fetch_uniprot_entry(client: httpx.Client, accession: str) -> dict | None:
     return None
 
 
-def _extract_best_pdb(entry: dict) -> str:
-    """Pick the best experimental PDB ID from UniProt cross-references.
+def _fetch_pdb_entity_info(
+    client: httpx.Client,
+    pdb_ids: list[str],
+) -> dict[str, dict]:
+    """Batch-query RCSB GraphQL for polymer entity counts and bound components."""
+    if not pdb_ids:
+        return {}
+    alias_tpl = (
+        '  e{i}: entry(entry_id: "{pid}") {{'
+        " rcsb_entry_info {{ polymer_entity_count polymer_entity_count_protein"
+        " nonpolymer_bound_components }}"
+        " polymer_entities {{ entity_poly {{ rcsb_sample_sequence_length type }} }}"
+        " }}"
+    )
+    aliases = [alias_tpl.format(i=i, pid=pid) for i, pid in enumerate(pdb_ids)]
+    query = "{\n" + "\n".join(aliases) + "\n}"
+    try:
+        resp = client.post(RCSB_GRAPHQL, json={"query": query})
+        if resp.status_code != 200:
+            log.warning("RCSB GraphQL HTTP %d — skipping entity filter", resp.status_code)
+            return {}
+    except httpx.HTTPError:
+        log.warning("RCSB GraphQL request failed — skipping entity filter")
+        return {}
+    data = resp.json().get("data", {})
+    return {pid: data[f"e{i}"] for i, pid in enumerate(pdb_ids) if data.get(f"e{i}")}
 
-    Prefers X-ray over Cryo-EM over other methods; within a method prefers
-    the lowest (best) resolution.  Returns empty string when no PDB exists.
+
+def _extract_best_pdb(
+    entry: dict,
+    client: httpx.Client | None = None,
+    protein_length_aa: int = 0,
+) -> str:
+    """Pick the best single-protein experimental PDB from UniProt cross-references.
+
+    When *client* is provided, queries RCSB to filter out complexes (multiple
+    protein entities) and peptide-fragment structures (< 5 % coverage).  Prefers
+    apo structures when resolution is comparable.
     """
     xrefs = entry.get("uniProtKBCrossReferences", [])
-    pdbs: list[tuple[str, float]] = []
+    candidates: list[tuple[str, str, float]] = []
     for xref in xrefs:
         if xref.get("database") != "PDB":
             continue
@@ -106,10 +148,50 @@ def _extract_best_pdb(entry: dict) -> str:
                 resolution = float(res_str.replace(" A", "").strip())
             except ValueError:
                 pass
+        candidates.append((pdb_id, method, resolution))
+    if not candidates:
+        return ""
+
+    if client is not None:
+        entity_info = _fetch_pdb_entity_info(client, [c[0] for c in candidates])
+        if entity_info:
+            filtered: list[tuple[str, str, float, bool]] = []
+            for pdb_id, method, resolution in candidates:
+                info = entity_info.get(pdb_id)
+                if not info:
+                    continue
+                ei = info.get("rcsb_entry_info", {})
+                if ei.get("polymer_entity_count", 99) != 1:
+                    continue
+                if protein_length_aa > 0:
+                    max_len = max(
+                        (
+                            (pe.get("entity_poly") or {}).get("rcsb_sample_sequence_length", 0)
+                            for pe in info.get("polymer_entities", [])
+                            if (pe.get("entity_poly") or {}).get("type") == "polypeptide(L)"
+                        ),
+                        default=0,
+                    )
+                    if max_len / protein_length_aa < MIN_COVERAGE_FRACTION:
+                        continue
+                bound = ei.get("nonpolymer_bound_components") or []
+                is_apo = all(lig in COMMON_BUFFER_LIGANDS for lig in bound)
+                filtered.append((pdb_id, method, resolution, is_apo))
+            if filtered:
+                scored = []
+                for pdb_id, method, resolution, is_apo in filtered:
+                    method_rank = 0 if "X-ray" in method else (1 if "EM" in method else 2)
+                    score = method_rank + resolution / 1000 - (0.0002 if is_apo else 0)
+                    scored.append((pdb_id, score))
+                scored.sort(key=lambda x: x[1])
+                return scored[0][0]
+            log.info("    no single-protein PDB after entity filtering (%d candidates rejected)", len(candidates))
+            return ""
+
+    pdbs: list[tuple[str, float]] = []
+    for pdb_id, method, resolution in candidates:
         method_rank = 0 if "X-ray" in method else (1 if "EM" in method else 2)
         pdbs.append((pdb_id, method_rank + resolution / 1000))
-    if not pdbs:
-        return ""
     pdbs.sort(key=lambda x: x[1])
     return pdbs[0][0]
 
@@ -197,10 +279,12 @@ def resolve(
             sids = gene_species.get(gene_id, [])
             sci_names = [species_lookup[s] for s in sids if s in species_lookup]
 
+            prot_len = int(row.get("protein_length_aa") or 0)
+
             if existing_pid and existing_idt == "uniprot":
                 entry = _fetch_uniprot_entry(client, existing_pid)
                 if entry:
-                    pdb_id = _extract_best_pdb(entry)
+                    pdb_id = _extract_best_pdb(entry, client=client, protein_length_aa=prot_len)
                     has_af = _check_alphafold(client, existing_pid)
                     af_val = "true" if has_af else ""
                     if pdb_id != existing_pdb:
@@ -248,7 +332,7 @@ def resolve(
             if resolved:
                 entry = _fetch_uniprot_entry(client, resolved)
                 if entry:
-                    pdb_id = _extract_best_pdb(entry)
+                    pdb_id = _extract_best_pdb(entry, client=client, protein_length_aa=prot_len)
                     has_af = _check_alphafold(client, resolved)
                     log.info("%-30s RESOLVED %s via %s (%s)  pdb=%s  alphafold=%s",
                              gene_id, resolved, winning_query,
@@ -285,7 +369,6 @@ def resolve(
 
 STRUCTURES_DIR = Path(__file__).resolve().parents[2] / "assets" / "structures"
 RCSB_PDB_URL = "https://files.rcsb.org/download/{pdb_id}.pdb"
-RCSB_GRAPHQL = "https://data.rcsb.org/graphql"
 
 _CHAIN_QUERY = """{
   entry(entry_id: "%s") {

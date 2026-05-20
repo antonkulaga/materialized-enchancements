@@ -3400,17 +3400,19 @@ def _rpg_gene_library_panel() -> rx.Component:
     )
 
 
-def _materialization_info_item(icon_name: str, title: str, body: str) -> rx.Component:
+def _materialization_info_item(icon_name: str, title: str, body: str | rx.Component) -> rx.Component:
+    body_el = (
+        rx.el.p(body, style={"color": "#cbd5e1", "fontSize": "0.9rem", "lineHeight": "1.55", "margin": "0"})
+        if isinstance(body, str)
+        else body
+    )
     return rx.el.div(
         rx.el.div(
             fomantic_icon(icon_name, size=16, color="#a78bfa"),
             rx.el.strong(title, style={"marginLeft": "8px", "fontSize": "0.98rem"}),
             style={"display": "flex", "alignItems": "center", "marginBottom": "6px"},
         ),
-        rx.el.p(
-            body,
-            style={"color": "#cbd5e1", "fontSize": "0.9rem", "lineHeight": "1.55", "margin": "0"},
-        ),
+        body_el,
         style={
             "padding": "12px",
             "borderRadius": "10px",
@@ -3431,10 +3433,29 @@ def _materialization_support_panel() -> rx.Component:
             _materialization_info_item(
                 "cube",
                 "How to 3D print your sculpture",
-                "Download the STL, open it in a slicer such as PrusaSlicer, Bambu Studio, Cura, or Lychee, "
-                "check the scale in millimeters, choose your material, add supports if your printer needs them, "
-                "then slice and print. The model is designed as a printable art object, but every printer and "
-                "material has its own tolerances.",
+                rx.el.p(
+                    "Download the STL, open it in a slicer such as PrusaSlicer, Bambu Studio, Cura, or Lychee, "
+                    "check the scale in millimeters, choose your material, add supports if your printer needs them, "
+                    "then slice and print. The model is designed as a printable art object, but every printer and "
+                    "material has its own tolerances. For optimal print profiles, see Marius Mihasan's ",
+                    rx.el.a(
+                        "3DP-Jmol printing profiles",
+                        href="https://github.com/mariusmihasan/3DP-Jmol-3D-printing-profiles",
+                        target="_blank",
+                        rel="noopener noreferrer",
+                        style={"color": "#a78bfa", "textDecoration": "underline"},
+                    ),
+                    " and his ",
+                    rx.el.a(
+                        "Modele Moleculare",
+                        href="https://modelemoleculare.ro/",
+                        target="_blank",
+                        rel="noopener noreferrer",
+                        style={"color": "#a78bfa", "textDecoration": "underline"},
+                    ),
+                    " project.",
+                    style={"color": "#cbd5e1", "fontSize": "0.9rem", "lineHeight": "1.55", "margin": "0"},
+                ),
             ),
             _materialization_info_item(
                 "heart",
@@ -5721,9 +5742,16 @@ def _model_action_panel() -> rx.Component:
                 rx.el.button(
                     fomantic_icon("download", size=14),
                     rx.el.span(" Download 3D print file", style={"marginLeft": "6px"}),
-                    on_click=ComposeState.download_artifacts,
+                    on_click=ComposeState.download_stl,
                     class_name="ui primary button",
                     style=compact_button_style,
+                ),
+                rx.el.button(
+                    fomantic_icon("file code outline", size=14),
+                    rx.el.span(" Download parameters", style={"marginLeft": "6px"}),
+                    on_click=ComposeState.download_params_json,
+                    class_name="ui button",
+                    style={**compact_button_style, "marginTop": "6px", "fontWeight": "600"},
                 ),
                 style=action_cell_style,
             ),
@@ -5888,22 +5916,28 @@ def _protein_stl_row(entry: dict) -> rx.Component:
 
     detail_row = rx.el.div(
         rx.el.div(
-            rx.el.span(entry["triangles"].to(str) + " tris · " + entry["shells"].to(str) + " shells"),
-            style={"fontSize": "0.72rem", "color": "#64748b"},
+            rx.el.span(
+                entry["render_label"],
+                style={
+                    "fontSize": "0.68rem",
+                    "fontWeight": "600",
+                    "color": "#a78bfa",
+                    "backgroundColor": "rgba(167, 139, 250, 0.12)",
+                    "border": "1px solid rgba(167, 139, 250, 0.25)",
+                    "borderRadius": "4px",
+                    "padding": "1px 6px",
+                    "marginRight": "6px",
+                },
+            ),
+            rx.el.span(
+                "Print size: " + entry["dimensions_mm"].to(str) + " mm",
+                style={"fontSize": "0.72rem", "color": "#cbd5e1"},
+            ),
+            style={"display": "flex", "alignItems": "center", "flexWrap": "wrap"},
         ),
         rx.el.div(
-            rx.el.span("Dimensions: ", style={"color": "#94a3b8"}),
-            rx.el.span(entry["dimensions_mm"], style={"color": "#cbd5e1"}),
-            style={"fontSize": "0.72rem"},
-        ),
-        rx.cond(
-            entry["watertight"],
-            rx.fragment(),
-            rx.el.div(
-                fomantic_icon("exclamation triangle", size=10, color="#f97316"),
-                rx.el.span(" May need mesh repair", style={"color": "#f97316"}),
-                style={"fontSize": "0.72rem", "display": "flex", "alignItems": "center"},
-            ),
+            rx.el.span(entry["triangles"].to(str) + " tris · " + entry["shells"].to(str) + " shells"),
+            style={"fontSize": "0.72rem", "color": "#64748b"},
         ),
         style={
             "display": "flex",
@@ -5944,8 +5978,24 @@ def _protein_stl_panel() -> rx.Component:
                 fomantic_icon("exclamation triangle", size=12),
                 rx.el.span(
                     " You can also 3D print the individual protein structures included in your character. "
-                    "Be careful — unlike the sculpture above, some of these are hard to 3D print "
-                    "and may need mesh repair.",
+                    "All models are scaled to fit a 180mm print bed (e.g. Bambu A1 Mini). "
+                    "Some may need mesh repair for best results. For optimized printing profiles, check Marius Mihasan's ",
+                    rx.el.a(
+                        "3DP-Jmol printing profiles",
+                        href="https://github.com/mariusmihasan/3DP-Jmol-3D-printing-profiles",
+                        target="_blank",
+                        rel="noopener noreferrer",
+                        style={"color": "#fbbf24", "textDecoration": "underline"},
+                    ),
+                    " and his ",
+                    rx.el.a(
+                        "Modele Moleculare",
+                        href="https://modelemoleculare.ro/",
+                        target="_blank",
+                        rel="noopener noreferrer",
+                        style={"color": "#fbbf24", "textDecoration": "underline"},
+                    ),
+                    " project.",
                     style={"fontSize": "0.84rem", "lineHeight": "1.45"},
                 ),
                 style={

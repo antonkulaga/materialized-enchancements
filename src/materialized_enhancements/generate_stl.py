@@ -19,12 +19,14 @@ import tempfile
 from enum import Enum
 from pathlib import Path
 
+import trimesh
 import typer
 
 log = logging.getLogger(__name__)
 
 STRUCTURES_DIR = Path("assets/structures")
 OUTPUT_DIR = Path("assets/stl")
+DEFAULT_TARGET_SIZE_MM = 180.0
 SCRIPT_PATH = Path(__file__).resolve().parent.parent.parent / "scripts" / "3dp_jmol" / "3DP-Jmol.v.alfa1.public"
 
 JMOL_HOME = Path.home() / ".local" / "share" / "jmol"
@@ -35,6 +37,21 @@ JMOL_DOWNLOAD_URL = (
     f"Jmol/Version%20{_JMOL_MAJOR_MINOR}/Jmol%20{JMOL_VERSION}/"
     f"Jmol-{JMOL_VERSION}-binary.tar.gz/download"
 )
+
+
+def rescale_stl(stl_path: Path, target_max_mm: float = DEFAULT_TARGET_SIZE_MM) -> bool:
+    """Rescale an STL so its largest dimension equals target_max_mm."""
+    mesh = trimesh.load(stl_path, force="mesh")
+    dims = mesh.bounds[1] - mesh.bounds[0]
+    max_dim = float(dims.max())
+    if max_dim <= 0:
+        return False
+    scale = target_max_mm / max_dim
+    mesh.apply_scale(scale)
+    mesh.export(stl_path)
+    new_max = float((mesh.bounds[1] - mesh.bounds[0]).max())
+    typer.echo(f"    Rescaled: {max_dim:.0f} → {new_max:.1f}mm (×{scale:.4f})")
+    return True
 
 
 class RenderStyle(str, Enum):
@@ -281,6 +298,10 @@ def generate(
     all_structures: bool = typer.Option(False, "--all", help="Process all PDB files in assets/structures/"),
     style: RenderStyle = typer.Option(RenderStyle.cartoon, "--style", "-s", help="Rendering style"),
     scale: float = typer.Option(0, "--scale", help="Print scale (0 = auto-max, 0.3 = 30%%)"),
+    target_size: float = typer.Option(
+        DEFAULT_TARGET_SIZE_MM, "--target-size", "-t",
+        help="Target max dimension in mm. STL is rescaled so the largest axis equals this value. 0 = no rescaling.",
+    ),
     hydrogen: bool = typer.Option(False, "--hydrogen/--no-hydrogen", help="Include hydrogen atoms"),
     color: bool = typer.Option(False, "--color/--no-color", help="Multicolor OBJ instead of monochrome STL"),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing outputs"),
@@ -317,7 +338,8 @@ def generate(
     output_dir.mkdir(parents=True, exist_ok=True)
     ext = ".obj" if color else ".stl"
 
-    typer.echo(f"Converting {len(files)} structure(s) → {style.value} {ext} @ scale={scale or 'auto'}")
+    rescale_label = f", rescale → {target_size:.0f}mm" if target_size > 0 else ""
+    typer.echo(f"Converting {len(files)} structure(s) → {style.value} {ext} @ scale={scale or 'auto'}{rescale_label}")
     typer.echo(f"Output: {output_dir.resolve()}\n")
 
     succeeded = 0
@@ -352,6 +374,8 @@ def generate(
             timeout=timeout,
         )
         if ok:
+            if target_size > 0 and not color and out_path.exists():
+                rescale_stl(out_path, target_size)
             succeeded += 1
         else:
             failed += 1

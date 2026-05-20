@@ -1,47 +1,58 @@
 gene_id,gene,category,pdb_id,protein_id,structure_source,render_style,file,triangles,dimensions_mm,max_dim_mm,surface_area_cm2,shells,tiny_shells,watertight,aspect_ratio,difficulty
-pif,Pif,Expression,"",C7G0B5,alphafold,cartoon,C7G0B5_predicted_cartoon.stl,469458,1252.9 x 1216.0 x 1528.4,1528.4,43907.41,438,1,false,1.3,expert
-tps_pv,TPS,Environmental Adaptation,"",C9K4M3,alphafold,cartoon,C9K4M3_predicted_cartoon.stl,435380,969.7 x 1031.3 x 1217.2,1217.2,33221.29,530,1,false,1.3,expert
-trpa1_viper,TRPA1,Perception,"",D4P383,alphafold,cartoon,D4P383_predicted_cartoon.stl,552448,1249.3 x 896.9 x 1287.1,1287.1,47354.87,604,1,false,1.4,expert
-klotho,Klotho,Longevity & Genome,5W21,Q9UEF7,rcsb,cartoon,5W21_cartoon.stl,546192,1014.7 x 728.2 x 1007.7,1014.7,33467.88,853,3,false,1.4,expert
-kcnma1_skate,KCNMA1,Perception,6V5A,Q12791,rcsb,cartoon,6V5A_cartoon.stl,333164,641.4 x 663.3 x 703.9,703.9,14917.43,482,7,false,1.1,expert
-clock_bmal1_dolphin,CLOCK / BMAL1,Environmental Adaptation,"",A0A6J3RDU0,alphafold,cartoon,A0A6J3RDU0_predicted_cartoon.stl,353568,1486.4 x 1494.7 x 1525.7,1525.7,32485.18,212,1,false,1.0,expert
-smedwi,PIWI / SMEDWI,Regeneration,"",Q2Q5Y8,alphafold,cartoon,Q2Q5Y8_predicted_cartoon.stl,438216,768.4 x 744.2 x 879.1,879.1,24273.6,564,1,false,1.2,expert
-piezo2,PIEZO2,Perception,"",Q9H5I5,alphafold,cartoon,Q9H5I5_predicted_cartoon.stl,326908,1209.3 x 1354.6 x 1222.4,1354.6,30250.48,297,1,false,1.1,expert
-fluc,Luciferase / Luciferin,Expression,3RIX,P08659,rcsb,cartoon,3RIX_cartoon.stl,252776,540.6 x 479.1 x 604.3,604.3,8746.89,401,1,false,1.3,hard
-prestin_echo,Prestin,Perception,7S8X,D7PC76,rcsb,cartoon,7S8X_cartoon.stl,346462,944.4 x 798.4 x 1026.8,1026.8,22969.6,406,2,false,1.3,hard
-sod2,SOD2,Stress Resistance,9NSJ,P04179,rcsb,cartoon,9NSJ_cartoon.stl,212422,500.6 x 531.7 x 426.0,531.7,6001.65,587,1,false,1.2,hard
-cpdp_potoroo,CPD Photolyase,Environmental Adaptation,"",Q28811,alphafold,cartoon,Q28811_predicted_cartoon.stl,271848,969.9 x 752.2 x 771.5,969.9,16527.21,331,1,false,1.3,hard
-has2_nmr,HAS2,Longevity & Genome,"",Q92819,alphafold,cartoon,Q92819_predicted_cartoon.stl,272496,756.2 x 616.3 x 735.1,756.2,13957.41,298,1,false,1.2,hard
-resilin,Resilin,Expression,"",Q9V7U0,alphafold,cartoon,Q9V7U0_predicted_cartoon.stl,234918,1546.9 x 1269.0 x 1456.6,1546.9,18639.79,63,1,false,1.2,hard
-fst344,FST,Regeneration,3HH2,P19883,rcsb,cartoon,3HH2_cartoon.stl,178326,564.9 x 524.9 x 830.9,830.9,8417.99,296,2,false,1.6,hard
-gfp,GFP,Expression,6L27,P42212,rcsb,cartoon,6L27_cartoon.stl,136590,379.5 x 455.0 x 498.4,498.4,3773.6,231,2,false,1.3,hard
-pcsk9_edit,PCSK9,Longevity & Genome,7S5H,Q8NBP7,rcsb,cartoon,7S5H_cartoon.stl,133794,413.3 x 406.1 x 400.8,413.3,3565.63,206,2,false,1.0,hard
-tp53_rtg9,TP53-RTG9,Longevity & Genome,"",G3UDE4,alphafold,cartoon,G3UDE4_predicted_cartoon.stl,159858,1367.1 x 955.2 x 744.9,1367.1,12907.42,125,1,false,1.8,hard
-masp1,MaSp1,Expression,"",P19837,alphafold,cartoon,P19837_predicted_cartoon.stl,315138,785.4 x 982.8 x 1052.5,1052.5,18163.22,189,1,false,1.3,hard
-ppri_ppra,PprI / PprA,Stress Resistance,"",Q9RXY7,alphafold,cartoon,Q9RXY7_predicted_cartoon.stl,164808,1154.2 x 569.6 x 674.2,1154.2,12530.07,201,0,false,2.0,hard
-vegf_therapy,VEGF,Regeneration,1MKK,P15692,rcsb,cartoon,1MKK_cartoon.stl,48672,294.8 x 369.6 x 480.2,480.2,1330.74,62,1,false,1.6,medium
-mgmt_p140k,MGMT,Longevity & Genome,1QNT,P16455,rcsb,cartoon,1QNT_cartoon.stl,87126,420.9 x 447.6 x 294.3,447.6,2413.35,116,2,false,1.5,medium
-epas1_tibetan,EPAS1,Environmental Adaptation,3F1P,Q99814,rcsb,cartoon,3F1P_cartoon.stl,59738,405.1 x 299.3 x 285.9,405.1,1468.3,77,1,false,1.4,medium
-aqp1,AQP1,Environmental Adaptation,4CSK,P29972,rcsb,cartoon,4CSK_cartoon.stl,122146,364.3 x 394.0 x 566.3,566.3,4289.43,152,1,false,1.6,medium
-chrna1_mongoose,CHRNA1,Environmental Adaptation,4ZJS,P02708,rcsb,cartoon,4ZJS_cartoon.stl,105690,489.6 x 565.1 x 495.6,565.1,3334.74,127,1,false,1.2,medium
-mstn_ko,MSTN,Regeneration,5F3B,O14793,rcsb,cartoon,5F3B_cartoon.stl,55374,348.6 x 482.9 x 383.1,482.9,1617.14,74,2,false,1.4,medium
-cirbp,CIRBP,Environmental Adaptation,5TBX,Q14011,rcsb,cartoon,5TBX_cartoon.stl,46760,211.6 x 294.2 x 364.7,364.7,1083.83,69,1,false,1.7,medium
-lin28a,Lin28a,Regeneration,5UDZ,Q9H9Z2,rcsb,cartoon,5UDZ_cartoon.stl,78596,442.0 x 348.7 x 374.6,442.0,1884.65,117,1,false,1.3,medium
-rbm3,RBM3,Environmental Adaptation,7EB1,P98179,rcsb,cartoon,7EB1_cartoon.stl,44274,329.4 x 252.9 x 245.0,329.4,932.48,59,1,false,1.3,medium
-apoe_edit,APOE,Longevity & Genome,7FCR,P02649,rcsb,cartoon,7FCR_cartoon.stl,64366,459.3 x 247.9 x 499.2,499.2,2260.13,64,2,false,2.0,medium
-tmc1,TMC1,Perception,8XOQ,Q8TDI8,rcsb,cartoon,8XOQ_cartoon.stl,126492,509.9 x 438.4 x 781.5,781.5,6153.85,169,2,false,1.8,medium
-sws1_bird,SWS1,Perception,8Y02,P03999,rcsb,cartoon,8Y02_cartoon.stl,152928,439.7 x 556.3 x 527.2,556.3,5542.79,194,1,false,1.3,medium
-reflectin,Reflectin,Expression,"",I7LGW2,alphafold,cartoon,I7LGW2_predicted_cartoon.stl,125926,814.1 x 685.7 x 1027.5,1027.5,7923.37,116,1,false,1.5,medium
-sting_bat,STING,Environmental Adaptation,"",L5JUR0,alphafold,cartoon,L5JUR0_predicted_cartoon.stl,171204,718.6 x 599.7 x 874.7,874.7,10234.93,165,0,false,1.5,medium
-dsup,Dsup,Stress Resistance,"",P0DOW4,alphafold,cartoon,P0DOW4_predicted_cartoon.stl,164132,1397.6 x 1225.3 x 1355.3,1397.6,12669.09,24,1,false,1.1,medium
-cahs_d,CAHS D,Stress Resistance,"",P0DOW5,alphafold,cartoon,P0DOW5_predicted_cartoon.stl,105362,618.8 x 491.8 x 582.7,618.8,3994.79,130,1,false,1.3,medium
-mb_seal,MB / GSH,Environmental Adaptation,"",R9RY82,alphafold,cartoon,R9RY82_predicted_cartoon.stl,77296,310.1 x 401.4 x 364.0,401.4,2187.33,88,1,false,1.3,medium
-pvpimt,PvPIMT,Longevity & Genome,"",S6CDF7,alphafold,cartoon,S6CDF7_predicted_cartoon.stl,124932,388.9 x 382.3 x 467.0,467.0,3609.1,170,1,false,1.2,medium
-afp_fish,AFP / AFGP,Environmental Adaptation,1WFB,P04002,rcsb,cartoon,1WFB_cartoon.stl,16486,484.0 x 173.5 x 262.9,484.0,594.91,16,1,false,2.8,medium
-cltx,Chlorotoxin,Expression,7X43,P45639,rcsb,cartoon,7X43_cartoon.stl,24176,222.4 x 148.0 x 192.7,222.4,318.34,40,0,false,1.5,medium
-tp53_elephant,TP53 (elephant),Longevity & Genome,9C5S,P04637,rcsb,cartoon,9C5S_cartoon.stl,9918,192.1 x 121.8 x 118.1,192.1,114.59,22,1,false,1.6,medium
-hsf1_pv,HSF1,Stress Resistance,"",A0A9J6CAY1,alphafold,cartoon,A0A9J6CAY1_predicted_cartoon.stl,31606,468.6 x 423.7 x 816.1,816.1,1794.08,18,1,false,1.9,medium
-pvlea,PvLEA,Stress Resistance,"",Q1XI25,alphafold,cartoon,Q1XI25_predicted_cartoon.stl,74130,530.4 x 472.5 x 549.3,549.3,3129.96,41,1,false,1.2,medium
-tert,TERT,Regeneration,5MEO,O14746,rcsb,cartoon,5MEO_cartoon.stl,4072,117.7 x 190.8 x 106.6,190.8,45.45,6,1,false,1.8,easy
-fgf21_stgfbr2,FGF21 / sTGFβR2,Longevity & Genome,5VAQ,Q9NSA1,rcsb,cartoon,5VAQ_cartoon.stl,10256,96.8 x 194.7 x 370.4,370.4,190.43,9,1,false,3.8,easy
-foxo3,FOXO3,Longevity & Genome,9QNG,O43524,rcsb,cartoon,9QNG_cartoon.stl,4856,57.6 x 115.9 x 145.5,145.5,45.63,9,1,false,2.5,easy
+"","","","","","",cartoon,5W21_cartoon.stl,546192,180.0 x 129.3 x 179.0,180.0,1244.85,859,3,false,1.4,expert
+kcnma1_skate,KCNMA1,Perception,6V5A,Q12791,rcsb,cartoon,6V5A_cartoon.stl,333164,164.0 x 169.9 x 180.0,180.0,1148.39,485,7,false,1.1,expert
+klotho,Klotho,Longevity & Genome,8TOH,Q9UEF7,rcsb,cartoon,8TOH_cartoon.stl,454328,104.9 x 107.5 x 180.0,180.0,1021.41,566,3,false,1.7,expert
+pif,Pif,Expression,"",C7G0B5,alphafold,cartoon,C7G0B5_predicted_cartoon.stl,469458,147.6 x 143.3 x 180.0,180.0,723.79,433,1,false,1.3,expert
+tps_pv,TPS,Environmental Adaptation,"",C9K4M3,alphafold,cartoon,C9K4M3_predicted_cartoon.stl,435380,143.5 x 152.6 x 180.0,180.0,861.71,535,1,false,1.3,expert
+trpa1_viper,TRPA1,Perception,"",D4P383,alphafold,cartoon,D4P383_predicted_cartoon.stl,552448,174.6 x 125.3 x 180.0,180.0,1093.25,607,1,false,1.4,expert
+smedwi,PIWI / SMEDWI,Regeneration,"",Q2Q5Y8,alphafold,cartoon,Q2Q5Y8_predicted_cartoon.stl,438216,157.7 x 152.5 x 180.0,180.0,1200.44,567,1,false,1.2,expert
+fluc,Luciferase / Luciferin,Expression,3RIX,P08659,rcsb,cartoon,3RIX_cartoon.stl,252776,161.0 x 142.9 x 180.0,180.0,908.15,400,1,false,1.3,hard
+prestin_echo,Prestin,Perception,7S8X,D7PC76,rcsb,cartoon,7S8X_cartoon.stl,346462,165.7 x 140.1 x 180.0,180.0,832.53,409,2,false,1.3,hard
+sod2,SOD2,Stress Resistance,9NSJ,P04179,rcsb,cartoon,9NSJ_cartoon.stl,212422,169.5 x 180.0 x 144.2,180.0,782.1,587,1,false,1.2,hard
+clock_bmal1_dolphin,CLOCK / BMAL1,Environmental Adaptation,"",A0A6J3RDU0,alphafold,cartoon,A0A6J3RDU0_predicted_cartoon.stl,353568,175.4 x 176.3 x 180.0,180.0,533.38,215,1,false,1.0,hard
+cpdp_potoroo,CPD Photolyase,Environmental Adaptation,"",Q28811,alphafold,cartoon,Q28811_predicted_cartoon.stl,271848,180.0 x 139.6 x 143.3,180.0,670.94,326,1,false,1.3,hard
+has2_nmr,HAS2,Longevity & Genome,"",Q92819,alphafold,cartoon,Q92819_predicted_cartoon.stl,272496,180.0 x 146.8 x 174.9,180.0,926.61,295,1,false,1.2,hard
+piezo2,PIEZO2,Perception,"",Q9H5I5,alphafold,cartoon,Q9H5I5_predicted_cartoon.stl,326908,160.7 x 180.0 x 162.5,180.0,631.88,301,1,false,1.1,hard
+"","","","","","",cartoon,3HH2_cartoon.stl,178326,122.7 x 114.0 x 180.0,180.0,467.57,299,2,false,1.6,hard
+gfp,GFP,Expression,6L27,P42212,rcsb,cartoon,6L27_cartoon.stl,136590,137.2 x 164.4 x 180.0,180.0,572.51,230,1,false,1.3,hard
+"","","","","","",cartoon,7S5H_cartoon.stl,133794,180.0 x 177.0 x 174.6,180.0,792.76,206,2,false,1.0,hard
+masp1,MaSp1,Expression,"",P19837,alphafold,cartoon,P19837_predicted_cartoon.stl,315138,134.7 x 168.1 x 180.0,180.0,621.93,188,1,false,1.3,hard
+fst344,FST,Regeneration,"",P19883,alphafold,cartoon,P19883_predicted_cartoon.stl,191778,180.0 x 74.7 x 140.0,180.0,380.4,256,0,false,2.4,hard
+resilin,Resilin,Expression,"",Q9V7U0,alphafold,cartoon,Q9V7U0_predicted_cartoon.stl,234918,180.0 x 147.7 x 169.5,180.0,295.27,73,1,false,1.2,hard
+vegf_therapy,VEGF,Regeneration,1MKK,P15692,rcsb,cartoon,1MKK_cartoon.stl,48672,110.7 x 138.5 x 180.0,180.0,218.99,62,1,false,1.6,medium
+epas1_tibetan,EPAS1,Environmental Adaptation,1P97,Q99814,rcsb,cartoon,1P97_cartoon.stl,59390,180.0 x 110.3 x 142.4,180.0,303.93,78,1,false,1.6,medium
+mgmt_p140k,MGMT,Longevity & Genome,1QNT,P16455,rcsb,cartoon,1QNT_cartoon.stl,87126,169.2 x 180.0 x 118.8,180.0,456.96,116,2,false,1.5,medium
+foxo3,FOXO3,Longevity & Genome,2K86,O43524,rcsb,cartoon,2K86_cartoon.stl,50348,108.0 x 180.0 x 78.8,180.0,204.63,56,1,false,2.3,medium
+tp53_elephant,TP53 (elephant),Longevity & Genome,3D06,P04637,rcsb,cartoon,3D06_cartoon.stl,99116,139.8 x 180.0 x 170.8,180.0,447.85,143,3,false,1.3,medium
+"","","","","","",cartoon,3F1P_cartoon.stl,59738,180.0 x 133.2 x 127.1,180.0,339.22,77,1,false,1.4,medium
+aqp1,AQP1,Environmental Adaptation,4CSK,P29972,rcsb,cartoon,4CSK_cartoon.stl,122146,116.0 x 125.5 x 180.0,180.0,507.48,151,1,false,1.6,medium
+chrna1_mongoose,CHRNA1,Environmental Adaptation,4ZJS,P02708,rcsb,cartoon,4ZJS_cartoon.stl,105690,156.1 x 180.0 x 157.8,180.0,396.78,128,1,false,1.2,medium
+"","","","","","",cartoon,5F3B_cartoon.stl,55374,130.3 x 180.0 x 142.9,180.0,262.93,74,2,false,1.4,medium
+mstn_ko,MSTN,Regeneration,5NTU,O14793,rcsb,cartoon,5NTU_cartoon.stl,157682,161.7 x 115.2 x 180.0,180.0,414.13,193,2,false,1.6,medium
+cirbp,CIRBP,Environmental Adaptation,5TBX,Q14011,rcsb,cartoon,5TBX_cartoon.stl,46760,104.6 x 145.3 x 180.0,180.0,308.12,68,1,false,1.7,medium
+"","","","","","",cartoon,5UDZ_cartoon.stl,78596,180.0 x 142.3 x 152.6,180.0,366.25,116,1,false,1.3,medium
+tert,TERT,Regeneration,5UGW,O14746,rcsb,cartoon,5UGW_cartoon.stl,91668,108.4 x 97.8 x 180.0,180.0,408.67,146,1,false,1.8,medium
+fgf21_stgfbr2,FGF21 / sTGFβR2,Longevity & Genome,6M6E,Q9NSA1,rcsb,cartoon,6M6E_cartoon.stl,70262,138.2 x 155.5 x 180.0,180.0,393.21,100,1,false,1.3,medium
+pcsk9_edit,PCSK9,Longevity & Genome,6U26,Q8NBP7,rcsb,cartoon,6U26_cartoon.stl,47168,120.0 x 128.8 x 180.0,180.0,238.07,59,1,false,1.5,medium
+rbm3,RBM3,Environmental Adaptation,7EB1,P98179,rcsb,cartoon,7EB1_cartoon.stl,44274,180.0 x 138.2 x 133.9,180.0,324.63,58,1,false,1.3,medium
+apoe_edit,APOE,Longevity & Genome,7FCR,P02649,rcsb,cartoon,7FCR_cartoon.stl,64366,165.7 x 89.7 x 180.0,180.0,343.38,64,2,false,2.0,medium
+tmc1,TMC1,Perception,8XOQ,Q8TDI8,rcsb,cartoon,8XOQ_cartoon.stl,126492,117.7 x 101.0 x 180.0,180.0,383.6,171,2,false,1.8,medium
+"","","","","","",cartoon,8Y02_cartoon.stl,152928,142.7 x 180.0 x 170.6,180.0,676.17,194,1,false,1.3,medium
+tp53_rtg9,TP53-RTG9,Longevity & Genome,"",G3UDE4,alphafold,cartoon,G3UDE4_predicted_cartoon.stl,159858,180.0 x 125.7 x 98.3,180.0,264.21,131,1,false,1.8,medium
+reflectin,Reflectin,Expression,"",I7LGW2,alphafold,cartoon,I7LGW2_predicted_cartoon.stl,125926,142.8 x 120.3 x 180.0,180.0,287.2,118,1,false,1.5,medium
+sting_bat,STING,Environmental Adaptation,"",L5JUR0,alphafold,cartoon,L5JUR0_predicted_cartoon.stl,171204,147.9 x 123.3 x 180.0,180.0,507.02,165,0,false,1.5,medium
+sws1_bird,SWS1,Perception,"",P03999,alphafold,cartoon,P03999_predicted_cartoon.stl,165228,180.0 x 89.2 x 132.0,180.0,480.12,166,1,false,2.0,medium
+cahs_d,CAHS D,Stress Resistance,"",P0DOW5,alphafold,cartoon,P0DOW5_predicted_cartoon.stl,105362,180.0 x 143.0 x 169.5,180.0,396.7,131,1,false,1.3,medium
+ppri_ppra,PprI / PprA,Stress Resistance,"",Q9RXY7,alphafold,cartoon,Q9RXY7_predicted_cartoon.stl,164808,180.0 x 89.1 x 105.2,180.0,360.4,197,0,false,2.0,medium
+mb_seal,MB / GSH,Environmental Adaptation,"",R9RY82,alphafold,cartoon,R9RY82_predicted_cartoon.stl,77296,139.0 x 180.0 x 163.1,180.0,511.16,90,1,false,1.3,medium
+pvpimt,PvPIMT,Longevity & Genome,"",S6CDF7,alphafold,cartoon,S6CDF7_predicted_cartoon.stl,124932,150.1 x 147.6 x 180.0,180.0,629.12,170,1,false,1.2,medium
+afp_fish,AFP / AFGP,Environmental Adaptation,1WFB,P04002,rcsb,cartoon,1WFB_cartoon.stl,16486,180.0 x 64.5 x 97.8,180.0,95.59,16,1,false,2.8,medium
+lin28a,Lin28a,Regeneration,2CQF,Q9H9Z2,rcsb,cartoon,2CQF_cartoon.stl,31766,180.0 x 167.9 x 158.2,180.0,160.25,39,1,false,1.1,medium
+cltx,Chlorotoxin,Expression,7X43,P45639,rcsb,cartoon,7X43_cartoon.stl,24176,180.0 x 119.9 x 156.0,180.0,243.3,40,0,false,1.5,medium
+"","","","","","",cartoon,9C5S_cartoon.stl,9918,180.0 x 114.5 x 110.9,180.0,116.4,22,1,false,1.6,medium
+hsf1_pv,HSF1,Stress Resistance,"",A0A9J6CAY1,alphafold,cartoon,A0A9J6CAY1_predicted_cartoon.stl,31606,103.6 x 93.6 x 180.0,180.0,101.79,18,1,false,1.9,medium
+dsup,Dsup,Stress Resistance,"",P0DOW4,alphafold,cartoon,P0DOW4_predicted_cartoon.stl,164132,180.0 x 157.9 x 174.6,180.0,245.06,29,1,false,1.1,medium
+pvlea,PvLEA,Stress Resistance,"",Q1XI25,alphafold,cartoon,Q1XI25_predicted_cartoon.stl,74130,173.9 x 154.9 x 180.0,180.0,391.83,41,1,false,1.2,medium
+"","","","","","",cartoon,5MEO_cartoon.stl,4072,111.4 x 180.0 x 100.9,180.0,46.89,6,1,false,1.8,easy
+"","","","","","",cartoon,5VAQ_cartoon.stl,10256,47.4 x 94.8 x 180.0,180.0,52.45,9,1,false,3.8,easy
+"","","","","","",cartoon,9QNG_cartoon.stl,4856,71.3 x 143.4 x 180.0,180.0,71.08,9,1,false,2.5,easy

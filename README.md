@@ -206,7 +206,7 @@ Copy `.env.template` to `.env` to override defaults (email delivery, deploy URL,
 
 ### Binary assets (Git LFS)
 
-Protein structure files (`assets/structures/*.pdb`) and 3D-printable STL meshes (`assets/stl/*.stl`) are tracked with [Git LFS](https://git-lfs.com/). After cloning, run `git lfs pull` to download them. To regenerate STLs from PDB sources: `uv run stl generate --all`.
+Protein structure files (`assets/structures/*.pdb`) and 3D-printable STL meshes (`assets/stl/*.stl`) are tracked with [Git LFS](https://git-lfs.com/). After cloning, run `git lfs pull` to download them. To regenerate STLs from PDB sources: `uv run stl generate --all`. For optimized 3D printing profiles, see Marius Mihasan's [3DP-Jmol printing profiles](https://github.com/mariusmihasan/3DP-Jmol-3D-printing-profiles) and his [Modele Moleculare](https://modelemoleculare.ro/) project.
 
 ---
 
@@ -315,6 +315,7 @@ The project is **open source** ([repository](https://github.com/winternewt/mater
 
 ### Gratitudes
 
+- **[Marius Mihasan](https://modelemoleculare.ro/)** — 3D molecular printing expertise, open-source [3DP-Jmol printing profiles](https://github.com/mariusmihasan/3DP-Jmol-3D-printing-profiles) used for protein structure printing guidance
 - **[hidoba](https://github.com/hidoba)** — interface advice and help with Milan Design Week
 
 ---
