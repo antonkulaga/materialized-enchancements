@@ -3334,10 +3334,22 @@ def _pdb_viewer_scripts() -> rx.Component:
         rx.script(
             """
             (() => {
-                if (window.__mePdbViewerInstalled) return;
-                window.__mePdbViewerInstalled = true;
+                const installerVersion = "no-spin-2026-05-22";
+                if (window.__mePdbViewerInstalled === installerVersion) return;
+                window.__mePdbViewerInstalled = installerVersion;
 
                 const pdbCache = {};
+
+                const cleanupViewer = (el, resetInit = true) => {
+                    if (el.__me_viewer) {
+                        try { el.__me_viewer.spin(false); } catch(_) {}
+                        try { el.__me_viewer.clear(); } catch(_) {}
+                        el.__me_viewer = null;
+                    }
+                    if (resetInit) delete el.dataset.pdbInit;
+                };
+
+                document.querySelectorAll(".me-pdb-viewer").forEach(cleanupViewer);
 
                 const initViewer = (el) => {
                     if (el.dataset.pdbInit) return;
@@ -3347,27 +3359,30 @@ def _pdb_viewer_scripts() -> rx.Component:
                     const viewer = $3Dmol.createViewer(el, {
                         backgroundColor: "0x0f172a",
                         antialias: true,
+                        useWorker: false,
                     });
                     el.__me_viewer = viewer;
+                    el.addEventListener("webglcontextlost", (e) => {
+                        e.preventDefault();
+                        try { viewer.spin(false); } catch(_) {}
+                    }, false);
                     const show = (pdb) => {
                         viewer.addModel(pdb, "pdb");
                         viewer.setStyle({}, {cartoon: {color: "spectrum"}});
                         viewer.zoomTo();
-                        viewer.render();
-                        viewer.spin("y", 0.4);
+                        try {
+                            viewer.render();
+                        } catch (_) {
+                            cleanupViewer(el, false);
+                            el.dataset.pdbInit = "failed";
+                            fail();
+                        }
                     };
                     const fail = () => {
                         el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:0.82rem;">Structure unavailable</div>';
                     };
                     if (pdbCache[src]) { show(pdbCache[src]); }
                     else { fetch(src).then(r => r.text()).then(pdb => { pdbCache[src] = pdb; show(pdb); }).catch(fail); }
-                };
-
-                const cleanupViewer = (el) => {
-                    if (el.__me_viewer) {
-                        try { el.__me_viewer.clear(); } catch(_) {}
-                        el.__me_viewer = null;
-                    }
                 };
 
                 const scanAll = () => {

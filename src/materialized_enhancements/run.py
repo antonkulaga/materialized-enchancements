@@ -61,8 +61,16 @@ def serve() -> None:
     from reflex.reflex import _run
     from reflex_base.config import environment
 
+    port_str = os.getenv("APP_PORT", "").strip()
+    port = int(port_str) if port_str else None
+
     environment.REFLEX_COMPILE_CONTEXT.set(constants.CompileContext.RUN)
-    _run(env=constants.Env.PROD, running_mode=RunningMode.FULLSTACK)
+    _run(
+        env=constants.Env.PROD,
+        running_mode=RunningMode.FULLSTACK,
+        frontend_port=port,
+        backend_port=port,
+    )
 
 
 def _build_preselect_url(

@@ -7,6 +7,7 @@ import logging
 import re
 
 import reflex as rx
+from reflex.app import default_frontend_exception_handler
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
@@ -29,6 +30,12 @@ logger = logging.getLogger(__name__)
 ensure_generated_public_dirs()
 _generated_static = StaticFiles(directory=GENERATED_PUBLIC_DIR, check_dir=False)
 DESKTOP_VIEWPORT_WIDTH_PX = 1440
+_SUPPRESSED_3DMOL_FRONTEND_ERROR_MARKERS = (
+    "OffscreenCanvas.transferToImageBitmap",
+    "3dmol",
+    "spinInterval",
+)
+_logged_suppressed_3dmol_frontend_error = False
 
 _head_components: list[rx.Component] = [
     rx.el.meta(name="viewport", content=f"width={DESKTOP_VIEWPORT_WIDTH_PX}"),
@@ -43,6 +50,20 @@ if UMAMI_SCRIPT_URL and UMAMI_WEBSITE_ID:
     _head_components.append(
         rx.script(src=UMAMI_SCRIPT_URL, custom_attrs=_umami_attrs)
     )
+
+
+def _handle_frontend_exception(exception: Exception) -> None:
+    """Suppress noisy stale-client 3Dmol canvas errors; keep normal Reflex logging."""
+    global _logged_suppressed_3dmol_frontend_error
+
+    message = str(exception).lower()
+    if all(marker.lower() in message for marker in _SUPPRESSED_3DMOL_FRONTEND_ERROR_MARKERS):
+        if not _logged_suppressed_3dmol_frontend_error:
+            logger.warning("Suppressing repeated stale-client 3Dmol OffscreenCanvas frontend errors")
+            _logged_suppressed_3dmol_frontend_error = True
+        return
+
+    default_frontend_exception_handler(exception)
 
 
 _SLUG_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,200}$")
@@ -130,5 +151,6 @@ def normalize_reflex_event_websocket_path(app: ASGIApp) -> ASGIApp:
 
 app = rx.App(
     head_components=_head_components,
+    frontend_exception_handler=_handle_frontend_exception,
     api_transformer=normalize_reflex_event_websocket_path,
 )
