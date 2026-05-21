@@ -31,7 +31,7 @@ _ROUTE_METADATA = {route.path: route for route in PUBLIC_ROUTES}
 _SITE_TITLE = "Materialized Enhancements"
 _REPORT_PORTRAIT_UPLOAD_ID = "report-portrait-upload"
 _HERO_PORTRAIT_UPLOAD_ID = "hero-portrait-upload"
-_OG_IMAGE_PATH = "/images/icons/share.jpg"
+_OG_IMAGE_PATH = "/images/og-preview.png"
 
 
 def _page_meta(route_path: str) -> list[dict[str, str]]:
@@ -48,8 +48,8 @@ def _page_meta(route_path: str) -> list[dict[str, str]]:
         {"property": "og:description", "content": route.description},
         {"property": "og:url", "content": canonical_url},
         {"property": "og:image", "content": image_url},
-        {"property": "og:image:width", "content": "1090"},
-        {"property": "og:image:height", "content": "849"},
+        {"property": "og:image:width", "content": "3703"},
+        {"property": "og:image:height", "content": "1705"},
         {"name": "twitter:card", "content": "summary_large_image"},
         {"name": "twitter:title", "content": title},
         {"name": "twitter:description", "content": route.description},
