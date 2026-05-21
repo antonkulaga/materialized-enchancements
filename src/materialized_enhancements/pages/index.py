@@ -5,6 +5,7 @@ import reflex as rx
 from materialized_enhancements.components.layout import fomantic_icon, template
 from materialized_enhancements.artex import artex_publish_button
 from materialized_enhancements.crawler_assets import PUBLIC_ROUTES
+from materialized_enhancements.env import public_app_url
 from materialized_enhancements.gene_data import (
     CATEGORY_COUNTS,
     CATEGORY_PRICES,
@@ -30,12 +31,30 @@ _ROUTE_METADATA = {route.path: route for route in PUBLIC_ROUTES}
 _SITE_TITLE = "Materialized Enhancements"
 _REPORT_PORTRAIT_UPLOAD_ID = "report-portrait-upload"
 _HERO_PORTRAIT_UPLOAD_ID = "hero-portrait-upload"
-_SOCIAL_META: list[dict[str, str]] = [
-    {"name": "robots", "content": "index, follow"},
-    {"property": "og:type", "content": "website"},
-    {"property": "og:site_name", "content": _SITE_TITLE},
-    {"name": "twitter:card", "content": "summary"},
-]
+_OG_IMAGE_PATH = "/images/icons/share.jpg"
+
+
+def _page_meta(route_path: str) -> list[dict[str, str]]:
+    base = public_app_url()
+    route = _ROUTE_METADATA[route_path]
+    title = f"{_SITE_TITLE} | {route.title}"
+    image_url = f"{base}{_OG_IMAGE_PATH}"
+    canonical_url = f"{base}/" if route_path == "/" else f"{base}{route_path}"
+    return [
+        {"name": "robots", "content": "index, follow"},
+        {"property": "og:type", "content": "website"},
+        {"property": "og:site_name", "content": _SITE_TITLE},
+        {"property": "og:title", "content": title},
+        {"property": "og:description", "content": route.description},
+        {"property": "og:url", "content": canonical_url},
+        {"property": "og:image", "content": image_url},
+        {"property": "og:image:width", "content": "1090"},
+        {"property": "og:image:height", "content": "849"},
+        {"name": "twitter:card", "content": "summary_large_image"},
+        {"name": "twitter:title", "content": title},
+        {"name": "twitter:description", "content": route.description},
+        {"name": "twitter:image", "content": image_url},
+    ]
 
 
 def _category_tooltip(category: str) -> str:
@@ -8647,7 +8666,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
     route="/",
     title=_page_title("/"),
     description=_page_description("/"),
-    meta=_SOCIAL_META,
+    meta=_page_meta("/"),
     on_load=[AppState.redirect_legacy_tab],
 )
 def index_page() -> rx.Component:
@@ -8655,11 +8674,16 @@ def index_page() -> rx.Component:
     return _tab_page("/", _rpg_active_genes_layout())
 
 
+_NOINDEX_META: list[dict[str, str]] = [
+    {"name": "robots", "content": "noindex, nofollow"},
+]
+
+
 @rx.page(
     route="/materialization",
     title=_page_title("/materialization"),
     description=_page_description("/materialization"),
-    meta=_SOCIAL_META,
+    meta=_NOINDEX_META,
     on_load=[ComposeState.apply_artex_params, ComposeState.apply_saved_report, ComposeState.apply_shared_report],
 )
 def materialization_page() -> rx.Component:
@@ -8671,7 +8695,7 @@ def materialization_page() -> rx.Component:
     route="/about",
     title=_page_title("/about"),
     description=_page_description("/about"),
-    meta=_SOCIAL_META,
+    meta=_page_meta("/about"),
     on_load=[AppState.redirect_legacy_tab],
 )
 def about_page() -> rx.Component:
