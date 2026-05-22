@@ -361,20 +361,30 @@
   }
 
   /**
-   * Snapshot a temporary clone in the viewport so html-to-image captures it
-   * with fully-resolved styles. Moving the real hidden node caused a visible
-   * report-card flash over the app while sharing/exporting.
+   * Snapshot a temporary clone in an invisible capture host. The clone must stay
+   * renderable for html-to-image, but the host itself must not contribute pixels
+   * to the live page; otherwise mobile browsers briefly flash the report over
+   * the current view while sharing/exporting.
    */
   async function snapshotNode(node, options) {
+    var host = document.createElement('div');
     var clone = node.cloneNode(true);
     clone.removeAttribute('id');
     clone.setAttribute('aria-hidden', 'true');
+    host.style.cssText =
+      'position:fixed !important;left:0 !important;top:0 !important;' +
+      'width:' + ((options && options.width) || 1080) + 'px !important;' +
+      'height:' + ((options && options.height) || 1080) + 'px !important;' +
+      'overflow:visible !important;opacity:0 !important;pointer-events:none !important;' +
+      'visibility:visible !important;z-index:2147483646 !important;' +
+      'contain:layout style !important;';
     clone.style.cssText = node.style.cssText +
       ';left:0 !important;top:0 !important;right:auto !important;bottom:auto !important;' +
-      'position:fixed !important;z-index:-1 !important;opacity:1 !important;' +
+      'position:relative !important;z-index:0 !important;opacity:1 !important;' +
       'pointer-events:none !important;visibility:visible !important;' +
       'transform:none !important;';
-    document.body.appendChild(clone);
+    host.appendChild(clone);
+    document.body.appendChild(host);
     void clone.offsetHeight;
     await waitImages(clone);
     await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
@@ -382,7 +392,7 @@
       var canvas = await htmlToImage.toCanvas(clone, h2iOptions(options));
       return canvas.toDataURL('image/webp', 0.92);
     } finally {
-      if (clone.parentNode) clone.parentNode.removeChild(clone);
+      if (host.parentNode) host.parentNode.removeChild(host);
     }
   }
 
