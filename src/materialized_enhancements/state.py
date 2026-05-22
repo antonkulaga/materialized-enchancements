@@ -407,6 +407,30 @@ def _is_safe_report_slug(value: str) -> bool:
     return bool(re.fullmatch(r"[a-zA-Z0-9_-]{1,96}", value.strip()))
 
 
+def _build_materialization_share_url(
+    *,
+    personal_tag: str,
+    selected_categories: list[str],
+    included_genes: list[str],
+) -> str:
+    """Build a URL that recreates the current materialization selection."""
+    if not selected_categories:
+        return ""
+    share_name = personal_tag.strip() or "anonymous"
+    name_b64 = base64.urlsafe_b64encode(share_name.encode("utf-8")).decode("ascii").rstrip("=")
+    bitmask = 0
+    for cat in selected_categories:
+        if cat in UNIQUE_CATEGORIES:
+            idx = UNIQUE_CATEGORIES.index(cat) + 1
+            bitmask |= 1 << (idx - 1)
+    url = f"{public_app_url()}/materialization?report=1&name={quote(name_b64)}&cats={bitmask}"
+    if included_genes:
+        genes_json = json.dumps(included_genes, separators=(",", ":"))
+        genes_b64 = base64.urlsafe_b64encode(genes_json.encode("utf-8")).decode("ascii").rstrip("=")
+        url = f"{url}&genes={quote(genes_b64)}"
+    return url
+
+
 def _artifact_payload(
     *,
     personal_tag: str,
@@ -455,13 +479,15 @@ def _build_report_landing_html(
     escaped_stl_url = _html_escape(stl_url)
     escaped_params_url = _html_escape(params_url)
     escaped_recreate_url = _html_escape(recreate_url)
+    open_url = recreate_url or make_own_url or page_url
+    escaped_open_url = _html_escape(open_url)
     escaped_make_own_url = _html_escape(make_own_url)
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=1440">
-  <meta http-equiv="refresh" content="0;url={escaped_page_url}">
+  <meta http-equiv="refresh" content="0;url={escaped_open_url}">
   <title>{escaped_title}</title>
   <meta name="description" content="{escaped_description}">
   <meta property="og:type" content="website">
@@ -492,7 +518,7 @@ def _build_report_landing_html(
     <p class="hint">Opening the interactive materialization page. If it does not open, use the first button below.</p>
     <p><img src="{escaped_image_url}" alt="{escaped_title} preview"></p>
     <div class="links">
-      <a class="primary" href="{escaped_page_url}">Open shared materialization</a>
+      <a class="primary" href="{escaped_open_url}">Open shared materialization</a>
       <a href="{escaped_make_own_url}">Make your own character</a>
       <a href="{escaped_recreate_url}">Recreate this character</a>
       <a href="{escaped_pdf_url}">Download PDF report</a>
@@ -1879,20 +1905,11 @@ class ComposeState(rx.State):
         Uses the same 1-indexed category bitmask convention as sculpture._build_category_bitmask
         plus an optional encoded gene list so recipients regenerate the same checked genes.
         """
-        if not self.selected_categories or not self.personal_tag.strip():
-            return ""
-        name_b64 = base64.urlsafe_b64encode(self.personal_tag.strip().encode("utf-8")).decode("ascii").rstrip("=")
-        bitmask = 0
-        for cat in self.selected_categories:
-            if cat in UNIQUE_CATEGORIES:
-                idx = UNIQUE_CATEGORIES.index(cat) + 1
-                bitmask |= 1 << (idx - 1)
-        url = f"{public_app_url()}/materialization?report=1&name={quote(name_b64)}&cats={bitmask}"
-        if self.included_genes:
-            genes_json = json.dumps(self.included_genes, separators=(",", ":"))
-            genes_b64 = base64.urlsafe_b64encode(genes_json.encode("utf-8")).decode("ascii").rstrip("=")
-            url = f"{url}&genes={quote(genes_b64)}"
-        return url
+        return _build_materialization_share_url(
+            personal_tag=self.personal_tag,
+            selected_categories=list(self.selected_categories),
+            included_genes=list(self.included_genes),
+        )
 
     def apply_saved_report(self) -> None:
         """Load a generated report bundle from ?shared_report=<slug>."""

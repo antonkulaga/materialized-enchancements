@@ -34,13 +34,16 @@
   function absoluteShareUrl() {
     var p = sharePath();
     var origin = canonicalOrigin();
-    if (!p) return origin + '/';
+    if (!p) return '';
     if (/^https?:\/\//i.test(p)) return p;
     if (p.charAt(0) === '/') return origin + p;
     return origin + '/' + (p.charAt(0) === '?' ? '' : '') + p;
   }
   function reportTargetUrl() {
     return generatedShareUrl() || absoluteShareUrl();
+  }
+  function publicReportTargetUrl() {
+    return generatedShareUrl();
   }
   function reportPdfTargetUrl() {
     return reportTargetUrl() || absoluteShareUrl();
@@ -80,7 +83,7 @@
   function paintShareUrl() {
     var urlEl = document.getElementById('report-share-url');
     if (!urlEl) return;
-    var url = reportTargetUrl();
+    var url = publicReportTargetUrl();
     urlEl.textContent = url || 'Create a public link to generate the QR and sharing buttons.';
   }
 
@@ -110,7 +113,7 @@
   }
 
   function renderQrInto(el) {
-    var url = reportTargetUrl();
+    var url = publicReportTargetUrl();
     if (!el) return false;
     if (!url) return qrPlaceholder(el);
     if (typeof qrcode === 'undefined') return qrFallback(el, url, 'QR library missing. Open link.');
@@ -1533,9 +1536,9 @@
   };
 
   window.__meCopyShareLink = async function () {
-    var url = reportTargetUrl() || absoluteShareUrl();
+    var url = publicReportTargetUrl();
     if (!url) {
-      feedback('No share URL available.', '#b45309');
+      feedback('Create a public link first.', '#b45309');
       return;
     }
     try {
@@ -1552,9 +1555,9 @@
   };
 
   window.__meShareIntent = function (network) {
-    var rawUrl = reportTargetUrl() || absoluteShareUrl();
+    var rawUrl = publicReportTargetUrl();
     if (!rawUrl) {
-      feedback('No share URL available.', '#b45309');
+      feedback('Create a public link first.', '#b45309');
       return;
     }
     var url = encodeURIComponent(rawUrl);
