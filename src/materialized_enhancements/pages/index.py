@@ -2226,11 +2226,13 @@ def _rpg_schema_hint_panel() -> rx.Component:
             },
         ),
         style={
-            "marginTop": "14px",
-            "padding": "11px 12px",
+            "marginTop": "0",
+            "marginBottom": "0",
+            "padding": "14px",
             "borderRadius": "10px",
             "border": "1px solid rgba(34, 211, 238, 0.24)",
             "background": "rgba(8, 47, 73, 0.28)",
+            "boxSizing": "border-box",
         },
     )
 
@@ -2281,12 +2283,22 @@ def _rpg_intro_video_panel() -> rx.Component:
             },
         ),
         style={
-            "marginTop": "12px",
-            "padding": "11px 12px",
+            "marginTop": "0",
+            "marginBottom": "0",
+            "padding": "14px",
             "borderRadius": "10px",
             "border": "1px solid rgba(167, 139, 250, 0.24)",
             "background": "rgba(46, 16, 101, 0.2)",
+            "boxSizing": "border-box",
         },
+    )
+
+
+def _rpg_sidebar_intro_stack() -> rx.Component:
+    return rx.el.div(
+        _rpg_schema_hint_panel(),
+        _rpg_intro_video_panel(),
+        class_name="me-rpg-sidebar-intro",
     )
 
 
@@ -3427,8 +3439,6 @@ def _rpg_gene_library_panel() -> rx.Component:
             *[_rpg_category_gene_accordion(cat) for cat in UNIQUE_CATEGORIES],
             class_name="me-rpg-library-grid",
         ),
-        _rpg_schema_hint_panel(),
-        _rpg_intro_video_panel(),
         class_name="me-rpg-library-panel",
         style={**_RPG_PANEL_STYLE, "padding": "14px"},
     )
@@ -4362,15 +4372,22 @@ def _rpg_flow_css() -> rx.Component:
             position: sticky;
             top: 0;
             z-index: 20;
-            padding: 10px 14px 8px;
+            padding: 14px;
             border-radius: 12px 12px 12px 12px;
             background: rgba(15, 23, 42, 0.94);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(124, 58, 237, 0.32);
             box-shadow: 0 4px 20px rgba(2, 6, 23, 0.5);
-            margin: 0 0 10px;
+            margin: 0 0 12px;
             width: 100%;
+            box-sizing: border-box;
+        }
+        .me-rpg-sidebar-intro {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 12px;
         }
         .me-rpg-body-map-panel {
             position: relative;
@@ -4650,7 +4667,8 @@ def _rpg_flow_css() -> rx.Component:
             overflow-y: auto;
             overflow-x: hidden;
             overscroll-behavior: contain;
-            padding-right: 4px;
+            padding: 12px 12px 20px 12px;
+            box-sizing: border-box;
             scrollbar-width: thin;
             scrollbar-gutter: stable;
         }
@@ -4699,7 +4717,8 @@ def _rpg_flow_css() -> rx.Component:
                 overflow-y: auto;
                 overflow-x: hidden;
                 overscroll-behavior: contain;
-                padding-right: 4px;
+                padding: 12px 12px 20px 12px;
+                box-sizing: border-box;
             }
             .me-rpg-gene-body-grid {
                 grid-template-columns: minmax(0, 1fr);
@@ -5069,6 +5088,7 @@ def _rpg_active_genes_layout() -> rx.Component:
     return _rpg_shell(
         rx.el.div(
             rx.el.div(
+                _rpg_sidebar_intro_stack(),
                 _budget_gauge(),
                 _rpg_gene_library_panel(),
                 id="gene-library",
