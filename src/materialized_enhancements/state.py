@@ -64,6 +64,8 @@ from materialized_enhancements.env import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_PERSONAL_TAG = ""
+REPORT_LANDING_HTML_VERSION: int = 2
+REPORT_LANDING_HTML_VERSION_META_NAME = "materialized-report-html-version"
 REPORT_CHARACTER_NOTE_MAX_CHARS: int = 420
 REPORT_PORTRAIT_MAX_BYTES: int = 2_500_000
 REPORT_PORTRAIT_ALLOWED_TYPES: set[str] = {"image/jpeg", "image/png", "image/webp"}
@@ -478,16 +480,15 @@ def _build_report_landing_html(
     escaped_pdf_url = _html_escape(pdf_url)
     escaped_stl_url = _html_escape(stl_url)
     escaped_params_url = _html_escape(params_url)
-    escaped_recreate_url = _html_escape(recreate_url)
-    open_url = recreate_url or make_own_url or page_url
-    escaped_open_url = _html_escape(open_url)
+    open_url = recreate_url or make_own_url
+    escaped_recreate_url = _html_escape(open_url)
     escaped_make_own_url = _html_escape(make_own_url)
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=1440">
-  <meta http-equiv="refresh" content="0;url={escaped_open_url}">
+  <meta name="{REPORT_LANDING_HTML_VERSION_META_NAME}" content="{REPORT_LANDING_HTML_VERSION}">
   <title>{escaped_title}</title>
   <meta name="description" content="{escaped_description}">
   <meta property="og:type" content="website">
@@ -515,10 +516,9 @@ def _build_report_landing_html(
   <main>
     <h1>{escaped_title}</h1>
     <p class="hint">{escaped_description}</p>
-    <p class="hint">Opening the interactive materialization page. If it does not open, use the first button below.</p>
     <p><img src="{escaped_image_url}" alt="{escaped_title} preview"></p>
     <div class="links">
-      <a class="primary" href="{escaped_open_url}">Open shared materialization</a>
+      <a class="primary" href="{escaped_recreate_url}">Open shared materialization</a>
       <a href="{escaped_make_own_url}">Make your own character</a>
       <a href="{escaped_recreate_url}">Recreate this character</a>
       <a href="{escaped_pdf_url}">Download PDF report</a>
@@ -529,6 +529,110 @@ def _build_report_landing_html(
 </body>
 </html>
 """
+
+
+def _report_landing_html_version(html: str) -> int:
+    match = re.search(
+        rf'<meta\s+name=["\']{re.escape(REPORT_LANDING_HTML_VERSION_META_NAME)}["\']\s+content=["\'](\d+)["\']',
+        html,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return 0
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return 0
+
+
+def _report_landing_html_needs_regeneration(html_path: Path) -> bool:
+    if not html_path.exists():
+        return True
+    try:
+        html = html_path.read_text(encoding="utf-8")
+    except OSError:
+        return True
+    return _report_landing_html_version(html) < REPORT_LANDING_HTML_VERSION
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
+def _build_report_landing_html_from_artifact(slug: str, artifact: dict[str, Any]) -> str:
+    rel_dir = f"reports/{slug}"
+    tag = str(artifact.get("name", "")).strip() or "anonymous"
+    recreate_url = str(artifact.get("share_url", "")).strip()
+    if not recreate_url:
+        categories = [cat for cat in _string_list(artifact.get("selected_categories", [])) if cat in UNIQUE_CATEGORIES]
+        recreate_url = _build_materialization_share_url(
+            personal_tag=tag,
+            selected_categories=categories,
+            included_genes=_string_list(artifact.get("included_genes", [])),
+        )
+    return _build_report_landing_html(
+        title=f"Materialized Enhancements — {tag}",
+        description="A generated personal enhancement report with downloadable STL model and A4 report.",
+        page_url=generated_public_absolute_url(f"{rel_dir}/index.html"),
+        image_url=generated_public_absolute_url(f"{rel_dir}/report.webp"),
+        pdf_url=generated_public_absolute_url(f"{rel_dir}/report.pdf"),
+        stl_url=generated_public_absolute_url(f"{rel_dir}/model.stl"),
+        params_url=generated_public_absolute_url(f"{rel_dir}/params.json"),
+        recreate_url=recreate_url,
+        make_own_url=f"{public_app_url()}/",
+    )
+
+
+def regenerate_stale_report_landing_pages() -> dict[str, int]:
+    """Rewrite generated report landing pages whose embedded HTML version is stale."""
+    reports_dir = generated_public_path("reports")
+    if not reports_dir.exists():
+        return {"checked": 0, "regenerated": 0, "skipped": 0}
+
+    checked = 0
+    regenerated = 0
+    skipped = 0
+    for report_dir in sorted(path for path in reports_dir.iterdir() if path.is_dir()):
+        checked += 1
+        html_path = report_dir / "index.html"
+        if not _report_landing_html_needs_regeneration(html_path):
+            continue
+        params_path = report_dir / "params.json"
+        if not params_path.exists():
+            skipped += 1
+            logger.warning("Skipping report landing regeneration for %s: missing params.json", report_dir.name)
+            continue
+        try:
+            artifact = json.loads(params_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError) as exc:
+            skipped += 1
+            logger.warning("Skipping report landing regeneration for %s: %s", report_dir.name, exc)
+            continue
+        if not isinstance(artifact, dict):
+            skipped += 1
+            logger.warning("Skipping report landing regeneration for %s: params.json is not an object", report_dir.name)
+            continue
+        try:
+            html_path.write_text(
+                _build_report_landing_html_from_artifact(report_dir.name, artifact),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            skipped += 1
+            logger.warning("Could not regenerate report landing page for %s: %s", report_dir.name, exc)
+            continue
+        regenerated += 1
+
+    logger.info(
+        "Report landing migration checked=%d regenerated=%d skipped=%d target_version=%d",
+        checked,
+        regenerated,
+        skipped,
+        REPORT_LANDING_HTML_VERSION,
+    )
+    return {"checked": checked, "regenerated": regenerated, "skipped": skipped}
 
 
 def _mirror_generated_report_for_dev(source_dir: Path, relative_dir: str) -> None:

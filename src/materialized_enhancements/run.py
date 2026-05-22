@@ -53,8 +53,10 @@ def serve() -> None:
     _setup()
 
     from materialized_enhancements.crawler_assets import generate_crawler_assets
+    from materialized_enhancements.state import regenerate_stale_report_landing_pages
 
     generate_crawler_assets()
+    regenerate_stale_report_landing_pages()
 
     from reflex import constants
     from reflex.constants.base import RunningMode

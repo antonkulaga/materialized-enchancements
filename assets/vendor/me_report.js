@@ -361,26 +361,28 @@
   }
 
   /**
-   * Temporarily move a node into the viewport so html-to-image captures it
-   * with fully-resolved styles. Uses full opacity and a top stacking z-index —
-   * `opacity:0.01` / `z-index:-1` caused blank white PNGs in Chromium because
-   * the SVG foreignObject snapshot rasterized as empty.
+   * Snapshot a temporary clone in the viewport so html-to-image captures it
+   * with fully-resolved styles. Moving the real hidden node caused a visible
+   * report-card flash over the app while sharing/exporting.
    */
   async function snapshotNode(node, options) {
-    var savedCss = node.style.cssText;
-    node.style.cssText = savedCss +
+    var clone = node.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.setAttribute('aria-hidden', 'true');
+    clone.style.cssText = node.style.cssText +
       ';left:0 !important;top:0 !important;right:auto !important;bottom:auto !important;' +
-      'position:fixed !important;z-index:2147483646 !important;opacity:1 !important;' +
+      'position:fixed !important;z-index:-1 !important;opacity:1 !important;' +
       'pointer-events:none !important;visibility:visible !important;' +
       'transform:none !important;';
-    void node.offsetHeight;
-    await waitImages(node);
+    document.body.appendChild(clone);
+    void clone.offsetHeight;
+    await waitImages(clone);
     await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
     try {
-      var canvas = await htmlToImage.toCanvas(node, h2iOptions(options));
+      var canvas = await htmlToImage.toCanvas(clone, h2iOptions(options));
       return canvas.toDataURL('image/webp', 0.92);
     } finally {
-      node.style.cssText = savedCss;
+      if (clone.parentNode) clone.parentNode.removeChild(clone);
     }
   }
 
