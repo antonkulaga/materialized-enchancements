@@ -94,7 +94,7 @@ def test_report_landing_migration_regenerates_missing_version(
     result = regenerate_stale_report_landing_pages()
     html = (report_dir / "index.html").read_text(encoding="utf-8")
 
-    assert result == {"checked": 1, "regenerated": 1, "skipped": 0}
+    assert result == {"checked": 1, "latest": 1, "regenerated": 1, "deleted": 0, "skipped": 0, "updated": 1}
     assert _report_landing_html_version(html) == REPORT_LANDING_HTML_VERSION
     assert "https://enhancement.bio/generated/reports/anonymous-s1985/report.webp" in html
     assert "https://enhancement.bio/materialization?report=1" in html
@@ -119,4 +119,23 @@ def test_report_landing_migration_skips_current_version(
 
     result = regenerate_stale_report_landing_pages()
 
-    assert result == {"checked": 1, "regenerated": 0, "skipped": 0}
+    assert result == {"checked": 1, "latest": 1, "regenerated": 0, "deleted": 0, "skipped": 0, "updated": 0}
+
+
+def test_report_landing_migration_deletes_report_without_params_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "materialized_enhancements.state.generated_public_path",
+        lambda *parts: tmp_path.joinpath(*parts),
+    )
+    report_dir = tmp_path / "reports" / "anonymous-s2025"
+    report_dir.mkdir(parents=True)
+    (report_dir / "index.html").write_text("<!doctype html><title>old</title>", encoding="utf-8")
+    (report_dir / "report.webp").write_text("stale", encoding="utf-8")
+
+    result = regenerate_stale_report_landing_pages()
+
+    assert result == {"checked": 1, "latest": 0, "regenerated": 0, "deleted": 1, "skipped": 0, "updated": 1}
+    assert not report_dir.exists()

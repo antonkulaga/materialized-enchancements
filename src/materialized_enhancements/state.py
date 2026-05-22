@@ -589,20 +589,35 @@ def regenerate_stale_report_landing_pages() -> dict[str, int]:
     """Rewrite generated report landing pages whose embedded HTML version is stale."""
     reports_dir = generated_public_path("reports")
     if not reports_dir.exists():
-        return {"checked": 0, "regenerated": 0, "skipped": 0}
+        result = {"checked": 0, "latest": 0, "regenerated": 0, "deleted": 0, "skipped": 0, "updated": 0}
+        print(
+            f"Report landing HTML version: current={REPORT_LANDING_HTML_VERSION} latest=0",
+            flush=True,
+        )
+        print("Report landing migration: updated=0 regenerated=0 deleted=0 skipped=0 checked=0", flush=True)
+        return result
 
     checked = 0
+    latest = 0
     regenerated = 0
+    deleted = 0
     skipped = 0
     for report_dir in sorted(path for path in reports_dir.iterdir() if path.is_dir()):
         checked += 1
         html_path = report_dir / "index.html"
         if not _report_landing_html_needs_regeneration(html_path):
+            latest += 1
             continue
         params_path = report_dir / "params.json"
         if not params_path.exists():
-            skipped += 1
-            logger.warning("Skipping report landing regeneration for %s: missing params.json", report_dir.name)
+            try:
+                shutil.rmtree(report_dir)
+            except OSError as exc:
+                skipped += 1
+                logger.warning("Could not delete unrecoverable report %s: %s", report_dir.name, exc)
+                continue
+            deleted += 1
+            logger.warning("Deleted unrecoverable generated report %s: missing params.json", report_dir.name)
             continue
         try:
             artifact = json.loads(params_path.read_text(encoding="utf-8"))
@@ -624,15 +639,35 @@ def regenerate_stale_report_landing_pages() -> dict[str, int]:
             logger.warning("Could not regenerate report landing page for %s: %s", report_dir.name, exc)
             continue
         regenerated += 1
+        latest += 1
 
+    updated = regenerated + deleted
     logger.info(
-        "Report landing migration checked=%d regenerated=%d skipped=%d target_version=%d",
+        "Report landing migration checked=%d latest=%d regenerated=%d deleted=%d skipped=%d target_version=%d",
         checked,
+        latest,
         regenerated,
+        deleted,
         skipped,
         REPORT_LANDING_HTML_VERSION,
     )
-    return {"checked": checked, "regenerated": regenerated, "skipped": skipped}
+    print(
+        f"Report landing HTML version: current={REPORT_LANDING_HTML_VERSION} latest={latest}",
+        flush=True,
+    )
+    print(
+        "Report landing migration: "
+        f"updated={updated} regenerated={regenerated} deleted={deleted} skipped={skipped} checked={checked}",
+        flush=True,
+    )
+    return {
+        "checked": checked,
+        "latest": latest,
+        "regenerated": regenerated,
+        "deleted": deleted,
+        "skipped": skipped,
+        "updated": updated,
+    }
 
 
 def _mirror_generated_report_for_dev(source_dir: Path, relative_dir: str) -> None:

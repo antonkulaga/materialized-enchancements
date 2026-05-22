@@ -4,6 +4,7 @@ import argparse
 import base64
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -51,6 +52,11 @@ def main() -> None:
 def serve() -> None:
     """Start the single-port production server (Reflex 0.9+ unified mode)."""
     _setup()
+
+    web_dir = Path(".web")
+    if web_dir.exists():
+        shutil.rmtree(web_dir)
+        print("Removed stale .web build directory before production serve.", flush=True)
 
     from materialized_enhancements.crawler_assets import generate_crawler_assets
     from materialized_enhancements.state import regenerate_stale_report_landing_pages
