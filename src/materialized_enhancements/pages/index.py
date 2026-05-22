@@ -3346,11 +3346,17 @@ def _pdb_viewer_scripts() -> rx.Component:
         rx.script(
             """
             (() => {
-                const installerVersion = "no-spin-2026-05-22";
+                const installerVersion = "lazy-safe-render-2026-05-22";
                 if (window.__mePdbViewerInstalled === installerVersion) return;
                 window.__mePdbViewerInstalled = installerVersion;
 
                 const pdbCache = {};
+                const is3DmolCanvasError = (err) => String((err && (err.stack || err.message)) || err || "").includes("OffscreenCanvas.transferToImageBitmap");
+                window.addEventListener("error", (event) => {
+                    if (is3DmolCanvasError(event.error || event.message)) {
+                        event.preventDefault();
+                    }
+                });
 
                 const cleanupViewer = (el, resetInit = true) => {
                     if (el.__me_viewer) {
@@ -3361,37 +3367,72 @@ def _pdb_viewer_scripts() -> rx.Component:
                     if (resetInit) delete el.dataset.pdbInit;
                 };
 
-                document.querySelectorAll(".me-pdb-viewer").forEach(cleanupViewer);
+                document.querySelectorAll(".me-pdb-viewer").forEach((el) => cleanupViewer(el));
+
+                const isRenderable = (el) => {
+                    if (!el.isConnected) return false;
+                    const rect = el.getBoundingClientRect();
+                    return rect.width >= 40 && rect.height >= 40;
+                };
 
                 const initViewer = (el) => {
                     if (el.dataset.pdbInit) return;
                     const src = el.dataset.pdbSrc;
                     if (!src || typeof $3Dmol === "undefined") return;
+                    if (!isRenderable(el)) return;
                     el.dataset.pdbInit = "1";
-                    const viewer = $3Dmol.createViewer(el, {
-                        backgroundColor: "0x0f172a",
-                        antialias: true,
-                        useWorker: false,
-                    });
+                    const fail = () => {
+                        cleanupViewer(el, false);
+                        el.dataset.pdbInit = "failed";
+                        el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:0.82rem;">Structure unavailable</div>';
+                    };
+                    let viewer;
+                    try {
+                        viewer = $3Dmol.createViewer(el, {
+                            backgroundColor: "0x0f172a",
+                            antialias: false,
+                            useWorker: false,
+                        });
+                    } catch (_) {
+                        fail();
+                        return;
+                    }
                     el.__me_viewer = viewer;
+                    const guardMethod = (methodName) => {
+                        const original = viewer[methodName];
+                        if (typeof original !== "function") return;
+                        viewer[methodName] = function() {
+                            try {
+                                return original.apply(viewer, arguments);
+                            } catch (err) {
+                                if (is3DmolCanvasError(err)) {
+                                    fail();
+                                    return undefined;
+                                }
+                                throw err;
+                            }
+                        };
+                    };
+                    guardMethod("render");
+                    guardMethod("resize");
+                    guardMethod("show");
                     el.addEventListener("webglcontextlost", (e) => {
                         e.preventDefault();
-                        try { viewer.spin(false); } catch(_) {}
-                    }, false);
-                    const show = (pdb) => {
-                        viewer.addModel(pdb, "pdb");
-                        viewer.setStyle({}, {cartoon: {color: "spectrum"}});
-                        viewer.zoomTo();
                         try {
-                            viewer.render();
+                            viewer.spin(false);
                         } catch (_) {
-                            cleanupViewer(el, false);
-                            el.dataset.pdbInit = "failed";
                             fail();
                         }
-                    };
-                    const fail = () => {
-                        el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:0.82rem;">Structure unavailable</div>';
+                    }, false);
+                    const show = (pdb) => {
+                        try {
+                            viewer.addModel(pdb, "pdb");
+                            viewer.setStyle({}, {cartoon: {color: "spectrum"}});
+                            viewer.zoomTo();
+                            viewer.render();
+                        } catch (_) {
+                            fail();
+                        }
                     };
                     if (pdbCache[src]) { show(pdbCache[src]); }
                     else { fetch(src).then(r => r.text()).then(pdb => { pdbCache[src] = pdb; show(pdb); }).catch(fail); }
@@ -3409,12 +3450,15 @@ def _pdb_viewer_scripts() -> rx.Component:
                                 for (const n of m.removedNodes) {
                                     if (n.nodeType !== 1) continue;
                                     if (n.classList && n.classList.contains("me-pdb-viewer")) cleanupViewer(n);
-                                    else if (n.querySelectorAll) n.querySelectorAll(".me-pdb-viewer").forEach(cleanupViewer);
+                                    else if (n.querySelectorAll) n.querySelectorAll(".me-pdb-viewer").forEach((el) => cleanupViewer(el));
                                 }
                             }
                             requestAnimationFrame(scanAll);
                         });
                         obs.observe(document.body, {childList: true, subtree: true});
+                        window.addEventListener("resize", () => requestAnimationFrame(scanAll), {passive: true});
+                        document.addEventListener("toggle", () => requestAnimationFrame(scanAll), true);
+                        document.addEventListener("click", () => requestAnimationFrame(scanAll), {passive: true});
                     } else {
                         setTimeout(tryInit, 200);
                     }

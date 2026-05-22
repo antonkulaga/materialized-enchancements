@@ -33,7 +33,6 @@ DESKTOP_VIEWPORT_WIDTH_PX = 1440
 _SUPPRESSED_3DMOL_FRONTEND_ERROR_MARKERS = (
     "OffscreenCanvas.transferToImageBitmap",
     "3dmol",
-    "spinInterval",
 )
 _logged_suppressed_3dmol_frontend_error = False
 
