@@ -7,6 +7,7 @@ import logging
 import re
 
 import reflex as rx
+from reflex import constants
 from reflex.app import default_frontend_exception_handler
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -35,7 +36,11 @@ _SUPPRESSED_3DMOL_FRONTEND_ERROR_MARKERS = (
     "OffscreenCanvas.transferToImageBitmap",
     "3dmol",
 )
-_logged_suppressed_3dmol_frontend_error = False
+_SUPPRESSED_STALE_CLIENT_FRONTEND_ERROR_MARKERS = (
+    "typeerror: t is not a function",
+    "connect/<@",
+)
+_logged_suppressed_frontend_errors: set[str] = set()
 
 _head_components: list[rx.Component] = [
     rx.el.meta(name="viewport", content=f"width={DESKTOP_VIEWPORT_WIDTH_PX}"),
@@ -55,14 +60,18 @@ if UMAMI_SCRIPT_URL and UMAMI_WEBSITE_ID:
 
 
 def _handle_frontend_exception(exception: Exception) -> None:
-    """Suppress noisy stale-client 3Dmol canvas errors; keep normal Reflex logging."""
-    global _logged_suppressed_3dmol_frontend_error
+    """Suppress known stale-client frontend errors; keep normal Reflex logging."""
 
     message = str(exception).lower()
     if all(marker.lower() in message for marker in _SUPPRESSED_3DMOL_FRONTEND_ERROR_MARKERS):
-        if not _logged_suppressed_3dmol_frontend_error:
+        if "3dmol" not in _logged_suppressed_frontend_errors:
             logger.warning("Suppressing repeated stale-client 3Dmol OffscreenCanvas frontend errors")
-            _logged_suppressed_3dmol_frontend_error = True
+            _logged_suppressed_frontend_errors.add("3dmol")
+        return
+    if all(marker in message for marker in _SUPPRESSED_STALE_CLIENT_FRONTEND_ERROR_MARKERS):
+        if "reflex-version-mismatch" not in _logged_suppressed_frontend_errors:
+            logger.warning("Suppressing repeated stale Reflex frontend bundle errors")
+            _logged_suppressed_frontend_errors.add("reflex-version-mismatch")
         return
 
     default_frontend_exception_handler(exception)
@@ -143,8 +152,19 @@ def normalize_reflex_event_websocket_path(app: ASGIApp) -> ASGIApp:
             path = str(scope.get("path", ""))
             if path == "/_event":
                 scope = {**scope, "path": "/_event/", "raw_path": b"/_event/"}
-            elif not path.startswith("/_event/"):
+                path = "/_event/"
+            if not path.startswith("/_event/"):
                 await send({"type": "websocket.close", "code": 1000})
+                return
+            subprotocols = scope.get("subprotocols") or []
+            frontend_version = str(subprotocols[0]) if subprotocols else ""
+            if frontend_version and frontend_version != constants.Reflex.VERSION:
+                logger.warning(
+                    "Closing stale Reflex frontend websocket: frontend=%s backend=%s",
+                    frontend_version,
+                    constants.Reflex.VERSION,
+                )
+                await send({"type": "websocket.close", "code": 1012})
                 return
         await app(scope, receive, send)
 

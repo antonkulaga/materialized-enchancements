@@ -111,13 +111,40 @@ _WS_WATCHDOG_JS = """
   var banner          = null;
   var sockets         = [];
   var _WS             = window.WebSocket;
+  var RELOAD_PARAM    = '__me_reload';
+
+  try {
+    var initialUrl = new URL(window.location.href);
+    if (initialUrl.searchParams.has(RELOAD_PARAM)) {
+      initialUrl.searchParams.delete(RELOAD_PARAM);
+      window.history.replaceState(null, '', initialUrl.pathname + initialUrl.search + initialUrl.hash);
+    }
+  } catch (err) {}
+
+  function reloadFresh() {
+    function go() {
+      var url = new URL(window.location.href);
+      url.searchParams.set(RELOAD_PARAM, String(Date.now()));
+      window.location.replace(url.pathname + url.search + url.hash);
+    }
+    if (!window.caches || !window.caches.keys) {
+      go();
+      return;
+    }
+    window.caches.keys()
+      .then(function (keys) {
+        return Promise.all(keys.map(function (key) { return window.caches.delete(key); }));
+      })
+      .then(go)
+      .catch(go);
+  }
 
   function PatchedWS(url, proto) {
     var ws = (proto !== undefined) ? new _WS(url, proto) : new _WS(url);
     sockets.push(ws);
     ws.addEventListener('open', function () {
       clearTimeout(confirmTimer); confirmTimer = null;
-      if (confirmedOutage) { clearTimeout(forceTimer); window.location.reload(); return; }
+      if (confirmedOutage) { clearTimeout(forceTimer); reloadFresh(); return; }
       everConnected = true;
       clearTimeout(forceTimer); forceTimer = null;
       hideBanner();
@@ -134,7 +161,7 @@ _WS_WATCHDOG_JS = """
         if (alive2) return;
         confirmedOutage = true;
         showBanner();
-        forceTimer = setTimeout(function () { window.location.reload(); }, FORCE_MS);
+        forceTimer = setTimeout(reloadFresh, FORCE_MS);
       }, CONFIRM_MS);
     });
     return ws;
@@ -151,7 +178,7 @@ _WS_WATCHDOG_JS = """
       'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7c3aed;' +
       'color:#fff;text-align:center;padding:0.65rem 1.1rem;font-size:0.95rem;' +
       'font-family:sans-serif;cursor:pointer;letter-spacing:.3px';
-    banner.onclick = function () { window.location.reload(); };
+    banner.onclick = reloadFresh;
     document.body && document.body.appendChild(banner);
     var secs = Math.ceil(FORCE_MS / 1000);
     function tick() {
