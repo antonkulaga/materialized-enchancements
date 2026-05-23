@@ -159,11 +159,14 @@ def normalize_reflex_event_websocket_path(app: ASGIApp) -> ASGIApp:
             subprotocols = scope.get("subprotocols") or []
             frontend_version = str(subprotocols[0]) if subprotocols else ""
             if frontend_version and frontend_version != constants.Reflex.VERSION:
-                logger.warning(
-                    "Closing stale Reflex frontend websocket: frontend=%s backend=%s",
-                    frontend_version,
-                    constants.Reflex.VERSION,
-                )
+                if "stale-ws" not in _logged_suppressed_frontend_errors:
+                    logger.warning(
+                        "Closing stale Reflex frontend websocket: frontend=%s backend=%s "
+                        "(further occurrences suppressed)",
+                        frontend_version,
+                        constants.Reflex.VERSION,
+                    )
+                    _logged_suppressed_frontend_errors.add("stale-ws")
                 await send({"type": "websocket.close", "code": 1012})
                 return
         await app(scope, receive, send)

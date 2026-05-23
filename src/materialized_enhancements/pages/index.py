@@ -60,7 +60,7 @@ def _page_meta(route_path: str) -> list[dict[str, str]]:
 
 
 def _page_image_url() -> str:
-    return f"{public_app_url()}{OG_PREVIEW_URL_PATH}"
+    return f"{public_app_url()}{OG_PREVIEW_URL_PATH}?v=2"
 
 
 def _category_tooltip(category: str) -> str:

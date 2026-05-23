@@ -149,8 +149,17 @@ _WS_WATCHDOG_JS = """
       clearTimeout(forceTimer); forceTimer = null;
       hideBanner();
     });
-    ws.addEventListener('close', function () {
+    ws.addEventListener('close', function (evt) {
       sockets = sockets.filter(function (s) { return s !== ws; });
+      // 1012 = Service Restart: the backend rejected our stale bundle — reload immediately.
+      if (evt && evt.code === 1012) {
+        if (confirmedOutage) return;
+        confirmedOutage = true;
+        clearTimeout(confirmTimer); clearTimeout(forceTimer);
+        showBanner(true);
+        forceTimer = setTimeout(reloadFresh, 2000);
+        return;
+      }
       if (!everConnected || confirmTimer || confirmedOutage) return;
       if (Date.now() - startedAt < INIT_GRACE_MS) return;
       var alive = sockets.some(function (s) { return s.readyState === 0 || s.readyState === 1; });
@@ -171,7 +180,7 @@ _WS_WATCHDOG_JS = """
   PatchedWS.prototype  = _WS.prototype;
   window.WebSocket     = PatchedWS;
 
-  function showBanner() {
+  function showBanner(immediate) {
     if (banner) return;
     banner = document.createElement('div');
     banner.style.cssText =
@@ -180,6 +189,10 @@ _WS_WATCHDOG_JS = """
       'font-family:sans-serif;cursor:pointer;letter-spacing:.3px';
     banner.onclick = reloadFresh;
     document.body && document.body.appendChild(banner);
+    if (immediate) {
+      banner.textContent = 'New version available — reloading…';
+      return;
+    }
     var secs = Math.ceil(FORCE_MS / 1000);
     function tick() {
       if (!banner) return;
