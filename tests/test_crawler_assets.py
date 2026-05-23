@@ -5,7 +5,12 @@ from pathlib import Path
 import pytest
 
 from materialized_enhancements.crawler_assets import (
+    ASSETS_DIR,
+    FAVICON_PATH,
+    OG_PREVIEW_SIZE,
+    OG_PREVIEW_PATH,
     PUBLIC_ROUTES,
+    ROOT_FAVICON_PATH,
     build_llms_txt,
     build_robots_txt,
     build_sitemap_xml,
@@ -45,7 +50,27 @@ def test_generate_crawler_assets_writes_expected_files(
     monkeypatch.setenv("DEPLOY_URL", "https://example.test")
     written = generate_crawler_assets(tmp_path)
 
-    assert sorted(path.name for path in written) == ["llms.txt", "robots.txt", "sitemap.xml"]
+    assert sorted(path.relative_to(tmp_path).as_posix() for path in written) == [
+        "llms.txt",
+        "robots.txt",
+        "sitemap.xml",
+    ]
     assert (tmp_path / "robots.txt").read_text(encoding="utf-8") == build_robots_txt()
     assert (tmp_path / "sitemap.xml").read_text(encoding="utf-8") == build_sitemap_xml()
     assert (tmp_path / "llms.txt").read_text(encoding="utf-8") == build_llms_txt()
+
+
+def test_static_og_preview_png_is_committed() -> None:
+    png = (ASSETS_DIR / OG_PREVIEW_PATH).read_bytes()
+
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    assert OG_PREVIEW_SIZE == (1200, 630)
+
+
+def test_static_favicons_are_committed() -> None:
+    root_ico = (ASSETS_DIR / ROOT_FAVICON_PATH).read_bytes()
+    image_ico = (ASSETS_DIR / FAVICON_PATH).read_bytes()
+
+    assert root_ico.startswith(b"\x00\x00\x01\x00")
+    assert image_ico.startswith(b"\x00\x00\x01\x00")
+    assert root_ico == image_ico

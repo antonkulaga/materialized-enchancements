@@ -14,6 +14,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 import materialized_enhancements.pages.index  # noqa: F401 — registers pages via @rx.page
+from materialized_enhancements.crawler_assets import FAVICON_URL_PATH
 from materialized_enhancements.env import (
     GENERATED_PUBLIC_DIR,
     GENERATED_URL_PREFIX,
@@ -38,6 +39,8 @@ _logged_suppressed_3dmol_frontend_error = False
 
 _head_components: list[rx.Component] = [
     rx.el.meta(name="viewport", content=f"width={DESKTOP_VIEWPORT_WIDTH_PX}"),
+    rx.el.link(rel="icon", href=FAVICON_URL_PATH, type="image/x-icon"),
+    rx.el.link(rel="shortcut icon", href=FAVICON_URL_PATH, type="image/x-icon"),
 ]
 
 if UMAMI_SCRIPT_URL and UMAMI_WEBSITE_ID:

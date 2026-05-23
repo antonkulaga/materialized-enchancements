@@ -10,6 +10,12 @@ from materialized_enhancements.gene_data import ANIMAL_LIBRARY, CATEGORY_COUNTS,
 
 
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
+OG_PREVIEW_PATH = Path("images") / "og-preview.png"
+OG_PREVIEW_URL_PATH = f"/{OG_PREVIEW_PATH.as_posix()}"
+OG_PREVIEW_SIZE = (1200, 630)
+FAVICON_PATH = Path("images") / "favicon.ico"
+FAVICON_URL_PATH = f"/{FAVICON_PATH.as_posix()}"
+ROOT_FAVICON_PATH = Path("favicon.ico")
 ROBOT_EXCLUDED_PATHS: tuple[str, ...] = (
     "/_event/",
     "/ping",

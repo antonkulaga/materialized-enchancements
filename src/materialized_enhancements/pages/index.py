@@ -4,7 +4,7 @@ import reflex as rx
 
 from materialized_enhancements.components.layout import fomantic_icon, template
 from materialized_enhancements.artex import artex_publish_button
-from materialized_enhancements.crawler_assets import PUBLIC_ROUTES
+from materialized_enhancements.crawler_assets import OG_PREVIEW_SIZE, OG_PREVIEW_URL_PATH, PUBLIC_ROUTES
 from materialized_enhancements.env import public_app_url
 from materialized_enhancements.gene_data import (
     CATEGORY_COUNTS,
@@ -31,14 +31,13 @@ _ROUTE_METADATA = {route.path: route for route in PUBLIC_ROUTES}
 _SITE_TITLE = "Materialized Enhancements"
 _REPORT_PORTRAIT_UPLOAD_ID = "report-portrait-upload"
 _HERO_PORTRAIT_UPLOAD_ID = "hero-portrait-upload"
-_OG_IMAGE_PATH = "/images/og-preview.png"
 
 
 def _page_meta(route_path: str) -> list[dict[str, str]]:
     base = public_app_url()
     route = _ROUTE_METADATA[route_path]
     title = f"{_SITE_TITLE} | {route.title}"
-    image_url = f"{base}{_OG_IMAGE_PATH}"
+    image_url = _page_image_url()
     canonical_url = f"{base}/" if route_path == "/" else f"{base}{route_path}"
     return [
         {"name": "robots", "content": "index, follow"},
@@ -48,13 +47,20 @@ def _page_meta(route_path: str) -> list[dict[str, str]]:
         {"property": "og:description", "content": route.description},
         {"property": "og:url", "content": canonical_url},
         {"property": "og:image", "content": image_url},
-        {"property": "og:image:width", "content": "3703"},
-        {"property": "og:image:height", "content": "1705"},
+        {"property": "og:image:type", "content": "image/png"},
+        {"property": "og:image:width", "content": str(OG_PREVIEW_SIZE[0])},
+        {"property": "og:image:height", "content": str(OG_PREVIEW_SIZE[1])},
+        {"property": "og:image:alt", "content": "Materialized Enhancements social preview card."},
         {"name": "twitter:card", "content": "summary_large_image"},
         {"name": "twitter:title", "content": title},
         {"name": "twitter:description", "content": route.description},
         {"name": "twitter:image", "content": image_url},
+        {"name": "twitter:image:alt", "content": "Materialized Enhancements social preview card."},
     ]
+
+
+def _page_image_url() -> str:
+    return f"{public_app_url()}{OG_PREVIEW_URL_PATH}"
 
 
 def _category_tooltip(category: str) -> str:
@@ -8744,6 +8750,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
 @rx.page(
     route="/",
     title=_page_title("/"),
+    image=_page_image_url(),
     description=_page_description("/"),
     meta=_page_meta("/"),
     on_load=[AppState.redirect_legacy_tab],
@@ -8761,6 +8768,7 @@ _NOINDEX_META: list[dict[str, str]] = [
 @rx.page(
     route="/materialization",
     title=_page_title("/materialization"),
+    image=_page_image_url(),
     description=_page_description("/materialization"),
     meta=_NOINDEX_META,
     on_load=[ComposeState.apply_artex_params, ComposeState.apply_saved_report, ComposeState.apply_shared_report],
@@ -8773,6 +8781,7 @@ def materialization_page() -> rx.Component:
 @rx.page(
     route="/about",
     title=_page_title("/about"),
+    image=_page_image_url(),
     description=_page_description("/about"),
     meta=_page_meta("/about"),
     on_load=[AppState.redirect_legacy_tab],

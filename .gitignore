@@ -1,5 +1,8 @@
 .states
 assets/external/
+assets/llms.txt
+assets/robots.txt
+assets/sitemap.xml
 *.db
 .web
 *.py[cod]

@@ -1,8 +1,0 @@
-User-agent: *
-Allow: /
-Allow: /llms.txt
-Disallow: /_event/
-Disallow: /ping
-
-Sitemap: https://enhancement.bio/sitemap.xml
-# LLM-readable overview: https://enhancement.bio/llms.txt
