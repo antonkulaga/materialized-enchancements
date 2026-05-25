@@ -489,6 +489,7 @@ def _build_report_landing_html(
   <meta charset="utf-8">
   <meta name="viewport" content="width=1440">
   <meta name="{REPORT_LANDING_HTML_VERSION_META_NAME}" content="{REPORT_LANDING_HTML_VERSION}">
+  <meta http-equiv="refresh" content="0;url={escaped_recreate_url}">
   <title>{escaped_title}</title>
   <meta name="description" content="{escaped_description}">
   <meta property="og:type" content="website">
@@ -518,10 +519,8 @@ def _build_report_landing_html(
     <p class="hint">{escaped_description}</p>
     <p><img src="{escaped_image_url}" alt="{escaped_title} preview"></p>
     <div class="links">
-      <a class="primary" href="{escaped_recreate_url}">Open shared materialization</a>
+      <a class="primary" href="{escaped_recreate_url}">Open this character</a>
       <a href="{escaped_make_own_url}">Make your own character</a>
-      <a href="{escaped_recreate_url}">Recreate this character</a>
-      <a href="{escaped_pdf_url}">Download PDF report</a>
       <a href="{escaped_stl_url}">Download STL model</a>
       <a href="{escaped_params_url}">Download params JSON</a>
     </div>
@@ -1209,13 +1208,19 @@ class ComposeState(rx.State):
         if self.stl_download_path and not self.share_card_data_url and not self.share_card_generating:
             self.share_card_generating = True
             yield rx.call_script(
-                "window.__meGenerateShareCard ? "
-                "window.__meGenerateShareCard(6000) : "
-                "JSON.stringify({error: 'Share card builder not loaded.'})",
+                "(async function() { try { "
+                "if (!window.__meGenerateShareCard) "
+                "return JSON.stringify({error: 'Share card builder not loaded.'}); "
+                "return await window.__meGenerateShareCard(6000); "
+                "} catch(e) { console.error('[materialized] share card wrapper', e); "
+                "return JSON.stringify({error: e && e.message ? e.message : String(e)}); "
+                "} })()",
                 callback=ComposeState.receive_share_card,
             )
+        elif self.stl_download_path and self.share_card_data_url and not self.report_public_url and not self.report_publishing:
+            yield type(self).start_report_publish
 
-    def receive_share_card(self, payload: str) -> None:  # type: ignore[return]
+    def receive_share_card(self, payload: str):  # type: ignore[return]
         """Receive generated share card WebP data URL from browser, then auto-publish."""
         self.share_card_generating = False
         try:
@@ -1227,12 +1232,16 @@ class ComposeState(rx.State):
         err = str(data.get("error", "")).strip()
         if err:
             logger.warning("Share card generation failed: %s", err)
+            yield rx.toast.error(f"Share card failed: {err}")
             return
         data_url = str(data.get("data_url", "")).strip()
-        if data_url and len(data_url) > 200:
-            self.share_card_data_url = data_url
-            if not self.report_public_url and not self.report_publishing:
-                yield type(self).start_report_publish
+        if not data_url or len(data_url) <= 200:
+            logger.warning("Share card callback returned no usable data_url (len=%d)", len(data_url) if data_url else 0)
+            yield rx.toast.error("Share card generation returned empty image. Try again.")
+            return
+        self.share_card_data_url = data_url
+        if not self.report_public_url and not self.report_publishing:
+            yield type(self).start_report_publish
 
     def show_support_artifact_tab(self) -> None:
         self.materialization_artifact_tab = "support"
@@ -1503,7 +1512,11 @@ class ComposeState(rx.State):
         self.report_params_url = ""
 
     def start_report_publish(self):  # type: ignore[return]
-        """Build browser-only report assets, then persist them to public downloads."""
+        """Generate public link with STL + params immediately (pure Python).
+
+        PNG/PDF are added asynchronously via JS callback when the browser
+        can render them.  The link is usable as soon as this method returns.
+        """
         if not self.stl_download_path:
             self.report_publish_error = "Generate a 3D model first."
             return
@@ -1556,7 +1569,6 @@ class ComposeState(rx.State):
 
         stl_path = Path(self.stl_download_path)
         if not stl_path.exists():
-            self.report_publishing = False
             self.report_publish_error = "STL file not found on disk."
             yield rx.toast.error(self.report_publish_error)
             return
@@ -1565,7 +1577,7 @@ class ComposeState(rx.State):
 
         tag = self.personal_tag.strip() or "anonymous"
         seed = self.sculpture_params.get("seed", self.param_seed)
-        slug = self.report_public_slug or _safe_report_slug(tag, seed)
+        slug = _safe_report_slug(tag, seed)
         rel_dir = f"reports/{slug}"
         ensure_generated_public_dirs()
         out_dir = generated_public_path("reports", slug)
@@ -1652,13 +1664,12 @@ class ComposeState(rx.State):
             _mirror_generated_report_for_dev(out_dir, rel_dir)
         except OSError as exc:
             logger.exception("Generated report publish failed")
-            self.report_publishing = False
             self.report_publish_error = f"Could not write generated report: {exc}"
             yield rx.toast.error(self.report_publish_error)
             return
 
-        self.report_publishing = False
         self.report_publish_error = ""
+        self.report_publishing = False
         self.report_public_slug = slug
         self.report_public_url = generated_public_absolute_url(f"{rel_dir}/index.html")
         self.report_model_url = model_url
@@ -1666,13 +1677,59 @@ class ComposeState(rx.State):
         self.report_pdf_url = pdf_url
         self.report_params_url = params_url
         self.materialization_artifact_tab = "share"
+        yield rx.toast.success("Public link created!")
         yield rx.call_script(_replace_state_js(self.report_public_url))
         yield rx.call_script(
-            "setTimeout(function(){ "
-            "if (window.__meUsePublishedPdfInPage) window.__meUsePublishedPdfInPage(); "
-            "}, 0)"
+            "(async function() { try { "
+            "if (!window.__meBuildReportBundleBase64) return; "
+            f"var result = await window.__meBuildReportBundleBase64(8000, {json.dumps(generated_public_url(f'{rel_dir}/index.html'))}); "
+            "return result; "
+            "} catch(e) { console.error('[materialized] async report assets', e); "
+            "return JSON.stringify({error: e && e.message ? e.message : String(e)}); "
+            "} })()",
+            callback=ComposeState.receive_report_assets,
         )
-        yield rx.toast.success("Generated report links are ready.")
+
+    def receive_report_assets(self, payload: str):  # type: ignore[return]
+        """Upgrade a published report with browser-rendered PNG/PDF (best-effort)."""
+        try:
+            data = json.loads(payload) if payload else {}
+        except (ValueError, TypeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        err = str(data.get("error", "")).strip()
+        if err:
+            logger.warning("Report asset rendering failed (link still works): %s", err)
+            return
+
+        slug = self.report_public_slug
+        if not slug:
+            return
+        out_dir = generated_public_path("reports", slug)
+        if not out_dir.exists():
+            return
+
+        try:
+            png_bytes = _decode_base64_payload(str(data.get("png_base64", "")), expected_label="WebP")
+            (out_dir / "report.webp").write_bytes(png_bytes)
+        except (ValueError, binascii.Error, OSError) as exc:
+            logger.warning("Could not save report WebP: %s", exc)
+
+        try:
+            pdf_bytes = _decode_base64_payload(str(data.get("pdf_base64", "")), expected_label="PDF")
+            (out_dir / "report.pdf").write_bytes(pdf_bytes)
+        except (ValueError, binascii.Error, OSError) as exc:
+            logger.warning("Could not save report PDF: %s", exc)
+
+        rel_dir = f"reports/{slug}"
+        _mirror_generated_report_for_dev(out_dir, rel_dir)
+        yield rx.toast.success("Report image and PDF saved to public link.")
+
+    def reset_report_publish(self) -> None:
+        """Clear a stuck browser-side report publish so the visitor can retry."""
+        self.report_publishing = False
+        self.report_publish_error = "Public link generation was reset. Try creating the link again."
 
     def set_recipient_email(self, value: str) -> None:
         self.recipient_email = value
@@ -2107,7 +2164,7 @@ class ComposeState(rx.State):
         self.report_expanded = True
         self.materialization_artifact_tab = "model"
         self.report_public_slug = slug
-        self.report_public_url = generated_public_url(f"{rel_dir}/index.html")
+        self.report_public_url = generated_public_absolute_url(f"{rel_dir}/index.html")
         self.report_model_url = generated_public_url(f"{rel_dir}/model.stl")
         self.report_png_url = generated_public_url(f"{rel_dir}/report.webp")
         self.report_pdf_url = generated_public_url(f"{rel_dir}/report.pdf")

@@ -242,7 +242,7 @@ def report_libs() -> rx.Component:
             """,
             custom_attrs={"type": "module"},
         ),
-        rx.script(src="/vendor/me_report.js"),
+        rx.script(src="/vendor/me_report.js?v=20260512-public-link-timeout"),
     )
 
 

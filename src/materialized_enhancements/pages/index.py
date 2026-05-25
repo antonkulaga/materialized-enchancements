@@ -13,6 +13,12 @@ from materialized_enhancements.gene_data import (
     GENE_LIBRARY,
     UNIQUE_CATEGORIES,
 )
+from materialized_enhancements.env import (
+    DISCORD_COMMUNITY_NAME,
+    DISCORD_INVITE_URL,
+    DONATION_URL,
+    GITHUB_PROJECT_URL,
+)
 from materialized_enhancements.state import (
     CATEGORY_COLORS,
     CATEGORY_DESCRIPTIONS,
@@ -3691,6 +3697,85 @@ def _materialization_edit_character_cta() -> rx.Component:
     )
 
 
+def _post_materialization_action_card(
+    icon_name: str,
+    label: str,
+    href: str,
+    accent_color: str,
+) -> rx.Component:
+    return rx.el.a(
+        fomantic_icon(icon_name, size=13, color=accent_color),
+        rx.el.span(label, style={"marginLeft": "6px"}),
+        href=href,
+        target="_blank",
+        rel="noopener noreferrer",
+        aria_label=label,
+        style={
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "padding": "7px 10px",
+            "boxSizing": "border-box",
+            "minHeight": "32px",
+            "minWidth": "0",
+            "borderRadius": "999px",
+            "background": "rgba(15, 23, 42, 0.42)",
+            "border": "1px solid rgba(196, 181, 253, 0.24)",
+            "color": "#e5e7eb",
+            "fontSize": "0.84rem",
+            "fontWeight": "850",
+            "lineHeight": "1",
+            "textDecoration": "none",
+            "whiteSpace": "nowrap",
+        },
+    )
+
+
+def _materialization_post_generation_ctas() -> rx.Component:
+    actions: list[rx.Component] = []
+    if DONATION_URL:
+        actions.append(
+            _post_materialization_action_card(
+                "coffee",
+                "Donate",
+                DONATION_URL,
+                "#f9a8d4",
+            )
+        )
+    if DISCORD_INVITE_URL:
+        actions.append(
+            _post_materialization_action_card(
+                "discord",
+                "Join Discord",
+                DISCORD_INVITE_URL,
+                "#a5b4fc",
+            )
+        )
+    if GITHUB_PROJECT_URL:
+        actions.append(
+            _post_materialization_action_card(
+                "github",
+                "Open GitHub issue",
+                GITHUB_PROJECT_URL,
+                "#e5e7eb",
+            )
+        )
+    if not actions:
+        return rx.fragment()
+    return rx.el.div(
+        *actions,
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "flexWrap": "wrap",
+            "gap": "6px",
+            "marginTop": "12px",
+            "minWidth": "0",
+        },
+    )
+
+
 def _reward_artifact_choice(
     label: str,
     description: str,
@@ -3910,6 +3995,7 @@ def _materialization_reward_panel() -> rx.Component:
                     },
                 ),
                 _materialization_edit_character_cta(),
+                _materialization_post_generation_ctas(),
                 style={"marginTop": "14px", "textAlign": "center"},
             ),
             rx.el.div(
@@ -8083,31 +8169,57 @@ def _share_qr_panel() -> rx.Component:
                     ComposeState.report_publishing,
                     rx.el.div(
                         rx.el.div(
-                            class_name="ui active mini inline loader",
-                            style={"marginRight": "6px"},
+                            rx.el.div(
+                                class_name="ui active mini inline loader",
+                                style={"marginRight": "6px"},
+                            ),
+                            rx.el.span(
+                                "Generating public link...",
+                                style={"color": "#94a3b8", "fontSize": "0.78rem"},
+                            ),
+                            style={"display": "flex", "alignItems": "center", "minWidth": "0"},
                         ),
-                        rx.el.span(
-                            "Generating public link...",
-                            style={"color": "#94a3b8", "fontSize": "0.78rem"},
-                        ),
-                        style={"display": "flex", "alignItems": "center", "marginTop": "6px"},
-                    ),
-                    rx.cond(
-                        ComposeState.share_url != "",
-                        rx.el.div(
-                            ComposeState.share_url,
+                        rx.el.button(
+                            "Reset",
+                            type="button",
+                            on_click=ComposeState.reset_report_publish,
+                            class_name="ui mini button",
                             style={
+                                "padding": "5px 9px",
                                 "fontSize": "0.72rem",
-                                "color": "#94a3b8",
-                                "marginTop": "6px",
-                                "fontFamily": "'SFMono-Regular', Menlo, Consolas, monospace",
-                                "wordBreak": "break-all",
-                                "maxWidth": "100%",
+                                "fontWeight": "800",
+                                "marginLeft": "8px",
                             },
                         ),
-                        rx.fragment(),
+                        style={"display": "flex", "alignItems": "center", "marginTop": "6px", "flexWrap": "wrap"},
+                    ),
+                    rx.el.div(
+                        _generate_public_link_button(),
+                        rx.el.div(
+                            "Creates a shareable public link with your report, model, and share card.",
+                            style={
+                                "fontSize": "0.72rem",
+                                "color": "#64748b",
+                                "marginTop": "6px",
+                                "lineHeight": "1.3",
+                            },
+                        ),
+                        style={"marginTop": "8px"},
                     ),
                 ),
+            ),
+            rx.cond(
+                ComposeState.report_publish_error != "",
+                rx.el.div(
+                    ComposeState.report_publish_error,
+                    style={
+                        "fontSize": "0.74rem",
+                        "color": "#fecaca",
+                        "marginTop": "6px",
+                        "lineHeight": "1.35",
+                    },
+                ),
+                rx.fragment(),
             ),
             style={"flex": "1", "minWidth": "180px", "overflow": "hidden"},
         ),

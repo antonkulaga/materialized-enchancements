@@ -24,7 +24,7 @@
   function generatedShareUrl() {
     return window.__mePendingPublishedReportUrl || publishedReportUrl();
   }
-  /** Server-provided canonical origin (DEPLOY_URL / PUBLIC_APP_URL); falls back to browser. */
+  /** Server-provided canonical origin (DEPLOY_URL); falls back to browser. */
   function canonicalOrigin() {
     var el = document.getElementById('report-canonical-base');
     var v = el && el.value ? String(el.value).trim().replace(/\/+$/, '') : '';
@@ -40,7 +40,7 @@
     return origin + '/' + (p.charAt(0) === '?' ? '' : '') + p;
   }
   function reportTargetUrl() {
-    return generatedShareUrl() || absoluteShareUrl();
+    return generatedShareUrl();
   }
   function publicReportTargetUrl() {
     return generatedShareUrl();
@@ -339,6 +339,22 @@
     return base;
   }
 
+  async function withTimeout(promise, timeoutMs, message) {
+    var timer = null;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise(function (_resolve, reject) {
+          timer = setTimeout(function () {
+            reject(new Error(message || 'Rendering timed out.'));
+          }, timeoutMs || 8000);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   /** Wait until every <img> under `root` has loaded (or failed). */
   async function waitImages(root) {
     var imgs = root.querySelectorAll('img');
@@ -348,11 +364,14 @@
           return Promise.resolve();
         }
         return new Promise(function (resolve) {
+          var timer = null;
           var done = function () {
+            if (timer) clearTimeout(timer);
             img.removeEventListener('load', done);
             img.removeEventListener('error', done);
             resolve();
           };
+          timer = setTimeout(done, 3000);
           img.addEventListener('load', done);
           img.addEventListener('error', done);
         });
@@ -702,6 +721,11 @@
     var url = localAssetUrl(puzzleSrc);
     return new Promise(function (resolve) {
       var img = new Image();
+      var timer = null;
+      var done = function (value) {
+        if (timer) clearTimeout(timer);
+        resolve(value);
+      };
       img.crossOrigin = 'anonymous';
       img.onload = function () {
         var maxPx = 260;
@@ -717,14 +741,15 @@
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, cw, ch);
         ctx.drawImage(img, 0, 0, cw, ch);
-        resolve({
+        done({
           dataUrl: c.toDataURL('image/png'),
           aspect: cw / ch,
         });
       };
       img.onerror = function () {
-        resolve(null);
+        done(null);
       };
+      timer = setTimeout(function () { done(null); }, 3000);
       img.src = url;
     });
   }
@@ -734,6 +759,11 @@
     if (!src) return Promise.resolve(null);
     return new Promise(function (resolve) {
       var img = new Image();
+      var timer = null;
+      var done = function (value) {
+        if (timer) clearTimeout(timer);
+        resolve(value);
+      };
       img.onload = function () {
         try {
           var size = 256;
@@ -749,12 +779,13 @@
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, size, size);
           ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
-          resolve(c.toDataURL('image/png'));
+          done(c.toDataURL('image/png'));
         } catch (_e) {
-          resolve(null);
+          done(null);
         }
       };
-      img.onerror = function () { resolve(null); };
+      img.onerror = function () { done(null); };
+      timer = setTimeout(function () { done(null); }, 3000);
       img.src = src;
     });
   }
@@ -762,6 +793,11 @@
   function loadHumanRasterForPdf() {
     return new Promise(function (resolve) {
       var img = new Image();
+      var timer = null;
+      var done = function (value) {
+        if (timer) clearTimeout(timer);
+        resolve(value);
+      };
       img.crossOrigin = 'anonymous';
       img.onload = function () {
         try {
@@ -777,15 +813,16 @@
           var ctx = c.getContext('2d');
           ctx.clearRect(0, 0, cw, ch);
           ctx.drawImage(img, 0, 0, cw, ch);
-          resolve({
+          done({
             dataUrl: c.toDataURL('image/png'),
             aspect: cw / ch,
           });
         } catch (_e) {
-          resolve(null);
+          done(null);
         }
       };
-      img.onerror = function () { resolve(null); };
+      img.onerror = function () { done(null); };
+      timer = setTimeout(function () { done(null); }, 3000);
       img.src = localAssetUrl('/images/body_only.webp');
     });
   }
@@ -1548,9 +1585,9 @@
   };
 
   window.__meCopyShareLink = async function () {
-    var url = publicReportTargetUrl();
+    var url = reportTargetUrl();
     if (!url) {
-      feedback('Create a public link first.', '#b45309');
+      feedback('No share link available yet.', '#b45309');
       return;
     }
     try {
@@ -1567,9 +1604,9 @@
   };
 
   window.__meShareIntent = function (network) {
-    var rawUrl = publicReportTargetUrl();
+    var rawUrl = reportTargetUrl();
     if (!rawUrl) {
-      feedback('Create a public link first.', '#b45309');
+      feedback('No share link available yet.', '#b45309');
       return;
     }
     var url = encodeURIComponent(rawUrl);

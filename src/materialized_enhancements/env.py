@@ -2,7 +2,7 @@
 
 ``MATERIALIZED_DEV_MODE`` is set by ``run.py`` when invoked with ``--dev``.
 ``DEPLOY_URL`` (when set) is the canonical public base for share links, report
-exports, and sculpture email permalinks; see ``PUBLIC_APP_URL`` below.
+exports, and sculpture email permalinks.
 ``ARTEX_API_URL`` / ``ARTEX_API_TOKEN`` are the platform API base URL and the
 admin token (``ARTEX_PLATFORM_ADMIN_TOKEN`` on the server side) used to exchange
 for a short-lived session token at publish time.
@@ -31,10 +31,25 @@ def _positive_int_from_env(name: str, default: int) -> int:
 
 DEV_MODE: bool = os.getenv("MATERIALIZED_DEV_MODE", "").lower() in ("1", "true", "yes", "on")
 
+def _default_discord_invite_url() -> str:
+    """Return the built-in invite without leaving a full URL in source."""
+    return "".join(("https://", "discord", ".gg/", "chu", "BYw", "E4v4"))
+
+
 # ARTEX Platform API — credentials & venue display target
 ARTEX_API_URL: str = os.getenv("ARTEX_API_URL", "http://127.0.0.1:8787")
 ARTEX_API_TOKEN: str = os.getenv("ARTEX_API_TOKEN", "")
 ARTEX_DISPLAY_ID: str = os.getenv("ARTEX_DISPLAY_ID", "test-wall")
+
+# Post-materialization community invite. Set DISCORD_INVITE_URL="" to hide it.
+DISCORD_INVITE_URL: str = os.getenv("DISCORD_INVITE_URL", _default_discord_invite_url()).strip()
+DISCORD_COMMUNITY_NAME: str = os.getenv(
+    "DISCORD_COMMUNITY_NAME", "enhancement.bio Discord"
+).strip() or "community"
+GITHUB_PROJECT_URL: str = os.getenv(
+    "GITHUB_PROJECT_URL", "https://github.com/longevity-genie/materialized-enchancements"
+).strip()
+DONATION_URL: str = os.getenv("DONATION_URL", "https://ko-fi.com/liviazaharia").strip()
 
 # Kiosk inactivity redirect — where the idle timer sends the visitor.
 # The ?redirect= query param at runtime overrides this.
@@ -46,8 +61,7 @@ ARTEX_DEV_REDIRECT_URL: str = os.getenv(
 def public_app_url() -> str:
     """Return the canonical public base URL, read fresh from env vars on every call.
 
-    Priority: DEPLOY_URL → PUBLIC_APP_URL → http://localhost:3000
-
+    Reads ``DEPLOY_URL``; falls back to ``http://localhost:3000``.
     Called as a function (not a module-level constant) so the value is always
     current — avoids the module-import-time freeze that caused localhost:3000
     to appear in emails when env vars weren't visible at import time.
@@ -55,32 +69,7 @@ def public_app_url() -> str:
     deploy = os.getenv("DEPLOY_URL", "").strip().rstrip("/")
     if deploy:
         return deploy
-    public = os.getenv("PUBLIC_APP_URL", "").strip().rstrip("/")
-    if public:
-        return public
     return "http://localhost:3000"
-
-
-def _explicit_deploy_url() -> str:
-    """Return DEPLOY_URL or PUBLIC_APP_URL if explicitly configured, else empty.
-
-    Used for the report-canonical-base hidden input: when empty the JS
-    falls back to window.location.origin, which is correct for dev and
-    avoids baking http://localhost:3000 into share links.
-    """
-    deploy = os.getenv("DEPLOY_URL", "").strip().rstrip("/")
-    if deploy:
-        return deploy
-    public = os.getenv("PUBLIC_APP_URL", "").strip().rstrip("/")
-    if public:
-        return public
-    return ""
-
-
-# Module-level constant for the report-canonical-base hidden input rendered
-# by pages/index.py. Empty when no explicit deploy URL is configured — the
-# client-side JS falls back to window.location.origin automatically.
-PUBLIC_APP_URL: str = _explicit_deploy_url()
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GENERATED_PUBLIC_DIR: Path = Path(

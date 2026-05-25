@@ -202,7 +202,14 @@ uv run start           # development mode (hot-reload)
 uv run serve           # production mode (single-port, Reflex 0.9+)
 ```
 
-Copy `.env.template` to `.env` to override defaults (email delivery, deploy URL, kiosk settings). For production, set `DEPLOY_URL` to your public domain so QR codes, report links, and social shares use absolute URLs.
+Copy `.env.template` to `.env` to override defaults (email delivery, deploy URL, kiosk settings, and post-materialization community links). For production, set `DEPLOY_URL` to your public domain so QR codes, report links, and social shares use absolute URLs.
+
+Useful optional overrides:
+
+- `DISCORD_INVITE_URL` controls the Discord CTA shown only after a visitor generates their materialization artifacts. Set it to an empty value to hide the CTA.
+- `DISCORD_COMMUNITY_NAME` controls the display name in that post-generation invite.
+- `GITHUB_PROJECT_URL` controls the post-generation GitHub CTA for stars, bug reports, and improvement suggestions. Set it to an empty value to hide the CTA.
+- `DONATION_URL` controls the post-generation donation/support CTA. Set it to an empty value to hide the CTA.
 
 ### Binary assets (Git LFS)
 
