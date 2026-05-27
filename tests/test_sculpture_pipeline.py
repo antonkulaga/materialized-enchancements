@@ -1,6 +1,6 @@
 """Pipeline-level sculpture tests: run the actual Voronoi computation per combo.
 
-This is the SLOW suite. Each combo runs compass-web `run_pipeline` once with the
+This is the SLOW suite. Each combo runs enhancement-geometry `run_pipeline` once with the
 initial seed (no retries). Combos whose first seed fails `is_valid_volume` are the
 ones that rely on seed-varying retry in production.
 
@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import pytest
-from compass_web.pipeline import run_pipeline
+from enhancement_geometry.pipeline import run_pipeline
 
 from materialized_enhancements.gene_data import GENE_LIBRARY, UNIQUE_CATEGORIES
 from materialized_enhancements.sculpture import (

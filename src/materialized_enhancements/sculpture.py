@@ -1,4 +1,4 @@
-"""Sculpture parameter mapping: gene selections → compass-web PipelineConfig → STL.
+"""Sculpture parameter mapping: gene selections → enhancement-geometry PipelineConfig → STL.
 
 Implements the mapping spec from data/input/sculpture_mapping_spec.md:
 user name + selected categories → gene pool → aggregate properties → 7 sculpture
@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import polars as pl
-from compass_web import PipelineConfig, export_stl, run_pipeline_with_retry
-from compass_web.config import MAX_MODEL_SPAN
+from enhancement_geometry import PipelineConfig, export_stl, run_pipeline_with_retry
+from enhancement_geometry.config import MAX_MODEL_SPAN
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ GENE_PROPERTIES_PATH = Path(__file__).resolve().parents[2] / "data" / "input" / 
 DEFAULT_EXPORT_DIR = Path(__file__).resolve().parents[2] / "data" / "output" / "sculptures"
 
 NUM_CIRCLES = 8
-DEFAULT_SCALE = 0.5  # compass-web default for scale_x / scale_y
-MIN_SEED_COUNT = 18  # Smallest safe slice from compass-web's default point generation.
+DEFAULT_SCALE = 0.5  # enhancement-geometry default for scale_x / scale_y
+MIN_SEED_COUNT = 18  # Smallest safe slice from enhancement-geometry's default point generation.
 # DEFAULT_EXTRUSION = -0.2  # was fixed while investigating failure rates; now computed from gravy_score
 
 # ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ DST_UPPER_SCALE = 0.9  # shrink upper bounds by 10%
 DST_LOWER_SCALE = 1.1  # raise lower bounds by 10%
 
 # ---------------------------------------------------------------------------
-# Base destination ranges — derived from compass-web hard geometry limits
+# Base destination ranges — derived from enhancement-geometry hard geometry limits
 # and the sculpture mapping spec (data/input/sculpture_mapping_spec.md).
 # ---------------------------------------------------------------------------
 _BASE_MIN_RADIUS = 5.0  # smallest visually distinguishable circle
@@ -190,7 +190,7 @@ def compute_sculpture_params(
 
     Returns a dict with keys: seed, radius, spacing, points, extrusion, scale_x, scale_y,
     plus derived keys: radii (tuple of 8), z_increment, seed_count, random_seed.
-    scale_x and scale_y are fixed at the compass-web default (0.5).
+    scale_x and scale_y are fixed at the enhancement-geometry default (0.5).
     """
     name_bytes = name.strip().lower().encode("utf-8")
     raw_crc = binascii.crc32(name_bytes) & 0xFFFFFFFF
@@ -271,7 +271,7 @@ def compute_sculpture_params(
 
 
 def build_pipeline_config(params: Dict[str, Any]) -> PipelineConfig:
-    """Convert computed sculpture params into a compass-web PipelineConfig."""
+    """Convert computed sculpture params into an enhancement-geometry PipelineConfig."""
     return PipelineConfig(
         radii=tuple(params["radii"]),
         z_increment=params["z_increment"],
@@ -316,7 +316,7 @@ def generate_sculpture(
 
     tag = name.strip().lower().replace(" ", "_")[:20] or "anon"
     suffix = f"_{tag}_s{params['seed']}"
-    cached_path = export_dir / f"compass_web{suffix}.stl"
+    cached_path = export_dir / f"enhancement_geometry{suffix}.stl"
 
     if cached_path.exists() and cached_path.stat().st_size > 0:
         logger.info("STL cache hit: %s (%.1f KB)", cached_path, cached_path.stat().st_size / 1024)
