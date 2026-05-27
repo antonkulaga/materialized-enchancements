@@ -200,10 +200,10 @@ Visitors unlock a unique printable 3D model based on their selected gene categor
    - **Spacing**: median exon count (mod 18), rescaled to 4.4–19.29 mm
    - **Points**: sum of system gene counts (mod 299) + 2, rescaled to 2.2–270
    - **Extrusion**: median GRAVY hydropathy score, rescaled to -0.35 to -0.05
-   - **Scale X/Y**: fixed at 0.5 (compass-web default)
+   - **Scale X/Y**: fixed at 0.5 (enhancement-geometry default)
    - **Radii (8 circles)**: base radius + Gaussian variation per seed
-2. `build_pipeline_config()` — converts params to compass-web `PipelineConfig`
-3. `run_pipeline_with_retry()` — executes compass-web pipeline (up to 10 attempts)
+2. `build_pipeline_config()` — converts params to enhancement-geometry `PipelineConfig`
+3. `run_pipeline_with_retry()` — executes enhancement-geometry pipeline (up to 10 attempts)
 4. `export_stl()` — writes binary STL to `data/output/sculptures/`
 5. Output filename: `{suffix}_{tag}_s{seed}.stl`
 

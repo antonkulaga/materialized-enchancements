@@ -12,8 +12,8 @@ from dataclasses import replace
 from typing import List
 
 import pytest
-from compass_web.config import PipelineConfig
-from compass_web.pipeline import run_pipeline
+from enhancement_geometry.config import PipelineConfig
+from enhancement_geometry.pipeline import run_pipeline
 
 from materialized_enhancements.gene_data import GENE_LIBRARY, UNIQUE_CATEGORIES
 from materialized_enhancements.sculpture import (

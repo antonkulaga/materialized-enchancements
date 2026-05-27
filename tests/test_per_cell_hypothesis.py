@@ -14,7 +14,7 @@ from typing import List
 import numpy as np
 import pytest
 import trimesh
-from compass_web.pipeline import run_pipeline, build_export_trimesh
+from enhancement_geometry.pipeline import run_pipeline, build_export_trimesh
 
 from materialized_enhancements.gene_data import GENE_LIBRARY, UNIQUE_CATEGORIES
 from materialized_enhancements.sculpture import (
@@ -67,7 +67,7 @@ def test_per_cell_volume_diagnosis(mask: int) -> None:
     invalid_cells = []
     per_cell_details = []
     for i, solid in enumerate(cell_solids):
-        from compass_web.lofted_surface_voronoi import orient_normals_outward
+        from enhancement_geometry.lofted_surface_voronoi import orient_normals_outward
         solid_o = orient_normals_outward(solid)
         pts = np.asarray(solid_o.points, dtype=float)
         fraw = np.asarray(solid_o.faces, dtype=int)

@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import List, NamedTuple, Optional
 
 import pytest
-from compass_web import export_stl, run_pipeline_with_retry
+from enhancement_geometry import export_stl, run_pipeline_with_retry
 
 from materialized_enhancements.gene_data import GENE_LIBRARY, UNIQUE_CATEGORIES
 from materialized_enhancements.sculpture import build_pipeline_config, compute_sculpture_params
