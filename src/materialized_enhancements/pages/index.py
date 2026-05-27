@@ -3887,8 +3887,21 @@ def _post_materialization_action_card(
     accent_color: str,
 ) -> rx.Component:
     return rx.el.a(
-        fomantic_icon(icon_name, size=13, color=accent_color),
-        rx.el.span(label, style={"marginLeft": "6px"}),
+        rx.el.span(
+            fomantic_icon(icon_name, size=22, color=accent_color),
+            style={
+                "width": "34px",
+                "height": "34px",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "borderRadius": "999px",
+                "background": "rgba(255, 255, 255, 0.09)",
+                "boxShadow": "inset 0 0 0 1px rgba(255, 255, 255, 0.10)",
+                "flex": "0 0 auto",
+            },
+        ),
+        rx.el.span(label, style={"marginLeft": "9px"}),
         href=href,
         target="_blank",
         rel="noopener noreferrer",
@@ -3897,34 +3910,26 @@ def _post_materialization_action_card(
             "display": "inline-flex",
             "alignItems": "center",
             "justifyContent": "center",
-            "padding": "7px 10px",
+            "padding": "8px 14px 8px 9px",
             "boxSizing": "border-box",
-            "minHeight": "32px",
+            "minHeight": "46px",
             "minWidth": "0",
             "borderRadius": "999px",
-            "background": "rgba(15, 23, 42, 0.42)",
-            "border": "1px solid rgba(196, 181, 253, 0.24)",
+            "background": "linear-gradient(135deg, rgba(124, 58, 237, 0.34), rgba(15, 23, 42, 0.68))",
+            "border": "2px solid rgba(196, 181, 253, 0.34)",
             "color": "#e5e7eb",
-            "fontSize": "0.84rem",
-            "fontWeight": "850",
+            "fontSize": "0.96rem",
+            "fontWeight": "900",
             "lineHeight": "1",
             "textDecoration": "none",
             "whiteSpace": "nowrap",
+            "boxShadow": "0 8px 18px rgba(2, 6, 23, 0.20)",
         },
     )
 
 
 def _materialization_post_generation_ctas() -> rx.Component:
     actions: list[rx.Component] = []
-    if DONATION_URL:
-        actions.append(
-            _post_materialization_action_card(
-                "coffee",
-                "Donate",
-                DONATION_URL,
-                "#f9a8d4",
-            )
-        )
     if DISCORD_INVITE_URL:
         actions.append(
             _post_materialization_action_card(
@@ -3938,9 +3943,18 @@ def _materialization_post_generation_ctas() -> rx.Component:
         actions.append(
             _post_materialization_action_card(
                 "github",
-                "Open GitHub issue",
+                "Star GitHub",
                 GITHUB_PROJECT_URL,
                 "#e5e7eb",
+            )
+        )
+    if DONATION_URL:
+        actions.append(
+            _post_materialization_action_card(
+                "coffee",
+                "Donate",
+                DONATION_URL,
+                "#f9a8d4",
             )
         )
     if not actions:
@@ -3965,6 +3979,7 @@ def _reward_artifact_choice(
     icon_name: str,
     active: rx.Var,
     on_click: rx.EventSpec,
+    action_label: str,
     image_src: str = "",
     image_alt: str = "",
     preview: rx.Component | None = None,
@@ -3989,7 +4004,7 @@ def _reward_artifact_choice(
         rx.el.div(
             rx.el.strong(label, style={"display": "block", "fontSize": "1.34rem", "lineHeight": "1.15"}),
             rx.el.span(description, style={"fontSize": "1.05rem", "lineHeight": "1.35", "color": rx.cond(active, "#dbeafe", "#cbd5e1")}),
-            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 2px"},
+            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 0"},
         ),
         rx.el.div(
             preview,
@@ -4020,25 +4035,45 @@ def _reward_artifact_choice(
                 "border": rx.cond(active, "2px solid rgba(253, 230, 138, 0.95)", "1px solid rgba(196, 181, 253, 0.24)"),
             },
         ),
+        rx.el.span(
+            rx.cond(active, "Viewing now", action_label),
+            rx.el.span(rx.cond(active, "", " ->"), style={"marginLeft": "7px"}),
+            style={
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "alignSelf": "center",
+                "minHeight": "38px",
+                "padding": "9px 17px",
+                "borderRadius": "999px",
+                "background": rx.cond(active, "rgba(253, 230, 138, 0.96)", "rgba(255, 255, 255, 0.96)"),
+                "color": rx.cond(active, "#422006", "#312e81"),
+                "fontSize": "0.98rem",
+                "fontWeight": "950",
+                "lineHeight": "1",
+                "boxShadow": "0 8px 18px rgba(2, 6, 23, 0.24)",
+            },
+        ),
         type="button",
         on_click=on_click,
+        aria_label=action_label,
         style={
             "display": "flex",
             "flexDirection": "column",
             "alignItems": "stretch",
             "gap": "10px",
-            "padding": "12px",
+            "padding": "13px",
             "borderRadius": "20px",
-            "border": rx.cond(active, "4px solid rgba(253, 230, 138, 0.92)", "2px solid rgba(196, 181, 253, 0.24)"),
+            "border": rx.cond(active, "4px solid rgba(253, 230, 138, 0.92)", "3px solid rgba(196, 181, 253, 0.46)"),
             "background": rx.cond(
                 active,
                 "linear-gradient(135deg, rgba(124, 58, 237, 0.58), rgba(15, 23, 42, 0.78))",
-                "rgba(15, 23, 42, 0.54)",
+                "linear-gradient(135deg, rgba(30, 41, 59, 0.82), rgba(15, 23, 42, 0.64))",
             ),
             "boxShadow": rx.cond(
                 active,
                 "0 0 0 4px rgba(124, 58, 237, 0.28), 0 18px 36px rgba(250, 204, 21, 0.18)",
-                "none",
+                "0 12px 28px rgba(2, 6, 23, 0.22)",
             ),
             "color": "#f8fafc",
             "cursor": "pointer",
@@ -4104,7 +4139,7 @@ def _create_own_character_card() -> rx.Component:
                 "Start a fresh enhancement profile",
                 style={"fontSize": "1.05rem", "lineHeight": "1.35", "color": "#dbeafe"},
             ),
-            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 2px"},
+            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 0"},
         ),
         rx.el.div(
             rx.el.img(
@@ -4148,18 +4183,38 @@ def _create_own_character_card() -> rx.Component:
                 "border": "2px solid rgba(253, 230, 138, 0.65)",
             },
         ),
+        rx.el.span(
+            "Start now",
+            rx.el.span(" ->", style={"marginLeft": "7px"}),
+            style={
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "alignSelf": "center",
+                "minHeight": "38px",
+                "padding": "9px 17px",
+                "borderRadius": "999px",
+                "background": "rgba(253, 230, 138, 0.96)",
+                "color": "#422006",
+                "fontSize": "0.98rem",
+                "fontWeight": "950",
+                "lineHeight": "1",
+                "boxShadow": "0 8px 18px rgba(2, 6, 23, 0.24)",
+            },
+        ),
         type="button",
         on_click=ComposeState.start_fresh,
+        aria_label="Start a fresh enhancement profile",
         style={
             "display": "flex",
             "flexDirection": "column",
             "alignItems": "stretch",
             "gap": "10px",
-            "padding": "12px",
+            "padding": "13px",
             "borderRadius": "20px",
-            "border": "3px solid rgba(253, 230, 138, 0.72)",
+            "border": "4px solid rgba(253, 230, 138, 0.78)",
             "background": "linear-gradient(135deg, rgba(124, 58, 237, 0.48), rgba(15, 23, 42, 0.72))",
-            "boxShadow": "0 0 0 3px rgba(250, 204, 21, 0.14), 0 12px 28px rgba(2, 6, 23, 0.22)",
+            "boxShadow": "0 0 0 3px rgba(250, 204, 21, 0.14), 0 16px 32px rgba(2, 6, 23, 0.26)",
             "color": "#f8fafc",
             "cursor": "pointer",
             "font": "inherit",
@@ -4215,7 +4270,7 @@ def _materialization_reward_panel() -> rx.Component:
                         },
                     ),
                     rx.el.h2(
-                        "Quest complete: your enhancement artifacts are ready",
+                        "Quest complete: your enhancement character is ready",
                         style={
                             "margin": "10px 0 8px",
                             "color": "#f8fafc",
@@ -4226,8 +4281,9 @@ def _materialization_reward_panel() -> rx.Component:
                         },
                     ),
                     rx.el.p(
-                        "Your selected genes became two take-home rewards: a printable 3D model you can inspect, "
-                        "download, or make, and a personal enhancement report you can share online or print.",
+                        "Congratulations. Your selected genes became two take-home rewards: a printable 3D model "
+                        "and a personal enhancement report. This project is also growing into an open enhancement "
+                        "gene knowledgebase for art, education, and future science.",
                         style={
                             "margin": "0",
                             "color": "#dbeafe",
@@ -4247,12 +4303,24 @@ def _materialization_reward_panel() -> rx.Component:
             ),
             rx.el.div(
                 rx.el.div(
-                    "Need to change the selected genes or visitor name?",
+                    "Help grow the enhancement atlas",
                     style={
-                        "marginBottom": "8px",
+                        "marginBottom": "5px",
                         "color": "#cbd5e1",
+                        "fontSize": "0.98rem",
+                        "fontWeight": "900",
+                        "textAlign": "center",
+                    },
+                ),
+                rx.el.div(
+                    "Join the movement: share feedback, suggest genes, support the next version, or edit this character.",
+                    style={
+                        "margin": "0 auto 10px",
+                        "maxWidth": "48rem",
+                        "color": "#94a3b8",
                         "fontSize": "0.9rem",
-                        "fontWeight": "800",
+                        "fontWeight": "700",
+                        "lineHeight": "1.35",
                         "textAlign": "center",
                     },
                 ),
@@ -4267,6 +4335,7 @@ def _materialization_reward_panel() -> rx.Component:
                     "cube",
                     model_active,
                     ComposeState.show_model_artifact_tab,
+                    "Open model",
                     image_src="/images/icons/shapes.jpg",
                     image_alt="Printed Materialized Enhancements 3D shapes",
                 ),
@@ -4276,6 +4345,7 @@ def _materialization_reward_panel() -> rx.Component:
                     "file alternate",
                     report_active,
                     ComposeState.show_report_artifact_tab,
+                    "Open report",
                     image_src="/images/icons/report_icon.jpeg",
                     image_alt="Personal enhancement report icon",
                 ),
@@ -4288,6 +4358,7 @@ def _materialization_reward_panel() -> rx.Component:
                         "share alternate",
                         share_active,
                         ComposeState.show_share_artifact_tab,
+                        "Open sharing",
                         image_src="/images/icons/share.jpg",
                         image_alt="Share and publish icon",
                     ),
