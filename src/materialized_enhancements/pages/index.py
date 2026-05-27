@@ -3880,6 +3880,34 @@ def _materialization_edit_character_cta() -> rx.Component:
     )
 
 
+def _materialization_create_new_character_cta() -> rx.Component:
+    return rx.el.button(
+        fomantic_icon("user plus", size=16, color="#312e81"),
+        rx.el.span(
+            "Create new character",
+            style={"marginLeft": "8px"},
+        ),
+        type="button",
+        on_click=ComposeState.start_fresh,
+        style={
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "marginBottom": "0",
+            "padding": "11px 18px",
+            "borderRadius": "6px",
+            "border": "1px solid rgba(196, 181, 253, 0.65)",
+            "background": "#f8fafc",
+            "color": "#312e81",
+            "font": "inherit",
+            "fontWeight": "900",
+            "lineHeight": "1",
+            "cursor": "pointer",
+            "boxShadow": "0 8px 18px rgba(2, 6, 23, 0.18)",
+        },
+    )
+
+
 def _post_materialization_action_card(
     icon_name: str,
     label: str,
@@ -4127,105 +4155,6 @@ def _share_card_preview() -> rx.Component:
     )
 
 
-def _create_own_character_card() -> rx.Component:
-    """Large card shown in place of 'Share & publish' for shared-link visitors."""
-    return rx.el.button(
-        rx.el.div(
-            rx.el.strong(
-                "Create my own character",
-                style={"display": "block", "fontSize": "1.34rem", "lineHeight": "1.15"},
-            ),
-            rx.el.span(
-                "Start a fresh enhancement profile",
-                style={"fontSize": "1.05rem", "lineHeight": "1.35", "color": "#dbeafe"},
-            ),
-            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 0"},
-        ),
-        rx.el.div(
-            rx.el.img(
-                src="/images/og-preview.png",
-                alt="Materialized Enhancements preview",
-                loading="lazy",
-                decoding="async",
-                style={
-                    "width": "100%",
-                    "height": "100%",
-                    "objectFit": "contain",
-                    "objectPosition": "center",
-                    "display": "block",
-                    "filter": "saturate(1.08) contrast(1.04)",
-                },
-            ),
-            rx.el.div(
-                fomantic_icon("user plus", size=20, color="#ffffff"),
-                style={
-                    "position": "absolute",
-                    "right": "10px",
-                    "top": "10px",
-                    "width": "36px",
-                    "height": "36px",
-                    "display": "flex",
-                    "alignItems": "center",
-                    "justifyContent": "center",
-                    "borderRadius": "999px",
-                    "background": "rgba(15, 23, 42, 0.78)",
-                    "boxShadow": "0 8px 16px rgba(2, 6, 23, 0.28)",
-                },
-            ),
-            style={
-                "position": "relative",
-                "width": "100%",
-                "aspectRatio": "4 / 3",
-                "maxHeight": "280px",
-                "overflow": "hidden",
-                "borderRadius": "14px",
-                "background": "rgba(15, 23, 42, 0.72)",
-                "border": "2px solid rgba(253, 230, 138, 0.65)",
-            },
-        ),
-        rx.el.span(
-            "Start now",
-            rx.el.span(" ->", style={"marginLeft": "7px"}),
-            style={
-                "display": "inline-flex",
-                "alignItems": "center",
-                "justifyContent": "center",
-                "alignSelf": "center",
-                "minHeight": "38px",
-                "padding": "9px 17px",
-                "borderRadius": "999px",
-                "background": "rgba(253, 230, 138, 0.96)",
-                "color": "#422006",
-                "fontSize": "0.98rem",
-                "fontWeight": "950",
-                "lineHeight": "1",
-                "boxShadow": "0 8px 18px rgba(2, 6, 23, 0.24)",
-            },
-        ),
-        type="button",
-        on_click=ComposeState.start_fresh,
-        aria_label="Start a fresh enhancement profile",
-        style={
-            "display": "flex",
-            "flexDirection": "column",
-            "alignItems": "stretch",
-            "gap": "10px",
-            "padding": "13px",
-            "borderRadius": "20px",
-            "border": "4px solid rgba(253, 230, 138, 0.78)",
-            "background": "linear-gradient(135deg, rgba(124, 58, 237, 0.48), rgba(15, 23, 42, 0.72))",
-            "boxShadow": "0 0 0 3px rgba(250, 204, 21, 0.14), 0 16px 32px rgba(2, 6, 23, 0.26)",
-            "color": "#f8fafc",
-            "cursor": "pointer",
-            "font": "inherit",
-            "textAlign": "center",
-            "appearance": "none",
-            "width": "100%",
-            "maxWidth": "none",
-        },
-    )
-
-
 def _materialization_reward_panel() -> rx.Component:
     """Visitor-facing reward card for all generated materialization outputs."""
     model_active = ComposeState.materialization_artifact_tab == "model"
@@ -4302,6 +4231,22 @@ def _materialization_reward_panel() -> rx.Component:
                 },
             ),
             rx.el.div(
+                _materialization_edit_character_cta(),
+                rx.cond(
+                    ComposeState.is_shared_visit,
+                    _materialization_create_new_character_cta(),
+                    rx.fragment(),
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "flexWrap": "wrap",
+                    "gap": "8px",
+                    "marginTop": "14px",
+                },
+            ),
+            rx.el.div(
                 rx.el.div(
                     "Help grow the enhancement atlas",
                     style={
@@ -4313,7 +4258,7 @@ def _materialization_reward_panel() -> rx.Component:
                     },
                 ),
                 rx.el.div(
-                    "Join the movement: share feedback, suggest genes, support the next version, or edit this character.",
+                    "Join the movement: share feedback, suggest genes, or support the next version.",
                     style={
                         "margin": "0 auto 10px",
                         "maxWidth": "48rem",
@@ -4324,9 +4269,16 @@ def _materialization_reward_panel() -> rx.Component:
                         "textAlign": "center",
                     },
                 ),
-                _materialization_edit_character_cta(),
                 _materialization_post_generation_ctas(),
-                style={"marginTop": "14px", "textAlign": "center"},
+                style={
+                    "marginTop": "16px",
+                    "padding": "13px 14px 14px",
+                    "textAlign": "center",
+                    "borderRadius": "14px",
+                    "background": "rgba(15, 23, 42, 0.46)",
+                    "border": "1px solid rgba(196, 181, 253, 0.20)",
+                    "boxShadow": "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                },
             ),
             rx.el.div(
                 _reward_artifact_choice(
@@ -4349,19 +4301,15 @@ def _materialization_reward_panel() -> rx.Component:
                     image_src="/images/icons/report_icon.jpeg",
                     image_alt="Personal enhancement report icon",
                 ),
-                rx.cond(
-                    ComposeState.is_shared_visit,
-                    _create_own_character_card(),
-                    _reward_artifact_choice(
-                        "Share & publish",
-                        "Share on social media!",
-                        "share alternate",
-                        share_active,
-                        ComposeState.show_share_artifact_tab,
-                        "Open sharing",
-                        image_src="/images/icons/share.jpg",
-                        image_alt="Share and publish icon",
-                    ),
+                _reward_artifact_choice(
+                    "Share & publish",
+                    "Share on social media!",
+                    "share alternate",
+                    share_active,
+                    ComposeState.show_share_artifact_tab,
+                    "Open sharing",
+                    image_src="/images/icons/share.jpg",
+                    image_alt="Share and publish icon",
                 ),
                 style={
                     "display": "grid",
