@@ -909,19 +909,17 @@ class ComposeState(rx.State):
     materialization_artifact_tab: str = "model"
     stl_base64: str = ""
     viewer_nonce: int = 0
-    onboarding_complete: str | None = rx.Cookie(
-        "false",
+    onboarding_complete: str | None = rx.LocalStorage(
+        "pending",
         name="me_onboarding_complete",
-        path="/",
-        max_age=60 * 60 * 24 * 365,
-        same_site="lax",
+        sync=True,
     )
     dismissed_onboarding: str | None = rx.LocalStorage(
-        "false",
+        "pending",
         name="me_dismissed_onboarding",
         sync=True,
     )
-    onboarding_step: str | None = rx.LocalStorage("0", name="me_onboarding_step", sync=True)
+    onboarding_step: str | None = rx.LocalStorage("pending", name="me_onboarding_step", sync=True)
 
     # Share card (in-memory preview, no disk write)
     share_card_data_url: str = ""
@@ -1198,6 +1196,23 @@ class ComposeState(rx.State):
 
     def _sync_onboarding_from_storage(self) -> None:
         """Align cookie + LocalStorage so a partial write still counts as finished."""
+        if (
+            self.onboarding_complete == "pending"
+            and self.dismissed_onboarding == "pending"
+            and self.onboarding_step == "pending"
+        ):
+            self.onboarding_complete = "false"
+            self.dismissed_onboarding = "false"
+            self.onboarding_step = "0"
+            return
+
+        if self.onboarding_complete == "pending":
+            self.onboarding_complete = "false"
+        if self.dismissed_onboarding == "pending":
+            self.dismissed_onboarding = "false"
+        if self.onboarding_step == "pending":
+            self.onboarding_step = "0"
+
         complete = str(self.onboarding_complete or "false").strip().lower() == "true"
         dismissed = str(self.dismissed_onboarding or "false").strip().lower() == "true"
         step = str(self.onboarding_step or "0").strip().lower()
@@ -1218,9 +1233,17 @@ class ComposeState(rx.State):
         if next_step >= 3:
             self._mark_onboarding_finished()
 
-    def dismiss_onboarding(self) -> None:
-        """Legacy handler: advance one step (used by older UI wiring)."""
+    def advance_name_onboarding_on_enter(self, key: str, _key_info: dict[str, Any]) -> None:
+        """Move past the name tooltip when the user confirms a non-empty name."""
+        if key != "Enter" or self.onboarding_step_index != 1:
+            return
+        if not self.personal_tag.strip():
+            return
         self.advance_onboarding()
+
+    def dismiss_onboarding(self) -> None:
+        """Dismiss onboarding completely."""
+        self._mark_onboarding_finished()
 
     def check_clean_storage(self):  # type: ignore[return]
         params = self.router.url.query_parameters
@@ -1234,6 +1257,7 @@ class ComposeState(rx.State):
             self.dismissed_onboarding = "false"
             self.onboarding_step = "0"
             yield rx.call_script(
+                "localStorage.removeItem('me_onboarding_complete');"
                 "localStorage.removeItem('me_dismissed_onboarding');"
                 "localStorage.removeItem('me_onboarding_step');"
                 "document.cookie = 'me_onboarding_complete=; path=/; max-age=0; SameSite=Lax';"
@@ -2342,6 +2366,8 @@ class ComposeState(rx.State):
 
     @rx.var
     def onboarding_finished(self) -> bool:
+        if self.onboarding_complete == "pending" or self.dismissed_onboarding == "pending" or self.onboarding_step == "pending":
+            return True
         complete = str(self.onboarding_complete or "false").strip().lower() == "true"
         dismissed = str(self.dismissed_onboarding or "false").strip().lower() == "true"
         step = str(self.onboarding_step or "0").strip().lower()
@@ -2362,24 +2388,24 @@ class ComposeState(rx.State):
 
     @rx.var
     def show_onboarding_genes(self) -> bool:
-        return self.onboarding_step_index == 0
+        return self.show_onboarding_suggestion and self.onboarding_step_index == 0
 
     @rx.var
     def show_onboarding_name(self) -> bool:
-        return self.onboarding_step_index == 1
+        return self.show_onboarding_suggestion and self.onboarding_step_index == 1
 
     @rx.var
     def show_onboarding_materialize(self) -> bool:
-        return self.onboarding_step_index == 2
+        return self.show_onboarding_suggestion and self.onboarding_step_index == 2
 
     @rx.var
     def show_onboarding_center_lift(self) -> bool:
         """Raise body-map column above the dimmed backdrop (name + materialize steps)."""
-        return self.onboarding_step_index == 1 or self.onboarding_step_index == 2
+        return self.show_onboarding_suggestion and (self.onboarding_step_index == 1 or self.onboarding_step_index == 2)
 
     @rx.var
     def show_onboarding_suggestion(self) -> bool:
-        return self.onboarding_step_index < 3
+        return not self.onboarding_finished
 
     @rx.var
     def budget_remaining(self) -> int:
@@ -2477,6 +2503,28 @@ class ComposeState(rx.State):
         if spent > 0 and not self.has_personal_tag:
             return "Please enter a character name or alias above to materialize your enhancements."
         return ""
+
+    @rx.var
+    def materialize_requirements_notice(self) -> str:
+        spent = _sum_credits_for_included_genes(self.selected_categories, self.included_genes)
+        missing_name = not self.has_personal_tag
+        missing_genes = spent <= 0
+        if missing_name and missing_genes:
+            return "Choose at least one gene and enter a character name before materializing."
+        if missing_genes:
+            return "Choose at least one gene from the Gene library before materializing."
+        if missing_name:
+            return "Enter a character name or alias before materializing."
+        return ""
+
+    @rx.var
+    def onboarding_materialize_guidance(self) -> str:
+        if self.materialize_requirements_notice:
+            return f"{self.materialize_requirements_notice} Then press the Materialize button to create your 3D model and report."
+        return (
+            "You are ready. Press the pulsing Materialize button below to grow your unique "
+            "mathematical Voronoi sculpture and download your personal report."
+        )
 
     @rx.var
     def materialize_totem_diversity_notice(self) -> str:

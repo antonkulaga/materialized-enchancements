@@ -2323,6 +2323,8 @@ def _onboarding_close_button() -> rx.Component:
         title="Close",
         on_click=ComposeState.advance_onboarding,
         style={
+            "position": "relative",
+            "zIndex": "1202",
             "flexShrink": "0",
             "width": "38px",
             "height": "38px",
@@ -2345,7 +2347,7 @@ def _onboarding_tooltip_card(
     icon_name: str,
     accent_color: str,
     headline: str,
-    detail: str,
+    detail: str | rx.Var[str],
 ) -> rx.Component:
     return rx.cond(
         show,
@@ -2396,6 +2398,8 @@ def _onboarding_tooltip_card(
             ),
             class_name="me-onboarding-tip-card",
             style={
+                "position": "relative",
+                "zIndex": "1200",
                 "width": "100%",
                 "maxWidth": "100%",
                 "boxSizing": "border-box",
@@ -2447,10 +2451,7 @@ def _materialize_onboarding_tooltip() -> rx.Component:
         icon_name="atom",
         accent_color="#10b981",
         headline="Materialize when you are ready",
-        detail=(
-            "After you have genes within budget, press the pulsing Materialize button below "
-            "to grow your unique mathematical Voronoi sculpture and download your personal report."
-        ),
+        detail=ComposeState.onboarding_materialize_guidance,
     )
 
 
@@ -2552,20 +2553,16 @@ def _rpg_materialization_leg_cta() -> rx.Component:
             title=rx.cond(
                 ComposeState.can_materialize,
                 "Generate the 3D sculpture and report.",
-                rx.cond(
-                    ComposeState.has_personal_tag,
-                    "Select at least one gene within budget to materialize.",
-                    "Please enter a character name or alias to materialize.",
-                ),
+                ComposeState.materialize_requirements_notice,
             ),
         ),
         rx.el.div(
             rx.cond(
-                ComposeState.materialize_name_missing_notice != "",
+                ComposeState.materialize_requirements_notice != "",
                 rx.el.div(
-                    fomantic_icon("user", size=12, color="#38bdf8"),
-                    rx.el.span(ComposeState.materialize_name_missing_notice, style={"marginLeft": "6px"}),
-                    class_name="me-rpg-materialize-alert me-rpg-materialize-info-alert",
+                    fomantic_icon("circle-alert", size=12, color="#fca5a5"),
+                    rx.el.span(ComposeState.materialize_requirements_notice, style={"marginLeft": "6px"}),
+                    class_name="me-rpg-materialize-alert me-rpg-materialize-error",
                 ),
                 rx.fragment(),
             ),
@@ -2849,19 +2846,28 @@ def _rpg_body_map_panel() -> rx.Component:
                             placeholder="Enhanced <Name>",
                             value=ComposeState.personal_tag,
                             on_change=ComposeState.set_personal_tag,
+                            on_key_down=ComposeState.advance_name_onboarding_on_enter,
                             style={
                                 "flex": "1",
                                 "minWidth": "0",
                                 "padding": "15px 18px",
                                 "borderRadius": "14px",
-                                "border": "1px solid rgba(167, 139, 250, 0.45)",
+                                "border": rx.cond(
+                                    ComposeState.has_personal_tag,
+                                    "1px solid rgba(167, 139, 250, 0.45)",
+                                    "2px solid rgba(248, 113, 113, 0.95)",
+                                ),
                                 "fontSize": "1.18rem",
                                 "fontWeight": "800",
                                 "outline": "none",
                                 "backgroundColor": "rgba(15, 23, 42, 0.88)",
                                 "color": "#f8fafc",
                                 "boxSizing": "border-box",
-                                "boxShadow": "0 0 24px rgba(124, 58, 237, 0.45), 0 0 52px rgba(56, 189, 248, 0.20)",
+                                "boxShadow": rx.cond(
+                                    ComposeState.has_personal_tag,
+                                    "0 0 24px rgba(124, 58, 237, 0.45), 0 0 52px rgba(56, 189, 248, 0.20)",
+                                    "0 0 0 3px rgba(248, 113, 113, 0.16), 0 0 24px rgba(248, 113, 113, 0.35)",
+                                ),
                             },
                         ),
                         rx.upload(
@@ -3522,6 +3528,7 @@ def _rpg_gene_library_title() -> rx.Component:
                 "lineHeight": "1.35",
             },
         ),
+        class_name="me-rpg-library-title",
         style={"marginBottom": "12px"},
     )
 
@@ -4798,6 +4805,20 @@ def _rpg_flow_css() -> rx.Component:
             position: relative;
             z-index: 1010;
         }
+        .me-onboarding-gene-lift .me-rpg-sidebar-intro,
+        .me-onboarding-gene-lift .me-budget-gauge,
+        .me-onboarding-gene-lift .me-rpg-library-title,
+        .me-onboarding-gene-lift .me-rpg-library-grid {
+            filter: blur(3px);
+            opacity: 0.54;
+            pointer-events: none;
+            user-select: none;
+        }
+        .me-onboarding-gene-lift .me-onboarding-tip-card {
+            filter: none;
+            opacity: 1;
+            pointer-events: auto;
+        }
         .me-budget-gauge {
             position: sticky;
             top: 0;
@@ -5540,10 +5561,11 @@ def _onboarding_backdrop() -> rx.Component:
                 "width": "100vw",
                 "height": "100vh",
                 "background": "rgba(2, 6, 23, 0.55)",
-                "backdropFilter": "blur(4px)",
-                "-webkit-backdropFilter": "blur(4px)",
+                "backdropFilter": "blur(3px)",
+                "WebkitBackdropFilter": "blur(3px)",
                 "zIndex": "1000",
                 "cursor": "pointer",
+                "pointerEvents": "auto",
             },
         ),
         rx.fragment(),
@@ -5558,16 +5580,19 @@ def _rpg_active_genes_layout() -> rx.Component:
                 _budget_gauge(),
                 _rpg_gene_library_panel(),
                 id="gene-library",
-                class_name="me-rpg-left-panel me-rpg-library-section",
+                class_name=rx.cond(
+                    ComposeState.show_onboarding_genes,
+                    "me-rpg-left-panel me-rpg-library-section me-onboarding-gene-lift",
+                    "me-rpg-left-panel me-rpg-library-section",
+                ),
                 style=rx.cond(
                     ComposeState.show_onboarding_genes,
                     {
                         "position": "relative",
-                        "zIndex": "1010",
-                        "boxShadow": "0 0 25px rgba(255, 255, 255, 0.70)",
-                        "borderRadius": "14px",
+                        "zIndex": "1200",
+                        "pointerEvents": "none",
                     },
-                    {}
+                    {},
                 ),
             ),
             rx.el.div(

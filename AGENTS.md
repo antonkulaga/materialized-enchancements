@@ -45,6 +45,9 @@ materialized-enhancements/          ← repo root
 uv run start        # starts Reflex dev server (http://localhost:3000)
 ```
 
+When testing first-visit onboarding/tutorial tooltips, use `uv run start --clean`
+so browser storage is cleared and the onboarding sequence appears from step 1.
+
 ---
 
 ## Data Model
