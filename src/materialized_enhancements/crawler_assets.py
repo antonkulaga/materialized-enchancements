@@ -38,7 +38,7 @@ PUBLIC_ROUTES: tuple[CrawlerRoute, ...] = (
         description=(
             "Build your post-human character from real genes — tardigrade radiation shields, "
             "naked-mole-rat cancer resistance, Greenland shark longevity — backed by scientific "
-            "evidence tiers and real citations. Spend enhancement credits and 3D-print the result."
+            "evidence tiers and real citations. Spend credits and grow a unique, mathematical Voronoi 3D-printable sculpture."
         ),
         changefreq="weekly",
         priority=1.0,

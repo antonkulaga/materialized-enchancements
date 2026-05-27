@@ -39,6 +39,13 @@ def main() -> None:
         os.environ["MATERIALIZED_DEV_MODE"] = "1"
         args = [a for a in args if a != "--dev"]
 
+    if "--clean" in args:
+        os.environ["CLEAN_BROWSER_STORAGE"] = "1"
+        args = [a for a in args if a != "--clean"]
+    if "--clean-storage" in args:
+        os.environ["CLEAN_BROWSER_STORAGE"] = "1"
+        args = [a for a in args if a != "--clean-storage"]
+
     _setup()
 
     from reflex import constants
@@ -222,7 +229,11 @@ def preselect() -> None:
     parser.add_argument("--backend-host", default=None,
                         help="Backend bind host, defaults to Reflex config / .env")
     parser.add_argument("--url-only", action="store_true", help="Print URL and exit without starting server")
+    parser.add_argument("--clean", "--clean-storage", action="store_true", help="Clear client-side LocalStorage on launch")
     parsed = parser.parse_args(args_raw)
+
+    if parsed.clean:
+        os.environ["CLEAN_BROWSER_STORAGE"] = "1"
 
     if parsed.url_only:
         _build_preselect_url(

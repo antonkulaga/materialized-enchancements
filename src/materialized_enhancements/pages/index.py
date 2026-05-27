@@ -341,7 +341,7 @@ def _landing_tab() -> rx.Component:
                         },
                     ),
                     rx.el.p(
-                        "Real genes. Real science. Your character.",
+                        "Real genes. Real science. Your character. Wearable 3D printed model.",
                         style={
                             "color": "#7c3aed",
                             "fontSize": "1.25rem",
@@ -813,7 +813,8 @@ def _budget_gauge() -> rx.Component:
                 "Design one enhanced human. You have ",
                 rx.el.strong(f"{DEFAULT_BUDGET} enhancement credits", style={"color": "#c4b5fd"}),
                 " and real genes from extraordinary organisms. "
-                "Every upgrade has a biological tradeoff — you cannot maximize everything.",
+                "Every upgrade has a biological tradeoff — you cannot maximize everything. "
+                "Once finished, materialize your enhancements into a personal report and a wearable 3D-printable model!",
                 style={
                     "fontSize": "0.82rem",
                     "lineHeight": "1.45",
@@ -2214,7 +2215,7 @@ def _rpg_schema_hint_panel() -> rx.Component:
             },
         ),
         rx.el.div(
-            "Trait choices become parametric geometry, then a unique STL and physical artifact.",
+            "Trait choices procedurally grow an organic mathematical Voronoi sculpture — a unique, printable 3D model.",
             style={
                 "marginTop": "8px",
                 "color": "#cbd5e1",
@@ -2306,6 +2307,153 @@ def _rpg_intro_video_panel() -> rx.Component:
     )
 
 
+def _onboarding_close_button() -> rx.Component:
+    return rx.el.button(
+        rx.el.span(
+            "×",
+            style={
+                "fontSize": "1.45rem",
+                "lineHeight": "1",
+                "fontWeight": "900",
+                "color": "#f8fafc",
+            },
+        ),
+        type="button",
+        aria_label="Close tip",
+        title="Close",
+        on_click=ComposeState.advance_onboarding,
+        style={
+            "flexShrink": "0",
+            "width": "38px",
+            "height": "38px",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "borderRadius": "10px",
+            "border": "1px solid rgba(148, 163, 184, 0.55)",
+            "background": "rgba(30, 41, 59, 0.95)",
+            "cursor": "pointer",
+            "padding": "0",
+        },
+    )
+
+
+def _onboarding_tooltip_card(
+    show: rx.Var[bool],
+    *,
+    step_label: str,
+    icon_name: str,
+    accent_color: str,
+    headline: str,
+    detail: str,
+) -> rx.Component:
+    return rx.cond(
+        show,
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon(icon_name, size=14, color=accent_color),
+                    rx.el.span(
+                        step_label,
+                        style={
+                            "marginLeft": "6px",
+                            "fontWeight": "900",
+                            "color": accent_color,
+                            "fontSize": "0.82rem",
+                            "textTransform": "uppercase",
+                        },
+                    ),
+                    style={"display": "flex", "alignItems": "center", "minWidth": "0"},
+                ),
+                _onboarding_close_button(),
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "flex-start",
+                    "gap": "10px",
+                    "marginBottom": "8px",
+                },
+            ),
+            rx.el.p(
+                headline,
+                style={
+                    "color": "#f8fafc",
+                    "fontSize": "1.12rem",
+                    "fontWeight": "900",
+                    "lineHeight": "1.4",
+                    "margin": "0 0 6px 0",
+                },
+            ),
+            rx.el.p(
+                detail,
+                style={
+                    "color": "#cbd5e1",
+                    "fontSize": "0.96rem",
+                    "fontWeight": "600",
+                    "lineHeight": "1.5",
+                    "margin": "0",
+                },
+            ),
+            class_name="me-onboarding-tip-card",
+            style={
+                "width": "100%",
+                "maxWidth": "100%",
+                "boxSizing": "border-box",
+                "padding": "14px",
+                "marginBottom": "12px",
+                "borderRadius": "14px",
+                "background": "linear-gradient(135deg, #111827 0%, #0b1020 100%)",
+                "border": f"2px solid {accent_color}",
+                "boxShadow": "0 0 25px rgba(255, 255, 255, 0.70)",
+                "pointerEvents": "auto",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
+def _gene_library_onboarding_tooltip() -> rx.Component:
+    return _onboarding_tooltip_card(
+        ComposeState.show_onboarding_genes,
+        step_label="Onboarding: Step 1",
+        icon_name="info circle",
+        accent_color="#a78bfa",
+        headline="Choose your enhancement genes",
+        detail=(
+            "Open a category accordion below and add genes to your character. "
+            "Each gene spends enhancement credits (cr) and shapes your unique mathematical Voronoi 3D model."
+        ),
+    )
+
+
+def _name_onboarding_tooltip() -> rx.Component:
+    return _onboarding_tooltip_card(
+        ComposeState.show_onboarding_name,
+        step_label="Onboarding: Step 2",
+        icon_name="user",
+        accent_color="#38bdf8",
+        headline="Add your name or alias",
+        detail=(
+            "Please add your name or alias here. It labels your character on the body map, "
+            "share card, and personal enhancement report."
+        ),
+    )
+
+
+def _materialize_onboarding_tooltip() -> rx.Component:
+    return _onboarding_tooltip_card(
+        ComposeState.show_onboarding_materialize,
+        step_label="Onboarding: Step 3",
+        icon_name="atom",
+        accent_color="#10b981",
+        headline="Materialize when you are ready",
+        detail=(
+            "After you have genes within budget, press the pulsing Materialize button below "
+            "to grow your unique mathematical Voronoi sculpture and download your personal report."
+        ),
+    )
+
+
 def _rpg_sidebar_intro_stack() -> rx.Component:
     return rx.el.div(
         _rpg_schema_hint_panel(),
@@ -2366,6 +2514,7 @@ def _rpg_selected_gene_loadout() -> rx.Component:
 
 def _rpg_materialization_leg_cta() -> rx.Component:
     return rx.el.div(
+        _materialize_onboarding_tooltip(),
         rx.el.div(
             rx.el.span(ComposeState.budget_spent, style={"fontWeight": "950", "color": "#ffffff"}),
             f" / {DEFAULT_BUDGET} cr",
@@ -2396,17 +2545,30 @@ def _rpg_materialization_leg_cta() -> rx.Component:
                 "me-rpg-materialize-leg-button is-disabled",
                 rx.cond(
                     ComposeState.can_materialize,
-                    "me-rpg-materialize-leg-button",
+                    "me-rpg-materialize-leg-button is-active-pulse",
                     "me-rpg-materialize-leg-button is-disabled",
                 ),
             ),
             title=rx.cond(
                 ComposeState.can_materialize,
                 "Generate the 3D sculpture and report.",
-                "Select at least one gene within budget to materialize. Character name is optional.",
+                rx.cond(
+                    ComposeState.has_personal_tag,
+                    "Select at least one gene within budget to materialize.",
+                    "Please enter a character name or alias to materialize.",
+                ),
             ),
         ),
         rx.el.div(
+            rx.cond(
+                ComposeState.materialize_name_missing_notice != "",
+                rx.el.div(
+                    fomantic_icon("user", size=12, color="#38bdf8"),
+                    rx.el.span(ComposeState.materialize_name_missing_notice, style={"marginLeft": "6px"}),
+                    class_name="me-rpg-materialize-alert me-rpg-materialize-info-alert",
+                ),
+                rx.fragment(),
+            ),
             rx.cond(
                 ComposeState.generation_error != "",
                 rx.el.div(
@@ -2427,7 +2589,11 @@ def _rpg_materialization_leg_cta() -> rx.Component:
             ),
             class_name="me-rpg-materialize-alert-stack",
         ),
-        class_name="me-rpg-materialize-leg-cta",
+        class_name=rx.cond(
+            ComposeState.show_onboarding_materialize,
+            "me-rpg-materialize-leg-cta me-onboarding-materialize-lift",
+            "me-rpg-materialize-leg-cta",
+        ),
     )
 
 
@@ -2668,14 +2834,6 @@ def _rpg_body_map_panel() -> rx.Component:
                                 "letterSpacing": "0.02em",
                             },
                         ),
-                        rx.el.span(
-                            " · Real genes. Real science. Your character.",
-                            style={
-                                "fontSize": "0.82rem",
-                                "fontWeight": "600",
-                                "color": "#c4b5fd",
-                            },
-                        ),
                         style={
                             "display": "flex",
                             "alignItems": "baseline",
@@ -2684,6 +2842,7 @@ def _rpg_body_map_panel() -> rx.Component:
                             "marginBottom": "6px",
                         },
                     ),
+                    _name_onboarding_tooltip(),
                     rx.el.div(
                         rx.el.input(
                             id="compose-personal-tag",
@@ -2754,12 +2913,28 @@ def _rpg_body_map_panel() -> rx.Component:
                             "gap": "10px",
                         },
                     ),
-                    style={
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "gap": "0px",
-                        "marginBottom": "7px",
-                    },
+                    style=rx.cond(
+                        ComposeState.show_onboarding_name,
+                        {
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "gap": "0px",
+                            "marginBottom": "7px",
+                            "position": "relative",
+                            "zIndex": "1010",
+                            "padding": "10px",
+                            "borderRadius": "14px",
+                            "boxShadow": "0 0 25px rgba(255, 255, 255, 0.70)",
+                            "background": "rgba(15, 23, 42, 0.92)",
+                        },
+                        {
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "gap": "0px",
+                            "marginBottom": "7px",
+                            "position": "relative",
+                        },
+                    ),
                 ),
                 class_name="me-rpg-body-map-title",
             ),
@@ -3491,12 +3666,13 @@ def _rpg_gene_library_panel() -> rx.Component:
         _pdb_viewer_scripts(),
         _rpg_gene_library_anchor_script(),
         _rpg_gene_library_title(),
+        _gene_library_onboarding_tooltip(),
         rx.el.div(
             *[_rpg_category_gene_accordion(cat) for cat in UNIQUE_CATEGORIES],
             class_name="me-rpg-library-grid",
         ),
         class_name="me-rpg-library-panel",
-        style={**_RPG_PANEL_STYLE, "padding": "14px"},
+        style={**_RPG_PANEL_STYLE, "padding": "14px", "position": "relative"},
     )
 
 
@@ -4508,6 +4684,37 @@ def _rpg_flow_css() -> rx.Component:
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+        @keyframes me-pulse {
+            0% {
+                transform: scale(1);
+                filter: brightness(1);
+                box-shadow: 0 0 24px rgba(124, 58, 237, 0.65), 0 10px 24px rgba(2, 6, 23, 0.38) !important;
+            }
+            50% {
+                transform: scale(1.085);
+                filter: brightness(1.28);
+                box-shadow: 0 0 55px rgba(167, 139, 250, 0.95), 0 0 75px rgba(124, 58, 237, 0.72), 0 14px 34px rgba(2, 6, 23, 0.44) !important;
+            }
+            100% {
+                transform: scale(1);
+                filter: brightness(1);
+                box-shadow: 0 0 24px rgba(124, 58, 237, 0.65), 0 10px 24px rgba(2, 6, 23, 0.38) !important;
+            }
+        }
+        @keyframes me-pulse-border {
+            0% {
+                border-color: rgba(167, 139, 250, 0.42);
+                box-shadow: 0 8px 30px rgba(124, 58, 237, 0.12);
+            }
+            50% {
+                border-color: rgba(167, 139, 250, 0.72);
+                box-shadow: 0 8px 35px rgba(124, 58, 237, 0.22);
+            }
+            100% {
+                border-color: rgba(167, 139, 250, 0.42);
+                box-shadow: 0 8px 30px rgba(124, 58, 237, 0.12);
+            }
+        }
         details.me-rpg-category-accordion > summary::-webkit-details-marker {
             display: none;
         }
@@ -4586,6 +4793,10 @@ def _rpg_flow_css() -> rx.Component:
         }
         .me-rpg-center-panel {
             min-width: 0;
+        }
+        .me-onboarding-center-lift {
+            position: relative;
+            z-index: 1010;
         }
         .me-budget-gauge {
             position: sticky;
@@ -4769,6 +4980,13 @@ def _rpg_flow_css() -> rx.Component:
             gap: 7px;
             pointer-events: auto;
         }
+        .me-onboarding-materialize-lift {
+            z-index: 6;
+            border-radius: 30px;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.90);
+            box-shadow: 0 0 35px rgba(255, 255, 255, 0.70);
+        }
         .me-rpg-materialize-alert-stack {
             position: absolute;
             top: calc(100% + 8px);
@@ -4830,6 +5048,9 @@ def _rpg_flow_css() -> rx.Component:
             cursor: not-allowed !important;
             opacity: 0.68 !important;
         }
+        .me-rpg-materialize-leg-button.is-active-pulse {
+            animation: me-pulse 2s infinite ease-in-out !important;
+        }
         .me-rpg-materialize-alert {
             width: min(460px, 82vw);
             box-sizing: border-box;
@@ -4850,6 +5071,10 @@ def _rpg_flow_css() -> rx.Component:
         .me-rpg-materialize-warning {
             border: 1px solid rgba(251, 191, 36, 0.48);
             color: #fde68a;
+        }
+        .me-rpg-materialize-info-alert {
+            border: 1px solid rgba(56, 189, 248, 0.52);
+            color: #bae6fd;
         }
         .me-rpg-category-anchor:hover {
             filter: brightness(1.12);
@@ -5303,6 +5528,28 @@ def _rpg_character_profile_layout() -> rx.Component:
     )
 
 
+def _onboarding_backdrop() -> rx.Component:
+    return rx.cond(
+        ComposeState.show_onboarding_suggestion,
+        rx.el.div(
+            on_click=ComposeState.advance_onboarding,
+            style={
+                "position": "fixed",
+                "top": "0",
+                "left": "0",
+                "width": "100vw",
+                "height": "100vh",
+                "background": "rgba(2, 6, 23, 0.55)",
+                "backdropFilter": "blur(4px)",
+                "-webkit-backdropFilter": "blur(4px)",
+                "zIndex": "1000",
+                "cursor": "pointer",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
 def _rpg_active_genes_layout() -> rx.Component:
     return _rpg_shell(
         rx.el.div(
@@ -5312,12 +5559,32 @@ def _rpg_active_genes_layout() -> rx.Component:
                 _rpg_gene_library_panel(),
                 id="gene-library",
                 class_name="me-rpg-left-panel me-rpg-library-section",
+                style=rx.cond(
+                    ComposeState.show_onboarding_genes,
+                    {
+                        "position": "relative",
+                        "zIndex": "1010",
+                        "boxShadow": "0 0 25px rgba(255, 255, 255, 0.70)",
+                        "borderRadius": "14px",
+                    },
+                    {}
+                ),
             ),
             rx.el.div(
                 _rpg_body_map_panel(),
-                class_name="me-rpg-center-panel",
+                class_name=rx.cond(
+                    ComposeState.show_onboarding_center_lift,
+                    "me-rpg-center-panel me-onboarding-center-lift",
+                    "me-rpg-center-panel",
+                ),
             ),
+            _onboarding_backdrop(),
             class_name="me-rpg-dashboard me-rpg-hero-grid",
+            style=rx.cond(
+                ComposeState.show_onboarding_suggestion,
+                {"position": "relative", "isolation": "isolate"},
+                {},
+            ),
         )
     )
 
@@ -5680,8 +5947,8 @@ def _model_generation_story_panel() -> rx.Component:
                     rx.el.p(
                         "The app takes ",
                         rx.el.strong(ComposeState.param_pool_size, style={"color": "#ffffff"}),
-                        " selected genes with measured model data and turns them into a Voronoi-based printable shape. ",
-                        "Your name and category choices make the seed, so the same choices can recreate the same object later.",
+                        " selected genes to procedurally grow a unique mathematical Voronoi shape. ",
+                        "Biophysical properties dictate its cellular complexity, seeded by your choices.",
                         style={
                             "margin": "0",
                             "fontSize": "1rem",
@@ -8716,6 +8983,31 @@ def _tab_menu(active_route: str) -> rx.Component:
             )
         ),
         _tab_link("/about", "home", "About", active_route),
+        rx.el.div(
+            rx.el.div(
+                rx.el.span(
+                    "Real Genes · Real Science · Your Character · ",
+                    style={"color": "#94a3b8"},
+                ),
+                rx.el.span(
+                    "Wearable 3D Printed Model",
+                    style={"color": "#a78bfa", "fontWeight": "900"},
+                ),
+                style={
+                    "height": "100%",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "background": "none",
+                    "cursor": "default",
+                    "pointerEvents": "none",
+                    "fontSize": "0.92rem",
+                    "letterSpacing": "0.04em",
+                    "textTransform": "uppercase",
+                    "padding": "0 1.5em",
+                },
+            ),
+            class_name="right menu",
+        ),
         class_name="ui top attached tabular menu",
         id="me-top-tab-menu",
     )
@@ -8735,6 +9027,11 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
             background: #020617 !important;
             border-color: rgba(124, 58, 237, 0.42) !important;
             border-radius: 0 !important;
+        }
+        @media (max-width: 1150px) {
+            #me-top-tab-menu .right.menu {
+                display: none !important;
+            }
         }
         #me-top-tab-menu.ui.top.attached.tabular.menu .item {
             color: #cbd5e1 !important;
@@ -8952,7 +9249,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
     image=_page_image_url(),
     description=_page_description("/"),
     meta=_page_meta("/"),
-    on_load=[AppState.redirect_legacy_tab],
+    on_load=[AppState.redirect_legacy_tab, ComposeState.check_clean_storage],
 )
 def index_page() -> rx.Component:
     """Character profile — default RPG loadout builder."""

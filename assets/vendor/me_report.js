@@ -1283,9 +1283,8 @@
     pdf.setFontSize(8.5);
     pdf.setTextColor(55, 65, 81);
     var storyText = pdfSafeWinAnsi(
-      'The app takes the selected genes with measured biophysical data and turns them into a ' +
-      'Voronoi-based printable shape. Your name and category choices make the seed, so the same ' +
-      'choices always recreate the same object.'
+      'The app takes the selected genes to procedurally grow a unique mathematical Voronoi shape. ' +
+      'Biophysical properties dictate its cellular complexity, seeded by your choices.'
     );
     var storyLines = pdf.splitTextToSize(storyText, w - 12);
     pdf.text(storyLines, sx, sy);
