@@ -1194,6 +1194,13 @@ class ComposeState(rx.State):
         self.dismissed_onboarding = "true"
         self.onboarding_step = "3"
 
+    def _onboarding_storage_script(self) -> str:
+        return (
+            f"localStorage.setItem('me_onboarding_complete', {json.dumps(str(self.onboarding_complete or 'false'))});"
+            f"localStorage.setItem('me_dismissed_onboarding', {json.dumps(str(self.dismissed_onboarding or 'false'))});"
+            f"localStorage.setItem('me_onboarding_step', {json.dumps(str(self.onboarding_step or '0'))});"
+        )
+
     def _sync_onboarding_from_storage(self) -> None:
         """Align cookie + LocalStorage so a partial write still counts as finished."""
         if (
@@ -1223,7 +1230,7 @@ class ComposeState(rx.State):
         if dismissed or step in ("3", "done"):
             self._mark_onboarding_finished()
 
-    def advance_onboarding(self) -> None:
+    def advance_onboarding(self):  # type: ignore[return]
         """Dismiss the current onboarding step and reveal the next spotlight."""
         if self.onboarding_finished:
             return
@@ -1232,14 +1239,15 @@ class ComposeState(rx.State):
         self.onboarding_step = str(next_step)
         if next_step >= 3:
             self._mark_onboarding_finished()
+        yield rx.call_script(self._onboarding_storage_script())
 
-    def advance_name_onboarding_on_enter(self, key: str, _key_info: dict[str, Any]) -> None:
+    def advance_name_onboarding_on_enter(self, key: str, _key_info: dict[str, Any]):  # type: ignore[return]
         """Move past the name tooltip when the user confirms a non-empty name."""
         if key != "Enter" or self.onboarding_step_index != 1:
             return
         if not self.personal_tag.strip():
             return
-        self.advance_onboarding()
+        yield from self.advance_onboarding()
 
     def dismiss_onboarding(self) -> None:
         """Dismiss onboarding completely."""
@@ -1257,9 +1265,9 @@ class ComposeState(rx.State):
             self.dismissed_onboarding = "false"
             self.onboarding_step = "0"
             yield rx.call_script(
-                "localStorage.removeItem('me_onboarding_complete');"
-                "localStorage.removeItem('me_dismissed_onboarding');"
-                "localStorage.removeItem('me_onboarding_step');"
+                "localStorage.setItem('me_onboarding_complete', 'false');"
+                "localStorage.setItem('me_dismissed_onboarding', 'false');"
+                "localStorage.setItem('me_onboarding_step', '0');"
                 "document.cookie = 'me_onboarding_complete=; path=/; max-age=0; SameSite=Lax';"
             )
             return
