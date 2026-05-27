@@ -3909,6 +3909,85 @@ def _share_card_preview() -> rx.Component:
     )
 
 
+def _create_own_character_card() -> rx.Component:
+    """Large card shown in place of 'Share & publish' for shared-link visitors."""
+    return rx.el.button(
+        rx.el.div(
+            rx.el.strong(
+                "Create my own character",
+                style={"display": "block", "fontSize": "1.34rem", "lineHeight": "1.15"},
+            ),
+            rx.el.span(
+                "Start a fresh enhancement profile",
+                style={"fontSize": "1.05rem", "lineHeight": "1.35", "color": "#dbeafe"},
+            ),
+            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 2px"},
+        ),
+        rx.el.div(
+            rx.el.img(
+                src="/images/og-preview.png",
+                alt="Materialized Enhancements preview",
+                loading="lazy",
+                decoding="async",
+                style={
+                    "width": "100%",
+                    "height": "100%",
+                    "objectFit": "contain",
+                    "objectPosition": "center",
+                    "display": "block",
+                    "filter": "saturate(1.08) contrast(1.04)",
+                },
+            ),
+            rx.el.div(
+                fomantic_icon("user plus", size=20, color="#ffffff"),
+                style={
+                    "position": "absolute",
+                    "right": "10px",
+                    "top": "10px",
+                    "width": "36px",
+                    "height": "36px",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "borderRadius": "999px",
+                    "background": "rgba(15, 23, 42, 0.78)",
+                    "boxShadow": "0 8px 16px rgba(2, 6, 23, 0.28)",
+                },
+            ),
+            style={
+                "position": "relative",
+                "width": "100%",
+                "aspectRatio": "4 / 3",
+                "maxHeight": "280px",
+                "overflow": "hidden",
+                "borderRadius": "14px",
+                "background": "rgba(15, 23, 42, 0.72)",
+                "border": "2px solid rgba(253, 230, 138, 0.65)",
+            },
+        ),
+        type="button",
+        on_click=ComposeState.start_fresh,
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "stretch",
+            "gap": "10px",
+            "padding": "12px",
+            "borderRadius": "20px",
+            "border": "3px solid rgba(253, 230, 138, 0.72)",
+            "background": "linear-gradient(135deg, rgba(124, 58, 237, 0.48), rgba(15, 23, 42, 0.72))",
+            "boxShadow": "0 0 0 3px rgba(250, 204, 21, 0.14), 0 12px 28px rgba(2, 6, 23, 0.22)",
+            "color": "#f8fafc",
+            "cursor": "pointer",
+            "font": "inherit",
+            "textAlign": "center",
+            "appearance": "none",
+            "width": "100%",
+            "maxWidth": "none",
+        },
+    )
+
+
 def _materialization_reward_panel() -> rx.Component:
     """Visitor-facing reward card for all generated materialization outputs."""
     model_active = ComposeState.materialization_artifact_tab == "model"
@@ -4017,14 +4096,18 @@ def _materialization_reward_panel() -> rx.Component:
                     image_src="/images/icons/report_icon.jpeg",
                     image_alt="Personal enhancement report icon",
                 ),
-                _reward_artifact_choice(
-                    "Share & publish",
-                    "Share on social media!",
-                    "share alternate",
-                    share_active,
-                    ComposeState.show_share_artifact_tab,
-                    image_src="/images/icons/share.jpg",
-                    image_alt="Share and publish icon",
+                rx.cond(
+                    ComposeState.is_shared_visit,
+                    _create_own_character_card(),
+                    _reward_artifact_choice(
+                        "Share & publish",
+                        "Share on social media!",
+                        "share alternate",
+                        share_active,
+                        ComposeState.show_share_artifact_tab,
+                        image_src="/images/icons/share.jpg",
+                        image_alt="Share and publish icon",
+                    ),
                 ),
                 style={
                     "display": "grid",
@@ -8531,14 +8614,18 @@ def _report_section_body() -> rx.Component:
         rx.cond(
             ComposeState.has_stl,
             rx.el.div(
-                rx.script(
-                    """
-                    setTimeout(function () {
-                      if (window.__meRenderActiveReportPdfInPage) {
-                        window.__meRenderActiveReportPdfInPage();
-                      }
-                    }, 0);
-                    """
+                rx.cond(
+                    ComposeState.is_shared_visit,
+                    rx.fragment(),
+                    rx.script(
+                        """
+                        setTimeout(function () {
+                          if (window.__meRenderActiveReportPdfInPage) {
+                            window.__meRenderActiveReportPdfInPage();
+                          }
+                        }, 0);
+                        """
+                    ),
                 ),
                 _report_pdf_viewer_panel(),
                 _report_portrait_upload_panel(),

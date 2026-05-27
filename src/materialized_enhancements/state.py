@@ -927,6 +927,9 @@ class ComposeState(rx.State):
     report_params_url: str = ""
     report_character_note: str = ""
     report_portrait_data_url: str = ""
+
+    # True when the visitor arrived via a shared recreate URL (?report=1)
+    is_shared_visit: bool = False
     report_portrait_filename: str = ""
     report_portrait_error: str = ""
     share_card_mode: str = "model"
@@ -1726,6 +1729,26 @@ class ComposeState(rx.State):
         _mirror_generated_report_for_dev(out_dir, rel_dir)
         yield rx.toast.success("Report image and PDF saved to public link.")
 
+    def start_fresh(self):  # type: ignore[return]
+        """Reset shared-visit state and redirect to the character builder."""
+        self.is_shared_visit = False
+        self.personal_tag = DEFAULT_PERSONAL_TAG
+        self.selected_categories = []
+        self.included_genes = []
+        self.stl_download_path = ""
+        self.stl_filename = ""
+        self.stl_base64 = ""
+        self.sculpture_params = {}
+        self.generating = False
+        self.generation_error = ""
+        self.share_card_data_url = ""
+        self.report_public_url = ""
+        self.report_public_slug = ""
+        self.report_publishing = False
+        self.report_publish_error = ""
+        self.materialization_artifact_tab = "model"
+        yield rx.redirect("/")
+
     def reset_report_publish(self) -> None:
         """Clear a stuck browser-side report publish so the visitor can retry."""
         self.report_publishing = False
@@ -2185,13 +2208,14 @@ class ComposeState(rx.State):
         Runs as page on_load handler. No-op when the query params aren't present
         or when a sculpture is already generated (prevents re-trigger from replaceState).
         """
-        if self.stl_download_path or self.generating:
-            print(f"[DEBUG] apply_shared_report: skipped (stl_download_path={self.stl_download_path!r}, generating={self.generating})", flush=True)
-            return
         params = self.router.url.query_parameters
         print(f"[DEBUG] apply_shared_report: url={self.router.url!r} params={dict(params)}", flush=True)
         if str(params.get("report", "")) != "1":
             print("[DEBUG] apply_shared_report: no report=1 param, returning", flush=True)
+            return
+        self.is_shared_visit = True
+        if self.stl_download_path or self.generating:
+            print(f"[DEBUG] apply_shared_report: skipped generation (stl_download_path={self.stl_download_path!r}, generating={self.generating})", flush=True)
             return
         name_b64 = str(params.get("name", ""))
         cats_raw = str(params.get("cats", ""))
