@@ -341,7 +341,7 @@ def _landing_tab() -> rx.Component:
                         },
                     ),
                     rx.el.p(
-                        "Real genes. Real science. Your character.",
+                        "Real genes. Real science. Your character. Wearable 3D printed model.",
                         style={
                             "color": "#7c3aed",
                             "fontSize": "1.25rem",
@@ -813,7 +813,8 @@ def _budget_gauge() -> rx.Component:
                 "Design one enhanced human. You have ",
                 rx.el.strong(f"{DEFAULT_BUDGET} enhancement credits", style={"color": "#c4b5fd"}),
                 " and real genes from extraordinary organisms. "
-                "Every upgrade has a biological tradeoff — you cannot maximize everything.",
+                "Every upgrade has a biological tradeoff — you cannot maximize everything. "
+                "Once finished, materialize your enhancements into a personal report and a wearable 3D-printable model!",
                 style={
                     "fontSize": "0.82rem",
                     "lineHeight": "1.45",
@@ -2214,7 +2215,7 @@ def _rpg_schema_hint_panel() -> rx.Component:
             },
         ),
         rx.el.div(
-            "Trait choices become parametric geometry, then a unique STL and physical artifact.",
+            "Trait choices procedurally grow an organic mathematical Voronoi sculpture — a unique, printable 3D model.",
             style={
                 "marginTop": "8px",
                 "color": "#cbd5e1",
@@ -2306,6 +2307,155 @@ def _rpg_intro_video_panel() -> rx.Component:
     )
 
 
+def _onboarding_close_button() -> rx.Component:
+    return rx.el.button(
+        rx.el.span(
+            "×",
+            style={
+                "fontSize": "1.45rem",
+                "lineHeight": "1",
+                "fontWeight": "900",
+                "color": "#f8fafc",
+            },
+        ),
+        type="button",
+        aria_label="Close tip",
+        title="Close",
+        on_click=ComposeState.advance_onboarding,
+        style={
+            "position": "relative",
+            "zIndex": "1202",
+            "flexShrink": "0",
+            "width": "38px",
+            "height": "38px",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "borderRadius": "10px",
+            "border": "1px solid rgba(148, 163, 184, 0.55)",
+            "background": "rgba(30, 41, 59, 0.95)",
+            "cursor": "pointer",
+            "padding": "0",
+        },
+    )
+
+
+def _onboarding_tooltip_card(
+    show: rx.Var[bool],
+    *,
+    step_label: str,
+    icon_name: str,
+    accent_color: str,
+    headline: str,
+    detail: str | rx.Var[str],
+) -> rx.Component:
+    return rx.cond(
+        show,
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    fomantic_icon(icon_name, size=14, color=accent_color),
+                    rx.el.span(
+                        step_label,
+                        style={
+                            "marginLeft": "6px",
+                            "fontWeight": "900",
+                            "color": accent_color,
+                            "fontSize": "0.82rem",
+                            "textTransform": "uppercase",
+                        },
+                    ),
+                    style={"display": "flex", "alignItems": "center", "minWidth": "0"},
+                ),
+                _onboarding_close_button(),
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "flex-start",
+                    "gap": "10px",
+                    "marginBottom": "8px",
+                },
+            ),
+            rx.el.p(
+                headline,
+                style={
+                    "color": "#f8fafc",
+                    "fontSize": "1.12rem",
+                    "fontWeight": "900",
+                    "lineHeight": "1.4",
+                    "margin": "0 0 6px 0",
+                },
+            ),
+            rx.el.p(
+                detail,
+                style={
+                    "color": "#cbd5e1",
+                    "fontSize": "0.96rem",
+                    "fontWeight": "600",
+                    "lineHeight": "1.5",
+                    "margin": "0",
+                },
+            ),
+            class_name="me-onboarding-tip-card",
+            style={
+                "position": "relative",
+                "zIndex": "1200",
+                "width": "100%",
+                "maxWidth": "100%",
+                "boxSizing": "border-box",
+                "padding": "14px",
+                "marginBottom": "12px",
+                "borderRadius": "14px",
+                "background": "linear-gradient(135deg, #111827 0%, #0b1020 100%)",
+                "border": f"2px solid {accent_color}",
+                "boxShadow": "0 0 25px rgba(255, 255, 255, 0.70)",
+                "pointerEvents": "auto",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
+def _gene_library_onboarding_tooltip() -> rx.Component:
+    return _onboarding_tooltip_card(
+        ComposeState.show_onboarding_genes,
+        step_label="Onboarding: Step 1",
+        icon_name="info circle",
+        accent_color="#a78bfa",
+        headline="Choose your enhancement genes",
+        detail=(
+            "Click a category icon on the body map (or an accordion below) to highlight and jump to it, "
+            "then add genes to your character. "
+            "Each gene spends enhancement credits (cr) and shapes your unique mathematical Voronoi 3D model."
+        ),
+    )
+
+
+def _name_onboarding_tooltip() -> rx.Component:
+    return _onboarding_tooltip_card(
+        ComposeState.show_onboarding_name,
+        step_label="Onboarding: Step 2",
+        icon_name="user",
+        accent_color="#38bdf8",
+        headline="Add your name or alias",
+        detail=(
+            "Please add your name or alias here. It labels your character on the body map, "
+            "share card, and personal enhancement report."
+        ),
+    )
+
+
+def _materialize_onboarding_tooltip() -> rx.Component:
+    return _onboarding_tooltip_card(
+        ComposeState.show_onboarding_materialize,
+        step_label="Onboarding: Step 3",
+        icon_name="atom",
+        accent_color="#10b981",
+        headline="Materialize when you are ready",
+        detail=ComposeState.onboarding_materialize_guidance,
+    )
+
+
 def _rpg_sidebar_intro_stack() -> rx.Component:
     return rx.el.div(
         _rpg_schema_hint_panel(),
@@ -2366,6 +2516,7 @@ def _rpg_selected_gene_loadout() -> rx.Component:
 
 def _rpg_materialization_leg_cta() -> rx.Component:
     return rx.el.div(
+        _materialize_onboarding_tooltip(),
         rx.el.div(
             rx.el.span(ComposeState.budget_spent, style={"fontWeight": "950", "color": "#ffffff"}),
             f" / {DEFAULT_BUDGET} cr",
@@ -2396,17 +2547,26 @@ def _rpg_materialization_leg_cta() -> rx.Component:
                 "me-rpg-materialize-leg-button is-disabled",
                 rx.cond(
                     ComposeState.can_materialize,
-                    "me-rpg-materialize-leg-button",
+                    "me-rpg-materialize-leg-button is-active-pulse",
                     "me-rpg-materialize-leg-button is-disabled",
                 ),
             ),
             title=rx.cond(
                 ComposeState.can_materialize,
                 "Generate the 3D sculpture and report.",
-                "Select at least one gene within budget to materialize. Character name is optional.",
+                ComposeState.materialize_requirements_notice,
             ),
         ),
         rx.el.div(
+            rx.cond(
+                ComposeState.materialize_requirements_notice != "",
+                rx.el.div(
+                    fomantic_icon("circle-alert", size=12, color="#fca5a5"),
+                    rx.el.span(ComposeState.materialize_requirements_notice, style={"marginLeft": "6px"}),
+                    class_name="me-rpg-materialize-alert me-rpg-materialize-error",
+                ),
+                rx.fragment(),
+            ),
             rx.cond(
                 ComposeState.generation_error != "",
                 rx.el.div(
@@ -2427,7 +2587,11 @@ def _rpg_materialization_leg_cta() -> rx.Component:
             ),
             class_name="me-rpg-materialize-alert-stack",
         ),
-        class_name="me-rpg-materialize-leg-cta",
+        class_name=rx.cond(
+            ComposeState.show_onboarding_materialize,
+            "me-rpg-materialize-leg-cta me-onboarding-materialize-lift",
+            "me-rpg-materialize-leg-cta",
+        ),
     )
 
 
@@ -2668,14 +2832,6 @@ def _rpg_body_map_panel() -> rx.Component:
                                 "letterSpacing": "0.02em",
                             },
                         ),
-                        rx.el.span(
-                            " · Real genes. Real science. Your character.",
-                            style={
-                                "fontSize": "0.82rem",
-                                "fontWeight": "600",
-                                "color": "#c4b5fd",
-                            },
-                        ),
                         style={
                             "display": "flex",
                             "alignItems": "baseline",
@@ -2684,25 +2840,35 @@ def _rpg_body_map_panel() -> rx.Component:
                             "marginBottom": "6px",
                         },
                     ),
+                    _name_onboarding_tooltip(),
                     rx.el.div(
                         rx.el.input(
                             id="compose-personal-tag",
                             placeholder="Enhanced <Name>",
                             value=ComposeState.personal_tag,
                             on_change=ComposeState.set_personal_tag,
+                            on_key_down=ComposeState.advance_name_onboarding_on_enter,
                             style={
                                 "flex": "1",
                                 "minWidth": "0",
                                 "padding": "15px 18px",
                                 "borderRadius": "14px",
-                                "border": "1px solid rgba(167, 139, 250, 0.45)",
+                                "border": rx.cond(
+                                    ComposeState.has_personal_tag,
+                                    "1px solid rgba(167, 139, 250, 0.45)",
+                                    "2px solid rgba(248, 113, 113, 0.95)",
+                                ),
                                 "fontSize": "1.18rem",
                                 "fontWeight": "800",
                                 "outline": "none",
                                 "backgroundColor": "rgba(15, 23, 42, 0.88)",
                                 "color": "#f8fafc",
                                 "boxSizing": "border-box",
-                                "boxShadow": "0 0 24px rgba(124, 58, 237, 0.45), 0 0 52px rgba(56, 189, 248, 0.20)",
+                                "boxShadow": rx.cond(
+                                    ComposeState.has_personal_tag,
+                                    "0 0 24px rgba(124, 58, 237, 0.45), 0 0 52px rgba(56, 189, 248, 0.20)",
+                                    "0 0 0 3px rgba(248, 113, 113, 0.16), 0 0 24px rgba(248, 113, 113, 0.35)",
+                                ),
                             },
                         ),
                         rx.upload(
@@ -2754,12 +2920,28 @@ def _rpg_body_map_panel() -> rx.Component:
                             "gap": "10px",
                         },
                     ),
-                    style={
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "gap": "0px",
-                        "marginBottom": "7px",
-                    },
+                    style=rx.cond(
+                        ComposeState.show_onboarding_name,
+                        {
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "gap": "0px",
+                            "marginBottom": "7px",
+                            "position": "relative",
+                            "zIndex": "1010",
+                            "padding": "10px",
+                            "borderRadius": "14px",
+                            "boxShadow": "0 0 25px rgba(255, 255, 255, 0.70)",
+                            "background": "rgba(15, 23, 42, 0.92)",
+                        },
+                        {
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "gap": "0px",
+                            "marginBottom": "7px",
+                            "position": "relative",
+                        },
+                    ),
                 ),
                 class_name="me-rpg-body-map-title",
             ),
@@ -3347,6 +3529,7 @@ def _rpg_gene_library_title() -> rx.Component:
                 "lineHeight": "1.35",
             },
         ),
+        class_name="me-rpg-library-title",
         style={"marginBottom": "12px"},
     )
 
@@ -3491,12 +3674,13 @@ def _rpg_gene_library_panel() -> rx.Component:
         _pdb_viewer_scripts(),
         _rpg_gene_library_anchor_script(),
         _rpg_gene_library_title(),
+        _gene_library_onboarding_tooltip(),
         rx.el.div(
             *[_rpg_category_gene_accordion(cat) for cat in UNIQUE_CATEGORIES],
             class_name="me-rpg-library-grid",
         ),
         class_name="me-rpg-library-panel",
-        style={**_RPG_PANEL_STYLE, "padding": "14px"},
+        style={**_RPG_PANEL_STYLE, "padding": "14px", "position": "relative"},
     )
 
 
@@ -3697,6 +3881,34 @@ def _materialization_edit_character_cta() -> rx.Component:
     )
 
 
+def _materialization_create_new_character_cta() -> rx.Component:
+    return rx.el.button(
+        fomantic_icon("user plus", size=16, color="#312e81"),
+        rx.el.span(
+            "Create new character",
+            style={"marginLeft": "8px"},
+        ),
+        type="button",
+        on_click=ComposeState.start_fresh,
+        style={
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "marginBottom": "0",
+            "padding": "11px 18px",
+            "borderRadius": "6px",
+            "border": "1px solid rgba(196, 181, 253, 0.65)",
+            "background": "#f8fafc",
+            "color": "#312e81",
+            "font": "inherit",
+            "fontWeight": "900",
+            "lineHeight": "1",
+            "cursor": "pointer",
+            "boxShadow": "0 8px 18px rgba(2, 6, 23, 0.18)",
+        },
+    )
+
+
 def _post_materialization_action_card(
     icon_name: str,
     label: str,
@@ -3704,8 +3916,21 @@ def _post_materialization_action_card(
     accent_color: str,
 ) -> rx.Component:
     return rx.el.a(
-        fomantic_icon(icon_name, size=13, color=accent_color),
-        rx.el.span(label, style={"marginLeft": "6px"}),
+        rx.el.span(
+            fomantic_icon(icon_name, size=22, color=accent_color),
+            style={
+                "width": "34px",
+                "height": "34px",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "borderRadius": "999px",
+                "background": "rgba(255, 255, 255, 0.09)",
+                "boxShadow": "inset 0 0 0 1px rgba(255, 255, 255, 0.10)",
+                "flex": "0 0 auto",
+            },
+        ),
+        rx.el.span(label, style={"marginLeft": "9px"}),
         href=href,
         target="_blank",
         rel="noopener noreferrer",
@@ -3714,34 +3939,26 @@ def _post_materialization_action_card(
             "display": "inline-flex",
             "alignItems": "center",
             "justifyContent": "center",
-            "padding": "7px 10px",
+            "padding": "8px 14px 8px 9px",
             "boxSizing": "border-box",
-            "minHeight": "32px",
+            "minHeight": "46px",
             "minWidth": "0",
             "borderRadius": "999px",
-            "background": "rgba(15, 23, 42, 0.42)",
-            "border": "1px solid rgba(196, 181, 253, 0.24)",
+            "background": "linear-gradient(135deg, rgba(124, 58, 237, 0.34), rgba(15, 23, 42, 0.68))",
+            "border": "2px solid rgba(196, 181, 253, 0.34)",
             "color": "#e5e7eb",
-            "fontSize": "0.84rem",
-            "fontWeight": "850",
+            "fontSize": "0.96rem",
+            "fontWeight": "900",
             "lineHeight": "1",
             "textDecoration": "none",
             "whiteSpace": "nowrap",
+            "boxShadow": "0 8px 18px rgba(2, 6, 23, 0.20)",
         },
     )
 
 
 def _materialization_post_generation_ctas() -> rx.Component:
     actions: list[rx.Component] = []
-    if DONATION_URL:
-        actions.append(
-            _post_materialization_action_card(
-                "coffee",
-                "Donate",
-                DONATION_URL,
-                "#f9a8d4",
-            )
-        )
     if DISCORD_INVITE_URL:
         actions.append(
             _post_materialization_action_card(
@@ -3755,9 +3972,18 @@ def _materialization_post_generation_ctas() -> rx.Component:
         actions.append(
             _post_materialization_action_card(
                 "github",
-                "Open GitHub issue",
+                "Star GitHub",
                 GITHUB_PROJECT_URL,
                 "#e5e7eb",
+            )
+        )
+    if DONATION_URL:
+        actions.append(
+            _post_materialization_action_card(
+                "coffee",
+                "Donate",
+                DONATION_URL,
+                "#f9a8d4",
             )
         )
     if not actions:
@@ -3782,6 +4008,7 @@ def _reward_artifact_choice(
     icon_name: str,
     active: rx.Var,
     on_click: rx.EventSpec,
+    action_label: str,
     image_src: str = "",
     image_alt: str = "",
     preview: rx.Component | None = None,
@@ -3806,7 +4033,7 @@ def _reward_artifact_choice(
         rx.el.div(
             rx.el.strong(label, style={"display": "block", "fontSize": "1.34rem", "lineHeight": "1.15"}),
             rx.el.span(description, style={"fontSize": "1.05rem", "lineHeight": "1.35", "color": rx.cond(active, "#dbeafe", "#cbd5e1")}),
-            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 2px"},
+            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 0"},
         ),
         rx.el.div(
             preview,
@@ -3837,25 +4064,45 @@ def _reward_artifact_choice(
                 "border": rx.cond(active, "2px solid rgba(253, 230, 138, 0.95)", "1px solid rgba(196, 181, 253, 0.24)"),
             },
         ),
+        rx.el.span(
+            rx.cond(active, "Viewing now", action_label),
+            rx.el.span(rx.cond(active, "", " ->"), style={"marginLeft": "7px"}),
+            style={
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "alignSelf": "center",
+                "minHeight": "38px",
+                "padding": "9px 17px",
+                "borderRadius": "999px",
+                "background": rx.cond(active, "rgba(253, 230, 138, 0.96)", "rgba(255, 255, 255, 0.96)"),
+                "color": rx.cond(active, "#422006", "#312e81"),
+                "fontSize": "0.98rem",
+                "fontWeight": "950",
+                "lineHeight": "1",
+                "boxShadow": "0 8px 18px rgba(2, 6, 23, 0.24)",
+            },
+        ),
         type="button",
         on_click=on_click,
+        aria_label=action_label,
         style={
             "display": "flex",
             "flexDirection": "column",
             "alignItems": "stretch",
             "gap": "10px",
-            "padding": "12px",
+            "padding": "13px",
             "borderRadius": "20px",
-            "border": rx.cond(active, "4px solid rgba(253, 230, 138, 0.92)", "2px solid rgba(196, 181, 253, 0.24)"),
+            "border": rx.cond(active, "4px solid rgba(253, 230, 138, 0.92)", "3px solid rgba(196, 181, 253, 0.46)"),
             "background": rx.cond(
                 active,
                 "linear-gradient(135deg, rgba(124, 58, 237, 0.58), rgba(15, 23, 42, 0.78))",
-                "rgba(15, 23, 42, 0.54)",
+                "linear-gradient(135deg, rgba(30, 41, 59, 0.82), rgba(15, 23, 42, 0.64))",
             ),
             "boxShadow": rx.cond(
                 active,
                 "0 0 0 4px rgba(124, 58, 237, 0.28), 0 18px 36px rgba(250, 204, 21, 0.18)",
-                "none",
+                "0 12px 28px rgba(2, 6, 23, 0.22)",
             ),
             "color": "#f8fafc",
             "cursor": "pointer",
@@ -3909,85 +4156,6 @@ def _share_card_preview() -> rx.Component:
     )
 
 
-def _create_own_character_card() -> rx.Component:
-    """Large card shown in place of 'Share & publish' for shared-link visitors."""
-    return rx.el.button(
-        rx.el.div(
-            rx.el.strong(
-                "Create my own character",
-                style={"display": "block", "fontSize": "1.34rem", "lineHeight": "1.15"},
-            ),
-            rx.el.span(
-                "Start a fresh enhancement profile",
-                style={"fontSize": "1.05rem", "lineHeight": "1.35", "color": "#dbeafe"},
-            ),
-            style={"minWidth": "0", "textAlign": "center", "padding": "4px 8px 2px"},
-        ),
-        rx.el.div(
-            rx.el.img(
-                src="/images/og-preview.png",
-                alt="Materialized Enhancements preview",
-                loading="lazy",
-                decoding="async",
-                style={
-                    "width": "100%",
-                    "height": "100%",
-                    "objectFit": "contain",
-                    "objectPosition": "center",
-                    "display": "block",
-                    "filter": "saturate(1.08) contrast(1.04)",
-                },
-            ),
-            rx.el.div(
-                fomantic_icon("user plus", size=20, color="#ffffff"),
-                style={
-                    "position": "absolute",
-                    "right": "10px",
-                    "top": "10px",
-                    "width": "36px",
-                    "height": "36px",
-                    "display": "flex",
-                    "alignItems": "center",
-                    "justifyContent": "center",
-                    "borderRadius": "999px",
-                    "background": "rgba(15, 23, 42, 0.78)",
-                    "boxShadow": "0 8px 16px rgba(2, 6, 23, 0.28)",
-                },
-            ),
-            style={
-                "position": "relative",
-                "width": "100%",
-                "aspectRatio": "4 / 3",
-                "maxHeight": "280px",
-                "overflow": "hidden",
-                "borderRadius": "14px",
-                "background": "rgba(15, 23, 42, 0.72)",
-                "border": "2px solid rgba(253, 230, 138, 0.65)",
-            },
-        ),
-        type="button",
-        on_click=ComposeState.start_fresh,
-        style={
-            "display": "flex",
-            "flexDirection": "column",
-            "alignItems": "stretch",
-            "gap": "10px",
-            "padding": "12px",
-            "borderRadius": "20px",
-            "border": "3px solid rgba(253, 230, 138, 0.72)",
-            "background": "linear-gradient(135deg, rgba(124, 58, 237, 0.48), rgba(15, 23, 42, 0.72))",
-            "boxShadow": "0 0 0 3px rgba(250, 204, 21, 0.14), 0 12px 28px rgba(2, 6, 23, 0.22)",
-            "color": "#f8fafc",
-            "cursor": "pointer",
-            "font": "inherit",
-            "textAlign": "center",
-            "appearance": "none",
-            "width": "100%",
-            "maxWidth": "none",
-        },
-    )
-
-
 def _materialization_reward_panel() -> rx.Component:
     """Visitor-facing reward card for all generated materialization outputs."""
     model_active = ComposeState.materialization_artifact_tab == "model"
@@ -4032,7 +4200,7 @@ def _materialization_reward_panel() -> rx.Component:
                         },
                     ),
                     rx.el.h2(
-                        "Quest complete: your enhancement artifacts are ready",
+                        "Quest complete: your enhancement character is ready",
                         style={
                             "margin": "10px 0 8px",
                             "color": "#f8fafc",
@@ -4043,8 +4211,9 @@ def _materialization_reward_panel() -> rx.Component:
                         },
                     ),
                     rx.el.p(
-                        "Your selected genes became two take-home rewards: a printable 3D model you can inspect, "
-                        "download, or make, and a personal enhancement report you can share online or print.",
+                        "Congratulations. Your selected genes became two take-home rewards: a printable 3D model "
+                        "and a personal enhancement report. This project is also growing into an open enhancement "
+                        "gene knowledgebase for art, education, and future science.",
                         style={
                             "margin": "0",
                             "color": "#dbeafe",
@@ -4063,19 +4232,54 @@ def _materialization_reward_panel() -> rx.Component:
                 },
             ),
             rx.el.div(
+                _materialization_edit_character_cta(),
+                rx.cond(
+                    ComposeState.is_shared_visit,
+                    _materialization_create_new_character_cta(),
+                    rx.fragment(),
+                ),
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "flexWrap": "wrap",
+                    "gap": "8px",
+                    "marginTop": "14px",
+                },
+            ),
+            rx.el.div(
                 rx.el.div(
-                    "Need to change the selected genes or visitor name?",
+                    "Help grow the enhancement atlas",
                     style={
-                        "marginBottom": "8px",
+                        "marginBottom": "5px",
                         "color": "#cbd5e1",
-                        "fontSize": "0.9rem",
-                        "fontWeight": "800",
+                        "fontSize": "0.98rem",
+                        "fontWeight": "900",
                         "textAlign": "center",
                     },
                 ),
-                _materialization_edit_character_cta(),
+                rx.el.div(
+                    "Join the movement: share feedback, suggest genes, or support the next version.",
+                    style={
+                        "margin": "0 auto 10px",
+                        "maxWidth": "48rem",
+                        "color": "#94a3b8",
+                        "fontSize": "0.9rem",
+                        "fontWeight": "700",
+                        "lineHeight": "1.35",
+                        "textAlign": "center",
+                    },
+                ),
                 _materialization_post_generation_ctas(),
-                style={"marginTop": "14px", "textAlign": "center"},
+                style={
+                    "marginTop": "16px",
+                    "padding": "13px 14px 14px",
+                    "textAlign": "center",
+                    "borderRadius": "14px",
+                    "background": "rgba(15, 23, 42, 0.46)",
+                    "border": "1px solid rgba(196, 181, 253, 0.20)",
+                    "boxShadow": "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                },
             ),
             rx.el.div(
                 _reward_artifact_choice(
@@ -4084,6 +4288,7 @@ def _materialization_reward_panel() -> rx.Component:
                     "cube",
                     model_active,
                     ComposeState.show_model_artifact_tab,
+                    "Open model",
                     image_src="/images/icons/shapes.jpg",
                     image_alt="Printed Materialized Enhancements 3D shapes",
                 ),
@@ -4093,21 +4298,19 @@ def _materialization_reward_panel() -> rx.Component:
                     "file alternate",
                     report_active,
                     ComposeState.show_report_artifact_tab,
+                    "Open report",
                     image_src="/images/icons/report_icon.jpeg",
                     image_alt="Personal enhancement report icon",
                 ),
-                rx.cond(
-                    ComposeState.is_shared_visit,
-                    _create_own_character_card(),
-                    _reward_artifact_choice(
-                        "Share & publish",
-                        "Share on social media!",
-                        "share alternate",
-                        share_active,
-                        ComposeState.show_share_artifact_tab,
-                        image_src="/images/icons/share.jpg",
-                        image_alt="Share and publish icon",
-                    ),
+                _reward_artifact_choice(
+                    "Share & publish",
+                    "Share on social media!",
+                    "share alternate",
+                    share_active,
+                    ComposeState.show_share_artifact_tab,
+                    "Open sharing",
+                    image_src="/images/icons/share.jpg",
+                    image_alt="Share and publish icon",
                 ),
                 style={
                     "display": "grid",
@@ -4508,6 +4711,37 @@ def _rpg_flow_css() -> rx.Component:
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+        @keyframes me-pulse {
+            0% {
+                transform: scale(1);
+                filter: brightness(1);
+                box-shadow: 0 0 24px rgba(124, 58, 237, 0.65), 0 10px 24px rgba(2, 6, 23, 0.38) !important;
+            }
+            50% {
+                transform: scale(1.085);
+                filter: brightness(1.28);
+                box-shadow: 0 0 55px rgba(167, 139, 250, 0.95), 0 0 75px rgba(124, 58, 237, 0.72), 0 14px 34px rgba(2, 6, 23, 0.44) !important;
+            }
+            100% {
+                transform: scale(1);
+                filter: brightness(1);
+                box-shadow: 0 0 24px rgba(124, 58, 237, 0.65), 0 10px 24px rgba(2, 6, 23, 0.38) !important;
+            }
+        }
+        @keyframes me-pulse-border {
+            0% {
+                border-color: rgba(167, 139, 250, 0.42);
+                box-shadow: 0 8px 30px rgba(124, 58, 237, 0.12);
+            }
+            50% {
+                border-color: rgba(167, 139, 250, 0.72);
+                box-shadow: 0 8px 35px rgba(124, 58, 237, 0.22);
+            }
+            100% {
+                border-color: rgba(167, 139, 250, 0.42);
+                box-shadow: 0 8px 30px rgba(124, 58, 237, 0.12);
+            }
+        }
         details.me-rpg-category-accordion > summary::-webkit-details-marker {
             display: none;
         }
@@ -4586,6 +4820,50 @@ def _rpg_flow_css() -> rx.Component:
         }
         .me-rpg-center-panel {
             min-width: 0;
+        }
+        .me-onboarding-center-lift {
+            position: relative;
+            z-index: 1010;
+        }
+        .me-onboarding-gene-lift .me-rpg-sidebar-intro,
+        .me-onboarding-gene-lift .me-budget-gauge,
+        .me-onboarding-gene-lift .me-rpg-library-title,
+        .me-onboarding-gene-lift .me-rpg-library-grid {
+            filter: blur(3px);
+            opacity: 0.54;
+            pointer-events: none;
+            user-select: none;
+        }
+        .me-onboarding-gene-lift .me-onboarding-tip-card {
+            filter: none;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .me-onboarding-marker-hint {
+            position: relative;
+            z-index: 1010;
+            pointer-events: none;
+        }
+        .me-onboarding-marker-hint .me-rpg-body-map-title,
+        .me-onboarding-marker-hint .me-rpg-body-image,
+        .me-onboarding-marker-hint .me-rpg-materialize-leg-cta {
+            opacity: 0.18;
+        }
+        .me-onboarding-marker-hint .me-rpg-body-marker {
+            opacity: 0.18;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .me-onboarding-marker-hint .me-rpg-body-marker--longevity-genome {
+            z-index: 1010;
+            opacity: 1;
+            pointer-events: auto;
+            filter: drop-shadow(0 0 18px rgba(124, 58, 237, 0.55));
+            animation: me-onboarding-marker-pulse 2s ease-in-out infinite;
+        }
+        @keyframes me-onboarding-marker-pulse {
+            0%, 100% { filter: drop-shadow(0 0 12px rgba(124, 58, 237, 0.4)); }
+            50% { filter: drop-shadow(0 0 28px rgba(124, 58, 237, 0.75)); }
         }
         .me-budget-gauge {
             position: sticky;
@@ -4769,6 +5047,13 @@ def _rpg_flow_css() -> rx.Component:
             gap: 7px;
             pointer-events: auto;
         }
+        .me-onboarding-materialize-lift {
+            z-index: 6;
+            border-radius: 30px;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.90);
+            box-shadow: 0 0 35px rgba(255, 255, 255, 0.70);
+        }
         .me-rpg-materialize-alert-stack {
             position: absolute;
             top: calc(100% + 8px);
@@ -4830,6 +5115,9 @@ def _rpg_flow_css() -> rx.Component:
             cursor: not-allowed !important;
             opacity: 0.68 !important;
         }
+        .me-rpg-materialize-leg-button.is-active-pulse {
+            animation: me-pulse 2s infinite ease-in-out !important;
+        }
         .me-rpg-materialize-alert {
             width: min(460px, 82vw);
             box-sizing: border-box;
@@ -4850,6 +5138,10 @@ def _rpg_flow_css() -> rx.Component:
         .me-rpg-materialize-warning {
             border: 1px solid rgba(251, 191, 36, 0.48);
             color: #fde68a;
+        }
+        .me-rpg-materialize-info-alert {
+            border: 1px solid rgba(56, 189, 248, 0.52);
+            color: #bae6fd;
         }
         .me-rpg-category-anchor:hover {
             filter: brightness(1.12);
@@ -5303,6 +5595,29 @@ def _rpg_character_profile_layout() -> rx.Component:
     )
 
 
+def _onboarding_backdrop() -> rx.Component:
+    return rx.cond(
+        ComposeState.show_onboarding_suggestion,
+        rx.el.div(
+            on_click=ComposeState.advance_onboarding,
+            style={
+                "position": "fixed",
+                "top": "0",
+                "left": "0",
+                "width": "100vw",
+                "height": "100vh",
+                "background": "rgba(2, 6, 23, 0.55)",
+                "backdropFilter": "blur(3px)",
+                "WebkitBackdropFilter": "blur(3px)",
+                "zIndex": "1000",
+                "cursor": "pointer",
+                "pointerEvents": "auto",
+            },
+        ),
+        rx.fragment(),
+    )
+
+
 def _rpg_active_genes_layout() -> rx.Component:
     return _rpg_shell(
         rx.el.div(
@@ -5311,13 +5626,40 @@ def _rpg_active_genes_layout() -> rx.Component:
                 _budget_gauge(),
                 _rpg_gene_library_panel(),
                 id="gene-library",
-                class_name="me-rpg-left-panel me-rpg-library-section",
+                class_name=rx.cond(
+                    ComposeState.show_onboarding_genes,
+                    "me-rpg-left-panel me-rpg-library-section me-onboarding-gene-lift",
+                    "me-rpg-left-panel me-rpg-library-section",
+                ),
+                style=rx.cond(
+                    ComposeState.show_onboarding_genes,
+                    {
+                        "position": "relative",
+                        "zIndex": "1200",
+                        "pointerEvents": "none",
+                    },
+                    {},
+                ),
             ),
             rx.el.div(
                 _rpg_body_map_panel(),
-                class_name="me-rpg-center-panel",
+                class_name=rx.cond(
+                    ComposeState.show_onboarding_genes,
+                    "me-rpg-center-panel me-onboarding-marker-hint",
+                    rx.cond(
+                        ComposeState.show_onboarding_center_lift,
+                        "me-rpg-center-panel me-onboarding-center-lift",
+                        "me-rpg-center-panel",
+                    ),
+                ),
             ),
+            _onboarding_backdrop(),
             class_name="me-rpg-dashboard me-rpg-hero-grid",
+            style=rx.cond(
+                ComposeState.show_onboarding_suggestion,
+                {"position": "relative", "isolation": "isolate"},
+                {},
+            ),
         )
     )
 
@@ -5680,8 +6022,8 @@ def _model_generation_story_panel() -> rx.Component:
                     rx.el.p(
                         "The app takes ",
                         rx.el.strong(ComposeState.param_pool_size, style={"color": "#ffffff"}),
-                        " selected genes with measured model data and turns them into a Voronoi-based printable shape. ",
-                        "Your name and category choices make the seed, so the same choices can recreate the same object later.",
+                        " selected genes to procedurally grow a unique mathematical Voronoi shape. ",
+                        "Biophysical properties dictate its cellular complexity, seeded by your choices.",
                         style={
                             "margin": "0",
                             "fontSize": "1rem",
@@ -8716,6 +9058,31 @@ def _tab_menu(active_route: str) -> rx.Component:
             )
         ),
         _tab_link("/about", "home", "About", active_route),
+        rx.el.div(
+            rx.el.div(
+                rx.el.span(
+                    "Real Genes · Real Science · Your Character · ",
+                    style={"color": "#94a3b8"},
+                ),
+                rx.el.span(
+                    "Wearable 3D Printed Model",
+                    style={"color": "#a78bfa", "fontWeight": "900"},
+                ),
+                style={
+                    "height": "100%",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "background": "none",
+                    "cursor": "default",
+                    "pointerEvents": "none",
+                    "fontSize": "0.92rem",
+                    "letterSpacing": "0.04em",
+                    "textTransform": "uppercase",
+                    "padding": "0 1.5em",
+                },
+            ),
+            class_name="right menu",
+        ),
         class_name="ui top attached tabular menu",
         id="me-top-tab-menu",
     )
@@ -8735,6 +9102,11 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
             background: #020617 !important;
             border-color: rgba(124, 58, 237, 0.42) !important;
             border-radius: 0 !important;
+        }
+        @media (max-width: 1150px) {
+            #me-top-tab-menu .right.menu {
+                display: none !important;
+            }
         }
         #me-top-tab-menu.ui.top.attached.tabular.menu .item {
             color: #cbd5e1 !important;
@@ -8952,7 +9324,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
     image=_page_image_url(),
     description=_page_description("/"),
     meta=_page_meta("/"),
-    on_load=[AppState.redirect_legacy_tab],
+    on_load=[AppState.redirect_legacy_tab, ComposeState.check_clean_storage],
 )
 def index_page() -> rx.Component:
     """Character profile — default RPG loadout builder."""

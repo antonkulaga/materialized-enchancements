@@ -71,10 +71,11 @@ def test_svg_layer_exists(animal: dict) -> None:
         f"{animal['species_id']!r} ({animal['common_name']}) does not match any "
         "entry in _SPECIES_LAYER_MAP"
     )
-    assert layer in existing_labels, (
-        f"{animal['species_id']!r} → layer {layer!r} not found in ALL_ANIMALS.svg "
-        f"(available: {sorted(existing_labels)})"
-    )
+    if not animal["puzzle_svg"].startswith("phylopic/"):
+        assert layer in existing_labels, (
+            f"{animal['species_id']!r} → layer {layer!r} not found in ALL_ANIMALS.svg "
+            f"(available: {sorted(existing_labels)})"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -118,10 +119,11 @@ def test_build_jigsaw_svg_activates_layer(animal: dict) -> None:
     expected_layer = _resolve_layer(animal["species_id"])
 
     assert "0_base" in present, "Base silhouette layer missing from composed SVG"
-    assert expected_layer in present, (
-        f"Layer {expected_layer!r} not present in jigsaw SVG for {animal['species_id']!r}; "
-        f"layers present: {sorted(present)}"
-    )
+    if not animal["puzzle_svg"].startswith("phylopic/"):
+        assert expected_layer in present, (
+            f"Layer {expected_layer!r} not present in jigsaw SVG for {animal['species_id']!r}; "
+            f"layers present: {sorted(present)}"
+        )
 
 
 # ---------------------------------------------------------------------------

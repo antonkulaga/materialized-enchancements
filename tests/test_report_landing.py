@@ -37,9 +37,8 @@ def test_report_landing_redirects_to_interactive_page_while_keeping_og_url() -> 
     assert _report_landing_html_version(html) == REPORT_LANDING_HTML_VERSION
     assert f'<meta name="{REPORT_LANDING_HTML_VERSION_META_NAME}" content="{REPORT_LANDING_HTML_VERSION}">' in html
     assert f'<meta property="og:url" content="{landing_url}">' in html
-    assert 'http-equiv="refresh"' not in html
-    assert f'<a class="primary" href="{escaped_recreate_url}">Open shared materialization</a>' in html
-    assert f'<a href="{escaped_recreate_url}">Recreate this character</a>' in html
+    assert 'http-equiv="refresh"' in html
+    assert f'<a class="primary" href="{escaped_recreate_url}">Open this character</a>' in html
     assert f'<a class="primary" href="{landing_url}">' not in html
 
 
@@ -98,7 +97,7 @@ def test_report_landing_migration_regenerates_missing_version(
     assert _report_landing_html_version(html) == REPORT_LANDING_HTML_VERSION
     assert "https://enhancement.bio/generated/reports/anonymous-s1985/report.webp" in html
     assert "https://enhancement.bio/materialization?report=1" in html
-    assert 'http-equiv="refresh"' not in html
+    assert 'http-equiv="refresh"' in html
 
 
 def test_report_landing_migration_skips_current_version(

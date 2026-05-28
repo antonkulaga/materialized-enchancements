@@ -5,6 +5,7 @@ import base64
 import binascii
 import json
 import logging
+import os
 import re
 import shutil
 from pathlib import Path
@@ -908,6 +909,17 @@ class ComposeState(rx.State):
     materialization_artifact_tab: str = "model"
     stl_base64: str = ""
     viewer_nonce: int = 0
+    onboarding_complete: str | None = rx.LocalStorage(
+        "pending",
+        name="me_onboarding_complete",
+        sync=True,
+    )
+    dismissed_onboarding: str | None = rx.LocalStorage(
+        "pending",
+        name="me_dismissed_onboarding",
+        sync=True,
+    )
+    onboarding_step: str | None = rx.LocalStorage("pending", name="me_onboarding_step", sync=True)
 
     # Share card (in-memory preview, no disk write)
     share_card_data_url: str = ""
@@ -976,7 +988,7 @@ class ComposeState(rx.State):
         self._prune_included_genes()
         self._recompute_params()
 
-    def select_category(self, category: str) -> None:
+    def select_category(self, category: str):  # type: ignore[return]
         """Select a category from the body map without treating a repeat click as removal."""
         if category in self.selected_categories:
             return
@@ -990,6 +1002,8 @@ class ComposeState(rx.State):
         self.selected_categories = [*self.selected_categories, category]
         self._prune_included_genes()
         self._recompute_params()
+        if self.onboarding_step_index == 0:
+            yield from self.advance_onboarding()
 
     def remove_category(self, category: str) -> None:
         self.selected_categories = [c for c in self.selected_categories if c != category]
@@ -1176,6 +1190,90 @@ class ComposeState(rx.State):
 
     def dismiss_mission_brief(self) -> None:
         self.show_mission_brief = False
+
+    def _mark_onboarding_finished(self) -> None:
+        self.onboarding_complete = "true"
+        self.dismissed_onboarding = "true"
+        self.onboarding_step = "3"
+
+    def _onboarding_storage_script(self) -> str:
+        return (
+            f"localStorage.setItem('me_onboarding_complete', {json.dumps(str(self.onboarding_complete or 'false'))});"
+            f"localStorage.setItem('me_dismissed_onboarding', {json.dumps(str(self.dismissed_onboarding or 'false'))});"
+            f"localStorage.setItem('me_onboarding_step', {json.dumps(str(self.onboarding_step or '0'))});"
+        )
+
+    def _sync_onboarding_from_storage(self) -> None:
+        """Align cookie + LocalStorage so a partial write still counts as finished."""
+        if (
+            self.onboarding_complete == "pending"
+            and self.dismissed_onboarding == "pending"
+            and self.onboarding_step == "pending"
+        ):
+            self.onboarding_complete = "false"
+            self.dismissed_onboarding = "false"
+            self.onboarding_step = "0"
+            return
+
+        if self.onboarding_complete == "pending":
+            self.onboarding_complete = "false"
+        if self.dismissed_onboarding == "pending":
+            self.dismissed_onboarding = "false"
+        if self.onboarding_step == "pending":
+            self.onboarding_step = "0"
+
+        complete = str(self.onboarding_complete or "false").strip().lower() == "true"
+        dismissed = str(self.dismissed_onboarding or "false").strip().lower() == "true"
+        step = str(self.onboarding_step or "0").strip().lower()
+
+        if complete:
+            self._mark_onboarding_finished()
+            return
+        if dismissed or step in ("3", "done"):
+            self._mark_onboarding_finished()
+
+    def advance_onboarding(self):  # type: ignore[return]
+        """Dismiss the current onboarding step and reveal the next spotlight."""
+        if self.onboarding_finished:
+            return
+        step = self.onboarding_step_index
+        next_step = min(3, step + 1)
+        self.onboarding_step = str(next_step)
+        if next_step >= 3:
+            self._mark_onboarding_finished()
+        yield rx.call_script(self._onboarding_storage_script())
+
+    def advance_name_onboarding_on_enter(self, key: str, _key_info: dict[str, Any]):  # type: ignore[return]
+        """Move past the name tooltip when the user confirms a non-empty name."""
+        if key != "Enter" or self.onboarding_step_index != 1:
+            return
+        if not self.personal_tag.strip():
+            return
+        yield from self.advance_onboarding()
+
+    def dismiss_onboarding(self) -> None:
+        """Dismiss onboarding completely."""
+        self._mark_onboarding_finished()
+
+    def check_clean_storage(self):  # type: ignore[return]
+        params = self.router.url.query_parameters
+        url_clean = str(params.get("clean", "")).strip().lower() in ("1", "true")
+        env_clean = os.environ.get("CLEAN_BROWSER_STORAGE") == "1"
+
+        if url_clean or env_clean:
+            if env_clean:
+                os.environ["CLEAN_BROWSER_STORAGE"] = "0"
+            self.onboarding_complete = "false"
+            self.dismissed_onboarding = "false"
+            self.onboarding_step = "0"
+            yield rx.call_script(
+                "localStorage.setItem('me_onboarding_complete', 'false');"
+                "localStorage.setItem('me_dismissed_onboarding', 'false');"
+                "localStorage.setItem('me_onboarding_step', '0');"
+                "document.cookie = 'me_onboarding_complete=; path=/; max-age=0; SameSite=Lax';"
+            )
+            return
+        self._sync_onboarding_from_storage()
 
     def toggle_choice_expanded(self) -> None:
         self.choice_expanded = not self.choice_expanded
@@ -2277,6 +2375,49 @@ class ComposeState(rx.State):
         return _sum_credits_for_included_genes(self.selected_categories, self.included_genes)
 
     @rx.var
+    def onboarding_finished(self) -> bool:
+        if self.onboarding_complete == "pending" or self.dismissed_onboarding == "pending" or self.onboarding_step == "pending":
+            return True
+        complete = str(self.onboarding_complete or "false").strip().lower() == "true"
+        dismissed = str(self.dismissed_onboarding or "false").strip().lower() == "true"
+        step = str(self.onboarding_step or "0").strip().lower()
+        return complete or dismissed or step in ("3", "done")
+
+    @rx.var
+    def onboarding_step_index(self) -> int:
+        if self.onboarding_finished:
+            return 3
+        raw = str(self.onboarding_step or "0").strip().lower()
+        step_by_name = {"genes": 0, "name": 1, "materialize": 2, "done": 3}
+        if raw in step_by_name:
+            return step_by_name[raw]
+        try:
+            return min(3, max(0, int(raw)))
+        except ValueError:
+            return 0
+
+    @rx.var
+    def show_onboarding_genes(self) -> bool:
+        return self.show_onboarding_suggestion and self.onboarding_step_index == 0
+
+    @rx.var
+    def show_onboarding_name(self) -> bool:
+        return self.show_onboarding_suggestion and self.onboarding_step_index == 1
+
+    @rx.var
+    def show_onboarding_materialize(self) -> bool:
+        return self.show_onboarding_suggestion and self.onboarding_step_index == 2
+
+    @rx.var
+    def show_onboarding_center_lift(self) -> bool:
+        """Raise body-map column above the dimmed backdrop (name + materialize steps)."""
+        return self.show_onboarding_suggestion and (self.onboarding_step_index == 1 or self.onboarding_step_index == 2)
+
+    @rx.var
+    def show_onboarding_suggestion(self) -> bool:
+        return not self.onboarding_finished
+
+    @rx.var
     def budget_remaining(self) -> int:
         return DEFAULT_BUDGET - self.budget_spent
 
@@ -2354,11 +2495,45 @@ class ComposeState(rx.State):
         return len(self.selected_categories) > 0
 
     @rx.var
+    def has_personal_tag(self) -> bool:
+        return bool(self.personal_tag and self.personal_tag.strip())
+
+    @rx.var
     def can_materialize(self) -> bool:
         spent = _sum_credits_for_included_genes(self.selected_categories, self.included_genes)
         return (
             len(self.selected_categories) > 0
             and spent > 0
+            and self.has_personal_tag
+        )
+
+    @rx.var
+    def materialize_name_missing_notice(self) -> str:
+        spent = _sum_credits_for_included_genes(self.selected_categories, self.included_genes)
+        if spent > 0 and not self.has_personal_tag:
+            return "Please enter a character name or alias above to materialize your enhancements."
+        return ""
+
+    @rx.var
+    def materialize_requirements_notice(self) -> str:
+        spent = _sum_credits_for_included_genes(self.selected_categories, self.included_genes)
+        missing_name = not self.has_personal_tag
+        missing_genes = spent <= 0
+        if missing_name and missing_genes:
+            return "Choose at least one gene and enter a character name before materializing."
+        if missing_genes:
+            return "Choose at least one gene from the Gene library before materializing."
+        if missing_name:
+            return "Enter a character name or alias before materializing."
+        return ""
+
+    @rx.var
+    def onboarding_materialize_guidance(self) -> str:
+        if self.materialize_requirements_notice:
+            return f"{self.materialize_requirements_notice} Then press the Materialize button to create your 3D model and report."
+        return (
+            "You are ready. Press the pulsing Materialize button below to grow your unique "
+            "mathematical Voronoi sculpture and download your personal report."
         )
 
     @rx.var

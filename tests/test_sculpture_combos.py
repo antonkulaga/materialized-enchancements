@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from typing import List
 
-from compass_web.config import MAX_MODEL_SPAN, PipelineConfig, validate_geometry_limits
-from compass_web.pipeline import run_pipeline
+from enhancement_geometry.config import MAX_MODEL_SPAN, PipelineConfig, validate_geometry_limits
+from enhancement_geometry.pipeline import run_pipeline
 
 from materialized_enhancements.gene_data import GENE_LIBRARY, UNIQUE_CATEGORIES
 from materialized_enhancements.sculpture import (
