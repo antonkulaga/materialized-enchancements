@@ -988,7 +988,7 @@ class ComposeState(rx.State):
         self._prune_included_genes()
         self._recompute_params()
 
-    def select_category(self, category: str) -> None:
+    def select_category(self, category: str):  # type: ignore[return]
         """Select a category from the body map without treating a repeat click as removal."""
         if category in self.selected_categories:
             return
@@ -1002,6 +1002,8 @@ class ComposeState(rx.State):
         self.selected_categories = [*self.selected_categories, category]
         self._prune_included_genes()
         self._recompute_params()
+        if self.onboarding_step_index == 0:
+            yield from self.advance_onboarding()
 
     def remove_category(self, category: str) -> None:
         self.selected_categories = [c for c in self.selected_categories if c != category]

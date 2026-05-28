@@ -2424,7 +2424,8 @@ def _gene_library_onboarding_tooltip() -> rx.Component:
         accent_color="#a78bfa",
         headline="Choose your enhancement genes",
         detail=(
-            "Open a category accordion below and add genes to your character. "
+            "Click a category icon on the body map (or an accordion below) to highlight and jump to it, "
+            "then add genes to your character. "
             "Each gene spends enhancement credits (cr) and shapes your unique mathematical Voronoi 3D model."
         ),
     )
@@ -4838,6 +4839,32 @@ def _rpg_flow_css() -> rx.Component:
             opacity: 1;
             pointer-events: auto;
         }
+        .me-onboarding-marker-hint {
+            position: relative;
+            z-index: 1010;
+            pointer-events: none;
+        }
+        .me-onboarding-marker-hint .me-rpg-body-map-title,
+        .me-onboarding-marker-hint .me-rpg-body-image,
+        .me-onboarding-marker-hint .me-rpg-materialize-leg-cta {
+            opacity: 0.18;
+        }
+        .me-onboarding-marker-hint .me-rpg-body-marker {
+            opacity: 0.18;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .me-onboarding-marker-hint .me-rpg-body-marker--longevity-genome {
+            z-index: 1010;
+            opacity: 1;
+            pointer-events: auto;
+            filter: drop-shadow(0 0 18px rgba(124, 58, 237, 0.55));
+            animation: me-onboarding-marker-pulse 2s ease-in-out infinite;
+        }
+        @keyframes me-onboarding-marker-pulse {
+            0%, 100% { filter: drop-shadow(0 0 12px rgba(124, 58, 237, 0.4)); }
+            50% { filter: drop-shadow(0 0 28px rgba(124, 58, 237, 0.75)); }
+        }
         .me-budget-gauge {
             position: sticky;
             top: 0;
@@ -5617,9 +5644,13 @@ def _rpg_active_genes_layout() -> rx.Component:
             rx.el.div(
                 _rpg_body_map_panel(),
                 class_name=rx.cond(
-                    ComposeState.show_onboarding_center_lift,
-                    "me-rpg-center-panel me-onboarding-center-lift",
-                    "me-rpg-center-panel",
+                    ComposeState.show_onboarding_genes,
+                    "me-rpg-center-panel me-onboarding-marker-hint",
+                    rx.cond(
+                        ComposeState.show_onboarding_center_lift,
+                        "me-rpg-center-panel me-onboarding-center-lift",
+                        "me-rpg-center-panel",
+                    ),
                 ),
             ),
             _onboarding_backdrop(),
