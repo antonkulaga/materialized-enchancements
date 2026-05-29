@@ -14,15 +14,15 @@ materialized-enhancements/          ← repo root
 ├── README.md
 ├── AGENTS.md
 ├── assets/
+│   ├── species_svg/                ← canonical per-species silhouette SVGs (single source of truth)
 │   ├── structures/                 ← PDB protein structures (Git LFS)
 │   └── stl/                        ← 3D-printable protein STLs + stl_report.csv (Git LFS)
 ├── data/
 │   ├── input/
 │   │   ├── gene_library.csv        ← canonical gene data (source of truth)
-│   │   └── puzzle/                 ← SVG puzzle pieces, one per source organism
-│   │       ├── human_base.svg      ← base human silhouette
-│   │       ├── 1_tardigrade.svg
-│   │       └── ...                 ← numbered SVGs, see _SPECIES_PUZZLE_MAP in puzzle.py
+│   │   ├── species_svg_map.csv     ← species → silhouette SVG map (single source of truth)
+│   │   └── puzzle/
+│   │       └── ALL_ANIMALS.svg     ← single layered jigsaw composite (jigsaw route dormant)
 │   ├── interim/                    ← intermediate processing
 │   └── output/                     ← generated art outputs, parquets, public report artifacts (gitignored)
 └── src/materialized_enhancements/
@@ -139,31 +139,32 @@ Species fields are resolved at load time via `gene_species.csv` + `species.csv`:
 - **`gene_data.py` is a loader, not a store**: it reads the CSV with Polars, maps column names, and exposes typed lists/dicts. No business logic beyond column mapping and derived aggregates (counts, unique lists).
 - **Category metadata lives in `state.py`**: display colours, icons, and ordering for categories are the only thing allowed to be coded in Python (they are UI config, not domain data).
 - **When the CSV changes, code must not change**: adding/removing rows or editing gene fields should require zero Python edits.
-- **Puzzle SVG mapping lives in `puzzle.py` → `_SPECIES_PUZZLE_MAP`**: maps species_id to SVG filenames in `data/input/puzzle/`. Gene-level overrides (e.g., `epas1_tibetan` → homo-longi) are in `_GENE_PUZZLE_OVERRIDE`. When new SVGs are added, only `_SPECIES_PUZZLE_MAP` and `_SPECIES_LAYER_MAP` need updating. The resolved filename is stored as `puzzle_svg` on each `GeneEntry` at load time.
+- **Species SVG mapping lives in `data/input/species_svg_map.csv`** (single source of truth), loaded by `puzzle.py` into `_SPECIES_PUZZLE_MAP` / `_SPECIES_LAYER_MAP`. Canonical silhouettes are `assets/species_svg/<species_id>.svg`. The gene-level override `_GENE_PUZZLE_OVERRIDE` (e.g., `epas1_tibetan`) bypasses the species map. The resolved path is stored as `puzzle_svg` on each `GeneEntry` at load time.
 
 ### Species SVG Resolution
 
-Species silhouette SVGs come from two sources:
+Species silhouettes are **single-source**: exactly one SVG per species at
+`assets/species_svg/<species_id>.svg`, served by Reflex at `/species_svg/...`.
+The species → SVG mapping is the CSV `data/input/species_svg_map.csv`; `puzzle.py`
+loads it into `_SPECIES_PUZZLE_MAP` (UI/reports) and `_SPECIES_LAYER_MAP` (the
+dormant jigsaw composer). Provenance and per-file licensing are documented in
+[`docs/species_svg_attribution.md`](docs/species_svg_attribution.md).
 
-1. **Hand-drawn jigsaw pieces** — artistic SVGs in `data/input/puzzle/` (e.g., `1_tardigrade.svg`) used for the original 28 species in the jigsaw puzzle and `ALL_ANIMALS.svg`.
-2. **PhyloPic silhouettes** — downloaded from [phylopic.org](https://www.phylopic.org/) into `data/input/puzzle/phylopic/`. Used for new species and to replace incorrect substitutes (e.g., dog was using cat SVG).
+- `resolve_puzzle_svg(gene_id, species_ids)` returns `species_svg/<id>.svg`; the
+  gene-level override `_GENE_PUZZLE_OVERRIDE` handles `epas1_tibetan`.
+- The resolved path is stored as `puzzle_svg` on each `GeneEntry`/animal row at
+  load time; `state.py` exposes it as `puzzle_src` = `/<puzzle_svg>`.
+- The single layered jigsaw composite is `data/input/puzzle/ALL_ANIMALS.svg`
+  (read by `build_jigsaw_svg`). The jigsaw route is currently dormant.
 
 **When adding a new species:**
 
-1. Run `python3 scripts/download_phylopic.py` to download silhouettes from PhyloPic for all species in `data/input/species.csv`.
-2. Add the species_id → filename mapping to `_SPECIES_PUZZLE_MAP` in `puzzle.py`. Use `phylopic/<species_id>.svg` (or `.png`) for PhyloPic-sourced files.
-3. Add the corresponding layer label to `_SPECIES_LAYER_MAP` (used by `build_jigsaw_svg()` if a matching layer exists in `ALL_ANIMALS.svg`).
+1. Add the silhouette as `assets/species_svg/<species_id>.svg` (must be SVG).
+2. Add a row to `data/input/species_svg_map.csv` (include `jigsaw_layer` only if a
+   matching Inkscape layer exists inside `ALL_ANIMALS.svg`).
+3. Record its provenance/license in `docs/species_svg_attribution.md`.
 
-**PhyloPic API resolution strategy** (implemented in `scripts/download_phylopic.py`):
-
-- Search by exact scientific name (lowercase): `GET /nodes?filter_name=<name>&build=538`
-- If not found, try genus only
-- If not found, try higher taxonomic levels (family, order, etc.)
-- Prefer SVG source files; fall back to PNG when SVG unavailable
-- Walk up parent nodes (up to 4 levels) to find any image
-- Attribution metadata is saved in `data/input/puzzle/phylopic/ATTRIBUTION.json`
-
-**License compliance**: PhyloPic images have individual Creative Commons licenses. The `ATTRIBUTION.json` file records the license for each downloaded image. Check it before distributing.
+No Python edits are required — `puzzle.py` is purely CSV-driven.
 
 ---
 

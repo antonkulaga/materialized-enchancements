@@ -341,6 +341,6 @@ The project is **open source** ([repository](https://github.com/winternewt/mater
 
 ## Attributions
 
-Organism silhouette artwork is sourced from [PhyloPic](https://www.phylopic.org/). Silhouettes with specific attribution requirements are listed in [`animals_phylopic.md`](animals_phylopic.md).
+Organism silhouette artwork is sourced from [PhyloPic](https://www.phylopic.org/). The canonical per-species silhouettes live in `assets/species_svg/`; provenance and per-file attribution requirements are documented in [`docs/species_svg_attribution.md`](docs/species_svg_attribution.md) (machine-readable map: [`data/input/species_svg_map.csv`](data/input/species_svg_map.csv)).
 
 Jigsaw prototype tools: [CustomShapeJigsawJs](https://github.com/proceduraljigsaw/CustomShapeJigsawJs) (MIT), [svg_extrude](https://github.com/deffi/svg_extrude) (AGPL-3.0).

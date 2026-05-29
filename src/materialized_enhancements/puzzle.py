@@ -3,6 +3,11 @@
 Manages puzzle-piece SVGs for each source species and composes them
 into a combined jigsaw SVG showing the human silhouette with selected
 species layers.
+
+Species → silhouette mapping is loaded from ``data/input/species_svg_map.csv``
+(single source of truth). Canonical per-species SVG files live in
+``assets/species_svg/``; the single layered jigsaw composite is
+``data/input/puzzle/ALL_ANIMALS.svg``.
 """
 
 from __future__ import annotations
@@ -10,97 +15,44 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import polars as pl
 
-PUZZLE_DIR = Path(__file__).resolve().parents[2] / "data" / "input" / "puzzle"
+
+DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "input"
+PUZZLE_DIR = DATA_DIR / "puzzle"
 ALL_ANIMALS_SVG_PATH = PUZZLE_DIR / "ALL_ANIMALS.svg"
-
 
 HUMAN_SPECIES_ID = "homo_sapiens"
 
+# ---------------------------------------------------------------------------
+# CSV-driven species → SVG mapping (single source of truth)
+# ---------------------------------------------------------------------------
+
+_SVG_MAP_PATH = DATA_DIR / "species_svg_map.csv"
+SPECIES_SVG_DF: pl.DataFrame = pl.read_csv(_SVG_MAP_PATH)
+
+SPECIES_SVG_MAP: dict[str, dict[str, str]] = {
+    row["species_id"]: row
+    for row in SPECIES_SVG_DF.iter_rows(named=True)
+}
+
+# Species → silhouette SVG URL path (relative to assets/ root).
+# homo_sapiens (flag="special") excluded: it has no default species silhouette;
+# the homo-longi image is only served via the gene-level override below.
 _SPECIES_PUZZLE_MAP: dict[str, str] = {
-    "ramazzottius_varieornatus": "1_tardigrade.svg",
-    "deinococcus_radiodurans": "2_Deinococcus.svg",
-    "heterocephalus_glaber": "3_naked mole rat.svg",
-    "cladosporium_sphaerospermum": "4_fungi_true.svg",
-    "loxodonta_africana": "5_elephant.svg",
-    "somniosus_microcephalus": "6_shark.svg",
-    "balaena_mysticetus": "7_whale.svg",
-    "turritopsis_dohrnii": "8_jellyfish.svg",
-    "aequorea_victoria": "8_jellyfish.svg",
-    "schmidtea_mediterranea": "9_planarian.svg",
-    "ambystoma_mexicanum": "10_axolotl.svg",
-    "pteropus_alecto": "11_bat.svg",
-    "leptonychotes_weddellii": "12_seal.svg",
-    "sepia_officinalis": "phylopic/sepia_officinalis.svg",
-    "pseudopleuronectes_americanus": "13_fish.svg",
-    "tursiops_truncatus": "14_dolphin.svg",
-    "crotalus_atrox": "15_Pit Viper.svg",
-    "erithacus_rubecula": "17_European Robin.svg",
-    "felis_catus": "18_cat.svg",
-    "photinus_pyralis": "20._fireflysvg.svg",
-    "electrophorus_electricus": "21_eel.svg",
-    "gekko_japonicus": "23_gecko.svg",
-    "mus_musculus": "25_mouse.svg",
-    "homarus_americanus": "26_lobster.svg",
-    "cyclorana_platycephala": "27_frog.svg",
-    "acomys_cahirinus": "phylopic/acomys_cahirinus.svg",
-    "polypedilum_vanderplanki": "phylopic/polypedilum_vanderplanki.png",
-    "canis_familiaris": "phylopic/canis_familiaris.svg",
-    "bos_taurus": "phylopic/bos_taurus.svg",
-    "melopsittacus_undulatus": "phylopic/melopsittacus_undulatus.svg",
-    "leucoraja_erinacea": "phylopic/leucoraja_erinacea.svg",
-    "trichonephila_clavipes": "phylopic/trichonephila_clavipes.svg",
-    "leiurus_quinquestriatus": "phylopic/leiurus_quinquestriatus.png",
-    "drosophila_melanogaster": "phylopic/drosophila_melanogaster.svg",
-    "pinctada_fucata": "phylopic/pinctada_fucata.png",
-    "potorous_tridactylus": "phylopic/potorous_tridactylus.svg",
-    "herpestes_ichneumon": "phylopic/herpestes_ichneumon.svg",
-    "urocitellus_parryii": "phylopic/urocitellus_parryii.svg",
+    row["species_id"]: f"species_svg/{row['species_id']}.svg"
+    for row in SPECIES_SVG_DF.filter(pl.col("flag") != "special").iter_rows(named=True)
 }
 
 _GENE_PUZZLE_OVERRIDE: dict[str, str] = {
-    "epas1_tibetan": "28_homo-longi.svg",
+    "epas1_tibetan": "species_svg/homo_sapiens.svg",
 }
 
+# Inkscape layer labels inside ALL_ANIMALS.svg for the jigsaw composer.
 _SPECIES_LAYER_MAP: dict[str, str] = {
-    "ramazzottius_varieornatus": "1_tardigrade",
-    "deinococcus_radiodurans": "2_Deinococcus",
-    "heterocephalus_glaber": "3_naked mole rat",
-    "cladosporium_sphaerospermum": "4_fungi",
-    "loxodonta_africana": "5_elephant",
-    "somniosus_microcephalus": "6_shark",
-    "balaena_mysticetus": "7_whale",
-    "turritopsis_dohrnii": "8_jellyfish",
-    "aequorea_victoria": "8_jellyfish",
-    "schmidtea_mediterranea": "9_planarian",
-    "ambystoma_mexicanum": "10_axolotl",
-    "pteropus_alecto": "11_bat",
-    "leptonychotes_weddellii": "12_seal",
-    "sepia_officinalis": "19_cuttlefish",
-    "pseudopleuronectes_americanus": "13_fish",
-    "tursiops_truncatus": "14_dolphin",
-    "crotalus_atrox": "15_pit viper",
-    "erithacus_rubecula": "17_european robin",
-    "felis_catus": "18_cat",
-    "photinus_pyralis": "20_firefly",
-    "electrophorus_electricus": "21_eel",
-    "gekko_japonicus": "23_gecko",
-    "mus_musculus": "25_mouse",
-    "homarus_americanus": "26_lobster",
-    "cyclorana_platycephala": "27_frog",
-    "acomys_cahirinus": "29_spiny mouse",
-    "polypedilum_vanderplanki": "24_chironomid",
-    "canis_familiaris": "30_dog",
-    "bos_taurus": "31_cattle",
-    "melopsittacus_undulatus": "32_budgerigar",
-    "leucoraja_erinacea": "33_skate",
-    "trichonephila_clavipes": "34_spider",
-    "leiurus_quinquestriatus": "35_scorpion",
-    "drosophila_melanogaster": "36_fruit fly",
-    "pinctada_fucata": "37_oyster",
-    "potorous_tridactylus": "38_potoroo",
-    "herpestes_ichneumon": "39_mongoose",
-    "urocitellus_parryii": "40_ground squirrel",
+    row["species_id"]: row["jigsaw_layer"]
+    for row in SPECIES_SVG_DF.iter_rows(named=True)
+    if row["jigsaw_layer"] and row["jigsaw_layer"] != "0_base"
 }
 
 
@@ -116,7 +68,7 @@ ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
 
 
 def resolve_puzzle_svg(gene_id: str, species_ids: list[str]) -> str:
-    """Return the puzzle SVG filename for a gene given its species, or empty string."""
+    """Return the silhouette SVG path for a gene given its species, or empty string."""
     if gene_id in _GENE_PUZZLE_OVERRIDE:
         return _GENE_PUZZLE_OVERRIDE[gene_id]
     for sid in species_ids:

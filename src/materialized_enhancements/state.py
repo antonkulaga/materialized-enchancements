@@ -2095,7 +2095,7 @@ class ComposeState(rx.State):
                 "pdb_url": g.get("pdb_url", ""),
                 "structure_pdb": g.get("structure_pdb", ""),
                 "puzzle_svg": g["puzzle_svg"],
-                "puzzle_src": f"/puzzle/{quote(g['puzzle_svg'])}" if g["puzzle_svg"] else "",
+                "puzzle_src": f"/{quote(g['puzzle_svg'])}" if g["puzzle_svg"] else "",
                 "species_page_url": g.get("species_page_url", ""),
                 "included": g["gene"] in self.included_genes,
                 "price": price,
@@ -2155,7 +2155,7 @@ class ComposeState(rx.State):
                 by_species[aid]["superpower"] = a["superpower"]
                 ps = a["puzzle_svg"]
                 by_species[aid]["puzzle_svg"] = ps
-                by_species[aid]["puzzle_src"] = f"/puzzle/{quote(ps)}" if ps else ""
+                by_species[aid]["puzzle_src"] = f"/{quote(ps)}" if ps else ""
 
         for row in by_species.values():
             traits: list[str] = row["traits"]
