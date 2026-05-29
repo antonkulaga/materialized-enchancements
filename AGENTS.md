@@ -157,12 +157,20 @@ dormant jigsaw composer). Provenance and per-file licensing are documented in
 - The single layered jigsaw composite is `data/input/puzzle/ALL_ANIMALS.svg`
   (read by `build_jigsaw_svg`). The jigsaw route is currently dormant.
 
+All 39 silhouettes are PhyloPic-sourced and regenerable: `scripts/download_phylopic.py`
+reads the CSV and re-downloads each `phylopic_uuid` (source.svg → vector.svg) into
+`assets/species_svg/`, reproducing the committed set byte-for-byte. `homo_sapiens` is
+mapped like any other species (Homo longi silhouette in cards/reports); the puzzle's only
+human exception is its `0_base` layer, handled separately by `build_jigsaw_svg`.
+
 **When adding a new species:**
 
-1. Add the silhouette as `assets/species_svg/<species_id>.svg` (must be SVG).
-2. Add a row to `data/input/species_svg_map.csv` (include `jigsaw_layer` only if a
-   matching Inkscape layer exists inside `ALL_ANIMALS.svg`).
-3. Record its provenance/license in `docs/species_svg_attribution.md`.
+1. Add a row to `data/input/species_svg_map.csv` with its `phylopic_uuid`, taxonomy,
+   `license`, and (only if a matching Inkscape layer exists in `ALL_ANIMALS.svg`) its
+   `jigsaw_layer`.
+2. Run `uv run python scripts/download_phylopic.py --species <species_id>` to fetch the
+   silhouette into `assets/species_svg/<species_id>.svg`.
+3. Record provenance/license in `docs/species_svg_attribution.md`.
 
 No Python edits are required — `puzzle.py` is purely CSV-driven.
 

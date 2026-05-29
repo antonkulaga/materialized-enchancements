@@ -127,13 +127,16 @@ def test_build_jigsaw_svg_activates_layer(animal: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 5. Human species → bold_base SVG (no animal layer, thicker stroke)
+# 5. Human species → has a Homo longi silhouette (cards/reports) like any other
+#    species, but the jigsaw renders only the bold base layer (no animal layer).
 # ---------------------------------------------------------------------------
 
 def test_human_species_bold_base() -> None:
     human = next((a for a in ANIMAL_LIBRARY if a["species_id"] == HUMAN_SPECIES_ID), None)
     assert human is not None, "Human species not found in ANIMAL_LIBRARY"
-    assert human["puzzle_svg"] == "", "Human should have no individual puzzle SVG"
+    assert human["puzzle_svg"] == "species_svg/homo_sapiens.svg", (
+        "Human should use the Homo longi silhouette like any other species"
+    )
 
     svg = build_jigsaw_svg([HUMAN_SPECIES_ID], bold_base=True)
     assert svg, "build_jigsaw_svg returned empty for Human"

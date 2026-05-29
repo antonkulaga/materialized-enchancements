@@ -32,12 +32,12 @@ One row per species. Columns:
 | `common_name`, `scientific_name` | display names |
 | `kingdom`, `phylum`, `class`, `order`, `family` | taxonomy (for grouping/justification) |
 | `ui_svg_path` | documented canonical path (`assets/species_svg/<id>.svg`) |
-| `ui_svg_type` | provenance kind: `jigsaw` (traced from a hand-drawn piece) or `phylopic` |
+| `ui_svg_type` | provenance kind — `phylopic` for all 39 (every silhouette is now sourced from PhyloPic) |
 | `jigsaw_layer` | Inkscape layer label inside `ALL_ANIMALS.svg` (or `0_base` for human) |
-| `phylopic_uuid`, `phylopic_title` | PhyloPic source image, when applicable |
+| `phylopic_uuid`, `phylopic_title` | PhyloPic source image (every row has one) |
 | `license` | CC license of the silhouette |
 | `similar_to` | species sharing a near-identical silhouette (informational) |
-| `flag` | `ok`, or `special` for `homo_sapiens` (see override below) |
+| `flag` | `ok` for all 39 (the former `special` mark on `homo_sapiens` was retired) |
 | `notes` | per-mapping rationale |
 
 The code derives the served path as `species_svg/{species_id}.svg`; it does not
@@ -50,20 +50,23 @@ read `ui_svg_path` (that column documents the same fact for humans).
 Loaded once at import from `data/input/species_svg_map.csv`:
 
 - **`SPECIES_SVG_DF`** / **`SPECIES_SVG_MAP`** — the raw frame and a `species_id → row` dict.
-- **`_SPECIES_PUZZLE_MAP`** — `species_id → "species_svg/<id>.svg"` for every row whose
-  `flag` is **not** `special`. (So `homo_sapiens` is intentionally absent.)
+- **`_SPECIES_PUZZLE_MAP`** — `species_id → "species_svg/<id>.svg"` for every row not
+  flagged `special` (none are now, so **all 39** including `homo_sapiens` are mapped).
+  The `flag != "special"` filter is kept as a defensive guard.
 - **`_GENE_PUZZLE_OVERRIDE`** — gene-level override, currently
-  `{"epas1_tibetan": "species_svg/homo_sapiens.svg"}`.
+  `{"epas1_tibetan": "species_svg/homo_sapiens.svg"}` (now resolves to the same file
+  the species walk would return; kept explicit).
 - **`_SPECIES_LAYER_MAP`** — `species_id → jigsaw_layer` for rows with a non-empty
-  `jigsaw_layer` other than `0_base`; used only by the jigsaw composer.
+  `jigsaw_layer` other than `0_base`; used only by the jigsaw composer. `homo_sapiens`
+  (`0_base`) is excluded here — that is the puzzle's only human exception.
 
 **`resolve_puzzle_svg(gene_id, species_ids)`**:
 
 1. If `gene_id` is in `_GENE_PUZZLE_OVERRIDE`, return that path immediately.
 2. Otherwise walk `species_ids` in order; return the first `"species_svg/<id>.svg"`
    found in `_SPECIES_PUZZLE_MAP`.
-3. Return `""` if nothing matches (e.g. human-only genes, since `homo_sapiens`
-   is not in the map).
+3. Return `""` only if no species matches. Human-only genes now resolve to
+   `species_svg/homo_sapiens.svg` (the Homo longi silhouette) like any other species.
 
 ---
 
@@ -115,18 +118,27 @@ All four steps use the single `assets/species_svg/` file; nothing reads art from
 
 ## Tests
 
-- **`tests/test_puzzle_organisms.py`** — non-human animals in the loaded library have a
-  non-empty `puzzle_svg`, and any `jigsaw_layer` referenced is present in `ALL_ANIMALS.svg`.
-- **`tests/test_puzzle_csv_migration.py`** — every resolved path starts with `species_svg/`
-  (no `phylopic/` or `puzzle/` remnants), and the override resolves to
-  `species_svg/homo_sapiens.svg`.
+- **`tests/test_puzzle_organisms.py`** — non-human animals have a non-empty `puzzle_svg`;
+  any `jigsaw_layer` referenced is present in `ALL_ANIMALS.svg`; and `homo_sapiens` both
+  carries the `species_svg/homo_sapiens.svg` silhouette and composes to only the `0_base`
+  layer in the jigsaw.
 
 ---
 
-## `scripts/download_phylopic.py` (orphaned)
+## `scripts/download_phylopic.py` (CSV-driven regeneration)
 
-Still in the repo, but **disconnected from the pipeline**: it downloads silhouettes and
-writes them (plus an `ATTRIBUTION.json`) into `data/input/puzzle/phylopic/`, a directory
-that no longer exists and that no runtime code reads. It is not part of how art is mapped
-or served today; it would need repointing (e.g. straight into `assets/species_svg/` +
-appending CSV rows) before it is useful again.
+A Typer CLI that regenerates **the entire** silhouette set from
+`data/input/species_svg_map.csv`. For each row with `ui_svg_type == "phylopic"` (all 39)
+it downloads the recorded `phylopic_uuid` — trying the contributor's `source.svg` first,
+then the potrace `vector.svg` — into `assets/species_svg/<species_id>.svg`. The
+`flag == "special"` and `ui_svg_type != "phylopic"` filters remain as defensive guards
+but currently exclude nothing.
+
+- `uv run python scripts/download_phylopic.py` — write into `assets/species_svg/`
+- `uv run python scripts/download_phylopic.py --check` — download to a scratch dir and
+  diff against the committed set without overwriting
+- `uv run python scripts/download_phylopic.py --species <id>` — single species
+
+`--check` reproduces **all 39** files byte-identically. The hand-drawn jigsaw pieces that
+formerly backed 25 of these species are not lost — they survive as the named layers inside
+`ALL_ANIMALS.svg`, and each row's `notes`/`jigsaw_layer` records which layer.

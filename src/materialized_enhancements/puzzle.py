@@ -36,9 +36,11 @@ SPECIES_SVG_MAP: dict[str, dict[str, str]] = {
     for row in SPECIES_SVG_DF.iter_rows(named=True)
 }
 
-# Species → silhouette SVG URL path (relative to assets/ root).
-# homo_sapiens (flag="special") excluded: it has no default species silhouette;
-# the homo-longi image is only served via the gene-level override below.
+# Species → silhouette SVG URL path (relative to assets/ root), for gene cards
+# and reports. Rows flagged "special" are excluded (none currently — homo_sapiens
+# was unmarked and now shows the Homo longi silhouette like any other species).
+# The puzzle's human exception is separate: homo_sapiens' 0_base layer is always
+# kept by build_jigsaw_svg and is excluded from _SPECIES_LAYER_MAP below.
 _SPECIES_PUZZLE_MAP: dict[str, str] = {
     row["species_id"]: f"species_svg/{row['species_id']}.svg"
     for row in SPECIES_SVG_DF.filter(pl.col("flag") != "special").iter_rows(named=True)
