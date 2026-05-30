@@ -51,8 +51,8 @@ Defined in `pages/index.py → _page_meta(route_path)`. Each page gets:
 | `og:title` | `{site_title} \| {page_title}` |
 | `og:description` | Per-route description from `crawler_assets.PUBLIC_ROUTES` |
 | `og:url` | `{DEPLOY_URL}/{route}` |
-| `og:image` | `{DEPLOY_URL}/images/icons/share.jpg` (1090×849) |
-| `og:image:width` / `height` | 1090 / 849 |
+| `og:image` | `{DEPLOY_URL}/images/og-preview.png?v=2` (1200×630) |
+| `og:image:width` / `height` | 1200 / 630 |
 | `twitter:card` | `summary_large_image` |
 | `twitter:title` / `description` / `image` | Mirrors OG values |
 
@@ -73,23 +73,40 @@ Each published report gets its own `index.html` with per-report OG tags built by
 | `og:image:type` | `image/webp` |
 | `twitter:card` | `summary_large_image` |
 
-The landing page auto-redirects to the interactive app via
-`/materialization?shared_report={slug}` and has fallback buttons for manual
-navigation.
+The landing page auto-redirects (meta-refresh) to the **recreate URL**
+`recreate_url = share_url` — i.e. `/materialization?report=1&name=…&cats=…&genes=…`
+(`state.py:1720, 1760`; for regenerated pages `_build_report_landing_html_from_artifact`
+takes `recreate_url` from the saved `share_url`, `state.py:567`). It also has
+fallback buttons for manual navigation. The recreate URL **deterministically
+regenerates** the sculpture on open (`apply_shared_report`) from the encoded seed,
+always reflecting the current data and generator — the intended, storage-free
+design (no per-item artifact to version/invalidate/serve; §4.1).
+
+> A second arrival handler, `apply_saved_report` (`state.py:2231`), loads the
+> *exact stored bytes* from `?shared_report={slug}` and shows a "shared with you"
+> banner — but **no code emits that URL**; it is the **deprecated** static-artifact
+> approach (same reason static STL sharing was dropped). The intended design is the
+> thin static shell (meta + version + redirect) feeding the deterministic
+> regenerate path. See [social-sharing-guide.md §4.1](social-sharing-guide.md).
+
+> For the **why** behind these choices, image-size constraints, the
+> landing-page + redirect pattern, and the full pitfalls checklist, see the
+> generalised guide: [docs/social-sharing-guide.md](social-sharing-guide.md).
 
 ### Verification after deploy
 
-1. Confirm the OG image returns 200: `curl -I https://enhancement.bio/images/icons/share.jpg`
+1. Confirm the OG image returns 200: `curl -I https://enhancement.bio/images/og-preview.png`
 2. Force re-scrape at [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) — Slack/Discord/iMessage cache previews for days.
 3. LinkedIn: [Post Inspector](https://www.linkedin.com/post-inspector/)
 4. Generic: [opengraph.xyz](https://opengraph.xyz) or `curl -A "Twitterbot" https://enhancement.bio/ | grep -i "og:"`
 
 ### OG image requirements
 
-Current: `assets/images/icons/share.jpg` (1090×849 JPEG, 124 KB).
-Ideal: 1200×630 PNG under 5 MB — the Facebook/LinkedIn/Slack sweet spot. To
-upgrade, replace the file; no code change needed (`_OG_IMAGE_PATH` in
-`pages/index.py` points to `/images/icons/share.jpg`).
+Current: `assets/images/og-preview.png` (1200×630 PNG) — the
+Facebook/LinkedIn/Slack/Telegram sweet spot, served absolute with a `?v=2`
+cache-buster. Path/size come from `crawler_assets.OG_PREVIEW_PATH` /
+`OG_PREVIEW_SIZE`; to refresh the image, replace the file and bump the `?v=`
+query in `pages/index.py → _page_image_url()` so networks re-fetch.
 
 ---
 
@@ -118,11 +135,12 @@ categories are selected.
 ### Trigger
 
 Visitor clicks **Create public link** → calls
-`ComposeState.on_click_publish_report_public()`.
+`ComposeState.start_report_publish()` (`state.py:1615`, button `pages/index.py:8296`).
+A stuck publish can be cleared with `reset_report_publish()` (`state.py:1850`).
 
 ### Browser-side (me_report.js)
 
-`__meBuildReportBundleBase64(timeout, publicPath, slug)`:
+`__meBuildReportBundleBase64(timeoutMs, publishedUrlOverride, slug)` (`me_report.js:1501`):
 
 1. Renders PNG card via `htmlToImage` → WebP at 92% quality
 2. Builds multi-page PDF via `jspdf` (cover, model views, gene library, share footer)
@@ -152,10 +170,17 @@ reports/{slug}/
 
 ### Slug format
 
-`_safe_report_slug(name, seed)` → `{sanitized_name}-s{seed}`
+`_safe_report_slug(name, seed)` → `{sanitized_name}-s{seed}` (`state.py:402`)
 
 - Name: lowercased, non-alnum → dash, max 36 chars, default "anonymous"
-- Validation: `[a-zA-Z0-9_-]{1,96}`
+
+Two **separate** validators guard the slug on the two reuse paths — keep them in
+sync if you change the format:
+
+- `_is_safe_report_slug` (`state.py:408`) — `[a-zA-Z0-9_-]{1,96}`, used by the
+  `?shared_report=` read path (`apply_saved_report`).
+- `_SLUG_RE` (`app.py:80`) — `^[a-zA-Z0-9_\-]{1,200}$`, used by the
+  `/_api/upload-report-assets` upload endpoint.
 
 ### Serving
 
