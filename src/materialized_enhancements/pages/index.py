@@ -14,7 +14,6 @@ from materialized_enhancements.gene_data import (
     UNIQUE_CATEGORIES,
 )
 from materialized_enhancements.env import (
-    DISCORD_COMMUNITY_NAME,
     DISCORD_INVITE_URL,
     DONATION_URL,
     GITHUB_PROJECT_URL,
@@ -2663,7 +2662,6 @@ def _rpg_silhouette_marker(
     icon_name = CATEGORY_ICONS.get(category, "star")
     tooltip = _category_tooltip(category)
     count = ComposeState.active_gene_counts[category]
-    total_count = CATEGORY_COUNTS.get(category, 0)
     is_selected = ComposeState.selected_categories.contains(category)
     is_affordable = ComposeState.affordable_categories.contains(category)
     is_enabled = is_selected | is_affordable

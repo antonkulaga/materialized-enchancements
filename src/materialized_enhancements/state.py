@@ -528,7 +528,6 @@ def _build_report_landing_html(
     escaped_description = _html_escape(description)
     escaped_page_url = _html_escape(page_url)
     escaped_image_url = _html_escape(image_url)
-    escaped_pdf_url = _html_escape(pdf_url)
     escaped_stl_url = _html_escape(stl_url)
     escaped_params_url = _html_escape(params_url)
     open_url = recreate_url or make_own_url
@@ -1773,7 +1772,6 @@ class ComposeState(rx.State):
         relative_png = f"{rel_dir}/report.webp"
         relative_pdf = f"{rel_dir}/report.pdf"
 
-        public_url = generated_public_url(f"{rel_dir}/index.html")
         model_url = generated_public_url(relative_model)
         params_url = generated_public_url(relative_params)
         png_url = generated_public_url(relative_png)
