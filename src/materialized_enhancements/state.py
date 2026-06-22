@@ -225,6 +225,56 @@ def _compact_gene_symbol(gene: str) -> str:
     return compact.strip()
 
 
+def _category_for_gene_name(gene: str) -> str:
+    """Resolve a gene display name to its primary category."""
+    for entry in GENE_LIBRARY:
+        if entry["gene"] == gene:
+            return str(entry["category"])
+    return ""
+
+
+def _mobile_body_change_overlay_script() -> str:
+    """Show the temporary mobile body-change overlay after adding a gene."""
+    return """
+(() => {
+    const isMobile = window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    if (!isMobile) return;
+    const el = document.getElementById("me-mobile-body-change-overlay");
+    if (!el) return;
+    el.classList.remove("is-visible");
+    void el.offsetWidth;
+    el.classList.add("is-visible");
+    window.clearTimeout(window.__meMobileBodyChangeTimer);
+    window.__meMobileBodyChangeTimer = window.setTimeout(() => {
+        el.classList.remove("is-visible");
+    }, 3200);
+})();
+"""
+
+
+def _mobile_onboarding_scroll_script(step: int) -> str:
+    """Scroll the mobile viewport to the current onboarding target."""
+    selector_by_step = {
+        0: "#gene-library",
+        1: "#compose-personal-tag",
+        2: ".me-rpg-materialize-leg-cta",
+        3: "#gene-library",
+    }
+    selector = selector_by_step[min(3, max(0, step))]
+    block = "start" if step in (0, 3) else "center"
+    return f"""
+(() => {{
+    const isMobile = window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    if (!isMobile) return;
+    window.setTimeout(() => {{
+        const target = document.querySelector({json.dumps(selector)});
+        if (!target) return;
+        target.scrollIntoView({{behavior: "smooth", block: {json.dumps(block)}, inline: "nearest"}});
+    }}, 120);
+}})();
+"""
+
+
 # Soft UX hint only: materialize stays allowed below this count.
 RECOMMENDED_MIN_INCLUDED_GENES_FOR_TOTEM: int = 3
 
@@ -895,6 +945,9 @@ class ComposeState(rx.State):
     included_genes: list[str] = []
     expanded_genes: list[str] = []
     hovered_gene_category: str = ""
+    mobile_change_overlay_gene: str = ""
+    mobile_change_overlay_category: str = ""
+    mobile_change_overlay_nonce: int = 0
 
     sculpture_params: Dict[str, Any] = {}
     generating: bool = False
@@ -1010,7 +1063,13 @@ class ComposeState(rx.State):
         self._prune_included_genes()
         self._recompute_params()
 
-    def toggle_gene(self, gene: str) -> None:
+    def _record_mobile_gene_addition(self, gene: str, category: str) -> None:
+        self.mobile_change_overlay_gene = gene
+        self.mobile_change_overlay_category = category
+        self.mobile_change_overlay_nonce += 1
+
+    def toggle_gene(self, gene: str):  # type: ignore[return]
+        added = False
         if gene in self.included_genes:
             self.included_genes = [g for g in self.included_genes if g != gene]
         else:
@@ -1019,9 +1078,13 @@ class ComposeState(rx.State):
             if spent + add_price > DEFAULT_BUDGET:
                 return
             self.included_genes = [*self.included_genes, gene]
+            self._record_mobile_gene_addition(gene, _category_for_gene_name(gene))
+            added = True
         self._recompute_params()
+        if added:
+            yield rx.call_script(_mobile_body_change_overlay_script())
 
-    def toggle_gene_from_library(self, gene: str, category: str) -> None:
+    def toggle_gene_from_library(self, gene: str, category: str):  # type: ignore[return]
         """Toggle a gene from the RPG library, auto-enabling its category."""
         if gene in self.included_genes:
             self.included_genes = [g for g in self.included_genes if g != gene]
@@ -1042,7 +1105,9 @@ class ComposeState(rx.State):
         if category not in self.selected_categories:
             self.selected_categories = [*self.selected_categories, category]
         self.included_genes = [*self.included_genes, gene]
+        self._record_mobile_gene_addition(gene, category)
         self._recompute_params()
+        yield rx.call_script(_mobile_body_change_overlay_script())
 
     def deselect_all_genes(self) -> None:
         """Clear the active RPG gene loadout."""
@@ -1242,6 +1307,7 @@ class ComposeState(rx.State):
         if next_step >= 3:
             self._mark_onboarding_finished()
         yield rx.call_script(self._onboarding_storage_script())
+        yield rx.call_script(_mobile_onboarding_scroll_script(next_step))
 
     def advance_name_onboarding_on_enter(self, key: str, _key_info: dict[str, Any]):  # type: ignore[return]
         """Move past the name tooltip when the user confirms a non-empty name."""
@@ -1274,6 +1340,8 @@ class ComposeState(rx.State):
             )
             return
         self._sync_onboarding_from_storage()
+        if not self.onboarding_finished:
+            yield rx.call_script(_mobile_onboarding_scroll_script(self.onboarding_step_index))
 
     def toggle_choice_expanded(self) -> None:
         self.choice_expanded = not self.choice_expanded

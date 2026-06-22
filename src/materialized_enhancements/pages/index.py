@@ -2968,6 +2968,134 @@ def _rpg_body_map_panel() -> rx.Component:
     )
 
 
+def _mobile_overlay_body_marker(category: str, top: str, left: str) -> rx.Component:
+    color = CATEGORY_COLORS.get(category, "#7c3aed")
+    count = ComposeState.active_gene_counts[category]
+    return rx.el.div(
+        rx.cond(
+            count > 0,
+            rx.el.span(
+                count,
+                style={
+                    "position": "absolute",
+                    "right": "-6px",
+                    "top": "-6px",
+                    "minWidth": "17px",
+                    "height": "17px",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "borderRadius": "999px",
+                    "border": "1px solid rgba(15, 23, 42, 0.96)",
+                    "background": color,
+                    "color": "#ffffff",
+                    "fontSize": "0.58rem",
+                    "fontWeight": "950",
+                    "lineHeight": "1",
+                },
+            ),
+            rx.fragment(),
+        ),
+        class_name=f"me-mobile-overlay-marker me-mobile-overlay-marker--{_category_css_slug(category)}",
+        style={
+            "position": "absolute",
+            "top": top,
+            "left": left,
+            "width": "26px",
+            "height": "26px",
+            "borderRadius": "999px",
+            "transform": "translate(-50%, -50%)",
+            "background": rx.cond(count > 0, color, f"{color}44"),
+            "border": f"1px solid {color}",
+            "boxShadow": rx.cond(count > 0, f"0 0 16px {color}", f"0 0 8px {color}66"),
+            "opacity": rx.cond(count > 0, "1", "0.55"),
+        },
+    )
+
+
+def _mobile_body_change_overlay() -> rx.Component:
+    return rx.el.div(
+        rx.el.div(
+            rx.el.div(
+                _mobile_overlay_body_marker("Expression", "17%", "35%"),
+                _mobile_overlay_body_marker("Perception", "17%", "65%"),
+                _mobile_overlay_body_marker("Longevity & Genome", "48%", "34%"),
+                _mobile_overlay_body_marker("Stress Resistance", "48%", "66%"),
+                _mobile_overlay_body_marker("Environmental Adaptation", "77%", "36%"),
+                _mobile_overlay_body_marker("Regeneration", "77%", "64%"),
+                rx.el.img(
+                    src="/images/body_only.webp",
+                    alt="Mini enhanced body preview",
+                    style={
+                        "height": "120px",
+                        "width": "82px",
+                        "objectFit": "contain",
+                        "display": "block",
+                        "filter": "drop-shadow(0 0 12px rgba(56, 189, 248, 0.44))",
+                    },
+                ),
+                class_name="me-mobile-body-change-mini-stage",
+            ),
+            rx.el.div(
+                rx.el.div(
+                    "Character updated",
+                    style={
+                        "fontSize": "0.72rem",
+                        "fontWeight": "950",
+                        "letterSpacing": "0.08em",
+                        "textTransform": "uppercase",
+                        "color": "#a78bfa",
+                    },
+                ),
+                rx.el.div(
+                    ComposeState.mobile_change_overlay_gene,
+                    style={
+                        "marginTop": "2px",
+                        "fontSize": "0.96rem",
+                        "fontWeight": "950",
+                        "lineHeight": "1.18",
+                        "color": "#f8fafc",
+                    },
+                ),
+                rx.el.div(
+                    ComposeState.mobile_change_overlay_category,
+                    style={
+                        "marginTop": "3px",
+                        "fontSize": "0.78rem",
+                        "fontWeight": "800",
+                        "lineHeight": "1.2",
+                        "color": "#cbd5e1",
+                    },
+                ),
+                style={"minWidth": "0", "flex": "1"},
+            ),
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "12px",
+            },
+        ),
+        id="me-mobile-body-change-overlay",
+        class_name="me-mobile-body-change-overlay",
+        aria_live="polite",
+        style={
+            "position": "fixed",
+            "right": "14px",
+            "bottom": "14px",
+            "zIndex": "1400",
+            "width": "min(360px, calc(100vw - 28px))",
+            "padding": "10px 12px",
+            "borderRadius": "18px",
+            "border": "1px solid rgba(167, 139, 250, 0.55)",
+            "background": "rgba(15, 23, 42, 0.94)",
+            "boxShadow": "0 20px 48px rgba(2, 6, 23, 0.58), 0 0 28px rgba(124, 58, 237, 0.32)",
+            "backdropFilter": "blur(14px)",
+            "WebkitBackdropFilter": "blur(14px)",
+            "pointerEvents": "none",
+        },
+    )
+
+
 def _rpg_gene_side_text(title: str, body: rx.Var) -> rx.Component:
     return rx.cond(
         body != "",
@@ -5143,6 +5271,26 @@ def _rpg_flow_css() -> rx.Component:
             border: 1px solid rgba(56, 189, 248, 0.52);
             color: #bae6fd;
         }
+        .me-mobile-body-change-overlay {
+            display: none;
+            opacity: 0;
+            transform: translateY(18px) scale(0.96);
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+        .me-mobile-body-change-mini-stage {
+            position: relative;
+            width: 118px;
+            min-width: 118px;
+            height: 138px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background:
+                radial-gradient(circle at 50% 42%, rgba(56, 189, 248, 0.28), rgba(2, 6, 23, 0) 68%),
+                rgba(2, 6, 23, 0.44);
+            overflow: hidden;
+        }
         .me-rpg-category-anchor:hover {
             filter: brightness(1.12);
         }
@@ -5527,6 +5675,15 @@ def _rpg_flow_css() -> rx.Component:
                 height: 58px !important;
             }
         }
+        @media (hover: none) and (pointer: coarse) {
+            .me-mobile-body-change-overlay {
+                display: block;
+            }
+            .me-mobile-body-change-overlay.is-visible {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
         .me-protein-stl-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -5654,6 +5811,7 @@ def _rpg_active_genes_layout() -> rx.Component:
                 ),
             ),
             _onboarding_backdrop(),
+            _mobile_body_change_overlay(),
             class_name="me-rpg-dashboard me-rpg-hero-grid",
             style=rx.cond(
                 ComposeState.show_onboarding_suggestion,
@@ -9294,6 +9452,269 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 min-width: 300px !important;
                 min-height: 68px !important;
                 font-size: clamp(1.6rem, 1.4vw, 2.05rem) !important;
+            }
+        }
+        @media (hover: none) and (pointer: coarse) {
+            html:has(.me-rpg-profile-page),
+            body:has(.me-rpg-profile-page) {
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                background: #020617 !important;
+                scroll-behavior: smooth;
+            }
+            #me-app-content:has(.me-rpg-profile-page) {
+                height: auto !important;
+                min-height: 100svh !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                background: #020617 !important;
+            }
+            #me-app-content:has(.me-rpg-profile-page) > .ui.fluid.container {
+                height: auto !important;
+                min-height: 100svh !important;
+                display: block !important;
+            }
+            .me-rpg-profile-page {
+                min-height: 100svh !important;
+                overflow: visible !important;
+                border-radius: 0 !important;
+            }
+            .me-rpg-profile-page > .me-rpg-shell {
+                height: auto !important;
+                min-height: 100svh !important;
+                padding: 0 !important;
+                border-radius: 0 !important;
+                overflow: visible !important;
+            }
+            .me-rpg-profile-page .me-rpg-dashboard {
+                display: flex !important;
+                flex-direction: column !important;
+                height: auto !important;
+                min-height: 100svh !important;
+                max-height: none !important;
+                overflow: visible !important;
+                gap: 0 !important;
+                align-items: stretch !important;
+            }
+            .me-rpg-profile-page .me-rpg-center-panel {
+                order: 1;
+                flex: 0 0 auto !important;
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                scrollbar-gutter: auto !important;
+            }
+            .me-rpg-profile-page .me-rpg-left-panel {
+                order: 2;
+                flex: 0 0 auto !important;
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                position: relative !important;
+                top: auto !important;
+                align-self: stretch !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-library-section {
+                height: auto !important;
+                max-height: none !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+                padding: 12px 10px calc(28px + env(safe-area-inset-bottom, 0px)) !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-library-panel {
+                width: 100% !important;
+                padding: 12px !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-library-grid,
+            .me-rpg-profile-page .me-rpg-category-gene-grid {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-category-gene-grid {
+                padding-left: 0 !important;
+                margin-left: 0 !important;
+                border-left: none !important;
+            }
+            .me-rpg-profile-page .me-budget-gauge {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 30 !important;
+                width: 100% !important;
+                border-radius: 14px !important;
+            }
+            .me-rpg-profile-page .me-rpg-sidebar-intro {
+                width: 100% !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-map-panel {
+                min-height: calc(100svh - 3.6rem) !important;
+                height: auto !important;
+                display: flex !important;
+                flex-direction: column !important;
+                position: relative !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-map-title {
+                position: absolute !important;
+                top: 8px !important;
+                left: max(10px, env(safe-area-inset-left, 0px)) !important;
+                right: max(10px, env(safe-area-inset-right, 0px)) !important;
+                z-index: 7 !important;
+                max-width: none !important;
+                padding: 9px 10px !important;
+                border: 1px solid rgba(167, 139, 250, 0.30) !important;
+                background: rgba(15, 23, 42, 0.78) !important;
+                box-shadow: 0 12px 30px rgba(2, 6, 23, 0.34) !important;
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+            }
+            .me-rpg-profile-page #compose-personal-tag {
+                min-height: 44px !important;
+                padding: 10px 13px !important;
+                font-size: 1rem !important;
+                border-radius: 12px !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage {
+                flex: none !important;
+                width: 100% !important;
+                height: calc(100svh - 3.6rem) !important;
+                min-height: calc(100svh - 3.6rem) !important;
+                max-height: none !important;
+                padding: 76px 0 calc(100px + env(safe-area-inset-bottom, 0px)) !important;
+                justify-content: center !important;
+                overflow: hidden !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage::before {
+                inset: 8% 14% 7% !important;
+                filter: blur(18px) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage::after {
+                inset: 18% 35% 9% !important;
+                filter: blur(26px) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-image {
+                height: min(70svh, 620px) !important;
+                max-height: calc(100svh - 190px) !important;
+                width: auto !important;
+                max-width: min(80vw, 420px) !important;
+                object-fit: contain !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker {
+                width: 132px !important;
+                height: 110px !important;
+                transform: translate(-50%, -50%) scale(0.88) !important;
+                z-index: 4 !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker:hover {
+                transform: translate(-50%, -50%) scale(0.94) !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-orbit-shell {
+                width: 132px !important;
+                height: 110px !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-gene-orbit {
+                display: none !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-icon-node {
+                width: 50px !important;
+                height: 50px !important;
+                background: rgba(15, 23, 42, 0.84) !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-icon-node i.icon {
+                font-size: 46px !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-count-badge {
+                min-width: 22px !important;
+                height: 22px !important;
+                font-size: 0.68rem !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-label {
+                top: calc(50% + 32px) !important;
+                padding: 4px 7px !important;
+                max-width: 144px !important;
+                white-space: normal !important;
+                border-radius: 8px !important;
+                background: rgba(15, 23, 42, 0.82) !important;
+                font-size: 0.72rem !important;
+                line-height: 1.1 !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-label span:first-child {
+                font-size: 0.74rem !important;
+                white-space: normal !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--expression {
+                top: 23% !important;
+                left: calc(50% - min(31vw, 180px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--perception {
+                top: 23% !important;
+                left: calc(50% + min(31vw, 180px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--longevity-genome {
+                top: 50% !important;
+                left: calc(50% - min(28vw, 160px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--stress-resistance {
+                top: 50% !important;
+                left: calc(50% + min(28vw, 160px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--environmental-adaptation {
+                top: 76% !important;
+                left: calc(50% - min(30vw, 170px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--regeneration {
+                top: 76% !important;
+                left: calc(50% + min(30vw, 170px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-leg-cta {
+                position: absolute !important;
+                left: 50% !important;
+                bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 10px)) !important;
+                transform: translateX(-50%) !important;
+                width: min(92vw, 440px) !important;
+                max-width: calc(100vw - 24px) !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-credit-line {
+                width: 100% !important;
+                box-sizing: border-box !important;
+                font-size: 0.74rem !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-credit-line span:last-child {
+                display: none !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-leg-button {
+                width: 100% !important;
+                min-width: 0 !important;
+                min-height: 56px !important;
+                padding: 14px 18px !important;
+                font-size: clamp(1.1rem, 5.2vw, 1.45rem) !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-alert-stack {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-alert {
+                width: 100% !important;
+            }
+            .me-rpg-profile-page .me-onboarding-marker-hint .me-rpg-body-map-title,
+            .me-rpg-profile-page .me-onboarding-marker-hint .me-rpg-body-image,
+            .me-rpg-profile-page .me-onboarding-marker-hint .me-rpg-materialize-leg-cta {
+                opacity: 0.18 !important;
+            }
+            .me-rpg-profile-page .me-onboarding-center-lift {
+                z-index: 1010 !important;
+            }
+            .me-rpg-profile-page .me-onboarding-tip-card {
+                max-width: calc(100vw - 24px) !important;
             }
         }
         """
