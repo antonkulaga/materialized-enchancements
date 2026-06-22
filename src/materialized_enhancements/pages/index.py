@@ -9283,6 +9283,25 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
             border-color: rgba(124, 58, 237, 0.72) !important;
             font-weight: 800 !important;
         }
+        @media (hover: none) and (pointer: coarse) {
+            #me-top-tab-menu.ui.top.attached.tabular.menu {
+                display: flex !important;
+                overflow-x: auto !important;
+                scrollbar-width: none;
+            }
+            #me-top-tab-menu.ui.top.attached.tabular.menu::-webkit-scrollbar {
+                display: none;
+            }
+            #me-top-tab-menu.ui.top.attached.tabular.menu .item {
+                flex: 1 0 auto !important;
+                justify-content: center !important;
+                min-height: 3rem !important;
+                padding: 0.72rem 0.55rem !important;
+                font-size: 0.86rem !important;
+                line-height: 1.05 !important;
+                white-space: nowrap !important;
+            }
+        }
         #me-rpg-tab-segment.ui.bottom.attached.segment {
             background: #020617 !important;
             border-color: rgba(124, 58, 237, 0.42) !important;
@@ -9600,78 +9619,78 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 filter: blur(26px) !important;
             }
             .me-rpg-profile-page .me-rpg-body-image {
-                height: min(70svh, 620px) !important;
-                max-height: calc(100svh - 190px) !important;
+                height: min(74svh, 680px) !important;
+                max-height: calc(100svh - 170px) !important;
                 width: auto !important;
-                max-width: min(80vw, 420px) !important;
+                max-width: min(88vw, 460px) !important;
                 object-fit: contain !important;
             }
             .me-rpg-profile-page .me-rpg-body-marker {
-                width: 132px !important;
-                height: 110px !important;
-                transform: translate(-50%, -50%) scale(0.88) !important;
+                width: 150px !important;
+                height: 124px !important;
+                transform: translate(-50%, -50%) scale(0.94) !important;
                 z-index: 4 !important;
             }
             .me-rpg-profile-page .me-rpg-body-marker:hover {
-                transform: translate(-50%, -50%) scale(0.94) !important;
+                transform: translate(-50%, -50%) scale(1) !important;
             }
             .me-rpg-profile-page .me-rpg-marker-orbit-shell {
-                width: 132px !important;
-                height: 110px !important;
+                width: 150px !important;
+                height: 124px !important;
             }
             .me-rpg-profile-page .me-rpg-marker-gene-orbit {
                 display: none !important;
             }
             .me-rpg-profile-page .me-rpg-marker-icon-node {
-                width: 50px !important;
-                height: 50px !important;
+                width: 56px !important;
+                height: 56px !important;
                 background: rgba(15, 23, 42, 0.84) !important;
             }
             .me-rpg-profile-page .me-rpg-marker-icon-node i.icon {
-                font-size: 46px !important;
+                font-size: 52px !important;
             }
             .me-rpg-profile-page .me-rpg-marker-count-badge {
-                min-width: 22px !important;
-                height: 22px !important;
-                font-size: 0.68rem !important;
+                min-width: 24px !important;
+                height: 24px !important;
+                font-size: 0.74rem !important;
             }
             .me-rpg-profile-page .me-rpg-marker-label {
-                top: calc(50% + 32px) !important;
-                padding: 4px 7px !important;
-                max-width: 144px !important;
+                top: calc(50% + 38px) !important;
+                padding: 5px 8px !important;
+                max-width: 156px !important;
                 white-space: normal !important;
                 border-radius: 8px !important;
                 background: rgba(15, 23, 42, 0.82) !important;
-                font-size: 0.72rem !important;
+                font-size: 0.88rem !important;
                 line-height: 1.1 !important;
             }
             .me-rpg-profile-page .me-rpg-marker-label span:first-child {
-                font-size: 0.74rem !important;
+                font-size: 0.92rem !important;
                 white-space: normal !important;
             }
             .me-rpg-profile-page .me-rpg-body-marker--expression {
-                top: 23% !important;
-                left: calc(50% - min(31vw, 180px)) !important;
+                top: 24% !important;
+                left: calc(50% - min(34vw, 190px)) !important;
             }
             .me-rpg-profile-page .me-rpg-body-marker--perception {
-                top: 23% !important;
-                left: calc(50% + min(31vw, 180px)) !important;
+                top: 24% !important;
+                left: calc(50% + min(34vw, 190px)) !important;
             }
             .me-rpg-profile-page .me-rpg-body-marker--longevity-genome {
                 top: 50% !important;
-                left: calc(50% - min(28vw, 160px)) !important;
+                left: calc(50% - min(33vw, 180px)) !important;
             }
             .me-rpg-profile-page .me-rpg-body-marker--stress-resistance {
                 top: 50% !important;
-                left: calc(50% + min(28vw, 160px)) !important;
+                left: calc(50% + min(33vw, 180px)) !important;
             }
             .me-rpg-profile-page .me-rpg-body-marker--environmental-adaptation {
                 top: 76% !important;
-                left: calc(50% - min(30vw, 170px)) !important;
+                left: calc(50% - min(34vw, 190px)) !important;
             }
             .me-rpg-profile-page .me-rpg-body-marker--regeneration {
                 top: 76% !important;
-                left: calc(50% + min(30vw, 170px)) !important;
+                left: calc(50% + min(34vw, 190px)) !important;
             }
             .me-rpg-profile-page .me-rpg-materialize-leg-cta {
                 position: absolute !important;
