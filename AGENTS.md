@@ -48,6 +48,14 @@ uv run start        # starts Reflex dev server (http://localhost:3000)
 When testing first-visit onboarding/tutorial tooltips, use `uv run start --clean`
 so browser storage is cleared and the onboarding sequence appears from step 1.
 
+### Cursor Cloud Mobile Preview Tunnel
+
+When working from Cursor Cloud and the user asks to view the running app on a
+phone or through a public preview URL, use a Pinggy tunnel to port 3000. Restart
+the Pinggy tunnel before giving the user a link, verify the restarted tunnel
+returns the app with `HTTP 200 OK`, and give the user the full fresh `https://...`
+Pinggy URL. Do not reuse old tunnel URLs.
+
 ---
 
 ## Data Model
