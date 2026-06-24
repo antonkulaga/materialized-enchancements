@@ -930,6 +930,15 @@ def _mobile_materialize_after_budget() -> rx.Component:
     )
 
 
+def _mobile_budget_materialize_stack() -> rx.Component:
+    """Budget gauge plus the mobile Materialize CTA in one sticky mobile stack."""
+    return rx.el.div(
+        _budget_gauge(),
+        _mobile_materialize_after_budget(),
+        class_name="me-mobile-budget-stack",
+    )
+
+
 def _sculpture_how_it_works_callout() -> rx.Component:
     """Full-width explainer above credits, category pick, and Choice: cr → 3D model + report."""
     return rx.el.div(
@@ -5361,6 +5370,9 @@ def _rpg_flow_css() -> rx.Component:
         .me-mobile-budget-materialize {
             display: none;
         }
+        .me-mobile-budget-stack {
+            display: block;
+        }
         .me-rpg-category-anchor:hover {
             filter: brightness(1.12);
         }
@@ -5850,8 +5862,7 @@ def _rpg_active_genes_layout() -> rx.Component:
         rx.el.div(
             rx.el.div(
                 _rpg_sidebar_intro_stack(),
-                _budget_gauge(),
-                _mobile_materialize_after_budget(),
+                _mobile_budget_materialize_stack(),
                 _rpg_gene_library_panel(),
                 id="gene-library",
                 class_name=rx.cond(
@@ -9599,13 +9610,28 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 padding: 0 !important;
                 scrollbar-gutter: auto !important;
             }
+            .me-rpg-profile-page .me-mobile-budget-stack {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 35 !important;
+                width: 100% !important;
+                margin: 0 0 12px 0 !important;
+                padding: 0 !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-mobile-budget-stack .me-budget-gauge {
+                position: static !important;
+                top: auto !important;
+                margin-bottom: 8px !important;
+            }
             .me-rpg-profile-page .me-mobile-budget-materialize {
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                position: sticky !important;
-                bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 10px)) !important;
-                z-index: 1350 !important;
+                position: static !important;
+                top: auto !important;
+                bottom: auto !important;
+                z-index: auto !important;
                 width: 100% !important;
                 padding: 0 !important;
                 margin: 0 0 12px 0 !important;
@@ -9641,7 +9667,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 max-height: none !important;
                 min-height: 0 !important;
                 overflow: visible !important;
-                padding: 12px 10px calc(118px + env(safe-area-inset-bottom, 0px)) !important;
+                padding: 12px 10px calc(28px + env(safe-area-inset-bottom, 0px)) !important;
                 box-sizing: border-box !important;
             }
             .me-rpg-profile-page .me-rpg-library-panel {
