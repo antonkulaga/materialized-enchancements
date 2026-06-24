@@ -918,6 +918,18 @@ def _budget_gauge() -> rx.Component:
     )
 
 
+def _mobile_materialize_after_budget() -> rx.Component:
+    """Mobile-only Materialize CTA that follows the sticky credit gauge."""
+    return rx.el.div(
+        _rpg_materialization_leg_cta(),
+        class_name=rx.cond(
+            ComposeState.show_onboarding_suggestion,
+            "me-mobile-budget-materialize me-mobile-budget-materialize--hidden",
+            "me-mobile-budget-materialize",
+        ),
+    )
+
+
 def _sculpture_how_it_works_callout() -> rx.Component:
     """Full-width explainer above credits, category pick, and Choice: cr → 3D model + report."""
     return rx.el.div(
@@ -5346,7 +5358,7 @@ def _rpg_flow_css() -> rx.Component:
                 rgba(2, 6, 23, 0.44);
             overflow: hidden;
         }
-        .me-rpg-mobile-sticky-materialize {
+        .me-mobile-budget-materialize {
             display: none;
         }
         .me-rpg-category-anchor:hover {
@@ -5839,6 +5851,7 @@ def _rpg_active_genes_layout() -> rx.Component:
             rx.el.div(
                 _rpg_sidebar_intro_stack(),
                 _budget_gauge(),
+                _mobile_materialize_after_budget(),
                 _rpg_gene_library_panel(),
                 id="gene-library",
                 class_name=rx.cond(
@@ -5866,14 +5879,6 @@ def _rpg_active_genes_layout() -> rx.Component:
                         "me-rpg-center-panel me-onboarding-center-lift",
                         "me-rpg-center-panel",
                     ),
-                ),
-            ),
-            rx.el.div(
-                _rpg_materialization_leg_cta(),
-                class_name=rx.cond(
-                    ComposeState.show_onboarding_suggestion,
-                    "me-rpg-mobile-sticky-materialize me-rpg-mobile-sticky-materialize--hidden",
-                    "me-rpg-mobile-sticky-materialize",
                 ),
             ),
             _onboarding_backdrop(),
@@ -9594,8 +9599,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 padding: 0 !important;
                 scrollbar-gutter: auto !important;
             }
-            .me-rpg-profile-page .me-rpg-mobile-sticky-materialize {
-                order: 2;
+            .me-rpg-profile-page .me-mobile-budget-materialize {
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
@@ -9603,15 +9607,15 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 10px)) !important;
                 z-index: 1350 !important;
                 width: 100% !important;
-                padding: 0 10px !important;
-                margin: 0 0 14px 0 !important;
+                padding: 0 !important;
+                margin: 0 0 12px 0 !important;
                 box-sizing: border-box !important;
                 pointer-events: none !important;
             }
-            .me-rpg-profile-page .me-rpg-mobile-sticky-materialize--hidden {
+            .me-rpg-profile-page .me-mobile-budget-materialize--hidden {
                 display: none !important;
             }
-            .me-rpg-profile-page .me-rpg-mobile-sticky-materialize .me-rpg-materialize-leg-cta {
+            .me-rpg-profile-page .me-mobile-budget-materialize .me-rpg-materialize-leg-cta {
                 position: relative !important;
                 left: auto !important;
                 bottom: auto !important;
@@ -9622,7 +9626,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 pointer-events: auto !important;
             }
             .me-rpg-profile-page .me-rpg-left-panel {
-                order: 3;
+                order: 2;
                 flex: 0 0 auto !important;
                 width: 100% !important;
                 min-width: 100% !important;
