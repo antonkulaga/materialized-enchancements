@@ -9903,6 +9903,24 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
             }
             .me-rpg-profile-page .me-onboarding-tip-card {
                 max-width: calc(100vw - 24px) !important;
+                padding: 10px 12px !important;
+                margin-bottom: 8px !important;
+                border-radius: 12px !important;
+                box-shadow: 0 0 18px rgba(255, 255, 255, 0.52) !important;
+            }
+            .me-rpg-profile-page .me-onboarding-tip-card p {
+                font-size: 0.88rem !important;
+                line-height: 1.38 !important;
+            }
+            .me-rpg-profile-page .me-onboarding-tip-card p:first-of-type {
+                font-size: 1rem !important;
+                line-height: 1.24 !important;
+                margin-bottom: 4px !important;
+            }
+            .me-rpg-profile-page .me-onboarding-tip-card button {
+                width: 32px !important;
+                height: 32px !important;
+                border-radius: 9px !important;
             }
         }
         """

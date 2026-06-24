@@ -67,6 +67,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_PERSONAL_TAG = ""
 REPORT_LANDING_HTML_VERSION: int = 2
 REPORT_LANDING_HTML_VERSION_META_NAME = "materialized-report-html-version"
+ONBOARDING_STORAGE_VERSION: str = "2026-06-24-mobile-onboarding-v2"
 REPORT_CHARACTER_NOTE_MAX_CHARS: int = 420
 REPORT_PORTRAIT_MAX_BYTES: int = 2_500_000
 REPORT_PORTRAIT_ALLOWED_TYPES: set[str] = {"image/jpeg", "image/png", "image/webp"}
@@ -972,6 +973,7 @@ class ComposeState(rx.State):
         sync=True,
     )
     onboarding_step: str | None = rx.LocalStorage("pending", name="me_onboarding_step", sync=True)
+    onboarding_version: str | None = rx.LocalStorage("pending", name="me_onboarding_version", sync=True)
 
     # Share card (in-memory preview, no disk write)
     share_card_data_url: str = ""
@@ -1262,6 +1264,7 @@ class ComposeState(rx.State):
 
     def _onboarding_storage_script(self) -> str:
         return (
+            f"localStorage.setItem('me_onboarding_version', {json.dumps(ONBOARDING_STORAGE_VERSION)});"
             f"localStorage.setItem('me_onboarding_complete', {json.dumps(str(self.onboarding_complete or 'false'))});"
             f"localStorage.setItem('me_dismissed_onboarding', {json.dumps(str(self.dismissed_onboarding or 'false'))});"
             f"localStorage.setItem('me_onboarding_step', {json.dumps(str(self.onboarding_step or '0'))});"
@@ -1269,6 +1272,26 @@ class ComposeState(rx.State):
 
     def _sync_onboarding_from_storage(self) -> None:
         """Align cookie + LocalStorage so a partial write still counts as finished."""
+        if self.onboarding_version == "pending":
+            has_prior_onboarding_state = (
+                self.onboarding_complete != "pending"
+                or self.dismissed_onboarding != "pending"
+                or self.onboarding_step != "pending"
+            )
+            self.onboarding_version = ONBOARDING_STORAGE_VERSION
+            if has_prior_onboarding_state:
+                self.onboarding_complete = "false"
+                self.dismissed_onboarding = "false"
+                self.onboarding_step = "0"
+                return
+
+        if self.onboarding_version != ONBOARDING_STORAGE_VERSION:
+            self.onboarding_version = ONBOARDING_STORAGE_VERSION
+            self.onboarding_complete = "false"
+            self.dismissed_onboarding = "false"
+            self.onboarding_step = "0"
+            return
+
         if (
             self.onboarding_complete == "pending"
             and self.dismissed_onboarding == "pending"
@@ -1328,10 +1351,12 @@ class ComposeState(rx.State):
         if url_clean or env_clean:
             if env_clean:
                 os.environ["CLEAN_BROWSER_STORAGE"] = "0"
+            self.onboarding_version = ONBOARDING_STORAGE_VERSION
             self.onboarding_complete = "false"
             self.dismissed_onboarding = "false"
             self.onboarding_step = "0"
             yield rx.call_script(
+                f"localStorage.setItem('me_onboarding_version', {json.dumps(ONBOARDING_STORAGE_VERSION)});"
                 "localStorage.setItem('me_onboarding_complete', 'false');"
                 "localStorage.setItem('me_dismissed_onboarding', 'false');"
                 "localStorage.setItem('me_onboarding_step', '0');"
@@ -1340,6 +1365,7 @@ class ComposeState(rx.State):
             return
         self._sync_onboarding_from_storage()
         if not self.onboarding_finished:
+            yield rx.call_script(self._onboarding_storage_script())
             yield rx.call_script(_mobile_onboarding_scroll_script(self.onboarding_step_index))
 
     def toggle_choice_expanded(self) -> None:
@@ -2445,8 +2471,15 @@ class ComposeState(rx.State):
 
     @rx.var
     def onboarding_finished(self) -> bool:
-        if self.onboarding_complete == "pending" or self.dismissed_onboarding == "pending" or self.onboarding_step == "pending":
+        if (
+            self.onboarding_version == "pending"
+            or self.onboarding_complete == "pending"
+            or self.dismissed_onboarding == "pending"
+            or self.onboarding_step == "pending"
+        ):
             return True
+        if self.onboarding_version != ONBOARDING_STORAGE_VERSION:
+            return False
         complete = str(self.onboarding_complete or "false").strip().lower() == "true"
         dismissed = str(self.dismissed_onboarding or "false").strip().lower() == "true"
         step = str(self.onboarding_step or "0").strip().lower()
