@@ -5870,7 +5870,11 @@ def _rpg_active_genes_layout() -> rx.Component:
             ),
             rx.el.div(
                 _rpg_materialization_leg_cta(),
-                class_name="me-rpg-mobile-sticky-materialize",
+                class_name=rx.cond(
+                    ComposeState.show_onboarding_suggestion,
+                    "me-rpg-mobile-sticky-materialize me-rpg-mobile-sticky-materialize--hidden",
+                    "me-rpg-mobile-sticky-materialize",
+                ),
             ),
             _onboarding_backdrop(),
             _mobile_body_change_overlay(),
@@ -9604,6 +9608,9 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 box-sizing: border-box !important;
                 pointer-events: none !important;
             }
+            .me-rpg-profile-page .me-rpg-mobile-sticky-materialize--hidden {
+                display: none !important;
+            }
             .me-rpg-profile-page .me-rpg-mobile-sticky-materialize .me-rpg-materialize-leg-cta {
                 position: relative !important;
                 left: auto !important;
@@ -9785,6 +9792,9 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
             }
             .me-rpg-profile-page .me-rpg-body-stage > .me-rpg-materialize-leg-cta {
                 display: none !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage > .me-rpg-materialize-leg-cta.me-onboarding-materialize-lift {
+                display: flex !important;
             }
             .me-rpg-profile-page .me-rpg-materialize-credit-line {
                 width: 100% !important;
