@@ -9599,7 +9599,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 max-height: none !important;
                 min-height: 0 !important;
                 overflow: visible !important;
-                padding: 12px 10px calc(28px + env(safe-area-inset-bottom, 0px)) !important;
+                padding: 12px 10px calc(118px + env(safe-area-inset-bottom, 0px)) !important;
                 box-sizing: border-box !important;
             }
             .me-rpg-profile-page .me-rpg-library-panel {
@@ -9665,7 +9665,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 height: calc(100svh - 3.6rem - 130px) !important;
                 min-height: 560px !important;
                 max-height: none !important;
-                padding: 10px 0 calc(100px + env(safe-area-inset-bottom, 0px)) !important;
+                padding: 18px 0 24px !important;
                 justify-content: center !important;
                 overflow: hidden !important;
                 box-sizing: border-box !important;
@@ -9679,8 +9679,8 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 filter: blur(26px) !important;
             }
             .me-rpg-profile-page .me-rpg-body-image {
-                height: min(74svh, 680px) !important;
-                max-height: calc(100svh - 170px) !important;
+                height: min(62svh, 540px) !important;
+                max-height: calc(100svh - 3.6rem - 270px) !important;
                 width: auto !important;
                 max-width: min(88vw, 460px) !important;
                 object-fit: contain !important;
@@ -9753,12 +9753,13 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 left: calc(50% + min(34vw, 190px)) !important;
             }
             .me-rpg-profile-page .me-rpg-materialize-leg-cta {
-                position: absolute !important;
+                position: fixed !important;
                 left: 50% !important;
                 bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 10px)) !important;
                 transform: translateX(-50%) !important;
                 width: min(92vw, 440px) !important;
                 max-width: calc(100vw - 24px) !important;
+                z-index: 1350 !important;
             }
             .me-rpg-profile-page .me-rpg-materialize-credit-line {
                 width: 100% !important;
