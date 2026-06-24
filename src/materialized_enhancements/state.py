@@ -1944,6 +1944,9 @@ class ComposeState(rx.State):
         if not self.stl_download_path:
             self.email_error = "No sculpture generated yet."
             return
+        if not RESEND_API_KEY:
+            self.email_error = "Email is not configured (missing RESEND_API_KEY)."
+            return
         self.email_error = ""
         self.email_sent = False
         self.email_sending = True

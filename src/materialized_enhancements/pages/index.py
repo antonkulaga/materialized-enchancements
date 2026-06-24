@@ -103,6 +103,7 @@ def _email_send_form(
     return rx.el.div(
         rx.el.div(
             rx.el.input(
+                class_name="me-email-send-input",
                 type="email",
                 placeholder=placeholder,
                 value=state_cls.recipient_email,
@@ -131,12 +132,14 @@ def _email_send_form(
                 ),
                 on_click=send_handler,
                 class_name=rx.cond(
-                    state_cls.can_send_email,
-                    accent_class,
+                    state_cls.email_sending,
                     f"ui disabled {accent_class.removeprefix('ui ')}",
+                    accent_class,
                 ),
+                type="button",
                 style={"padding": "12px 18px", "fontSize": "0.96rem", "fontWeight": "900", "whiteSpace": "nowrap"},
             ),
+            class_name="me-email-send-row",
             style={"display": "flex", "gap": "8px", "alignItems": "stretch"},
         ),
         rx.cond(
@@ -170,6 +173,7 @@ def _email_send_form(
             ),
             rx.fragment(),
         ),
+        class_name="me-email-send-form",
         style={"marginTop": "0"},
     )
 
@@ -4212,6 +4216,7 @@ def _reward_artifact_choice(
         type="button",
         on_click=on_click,
         aria_label=action_label,
+        class_name="me-reward-artifact-choice",
         style={
             "display": "flex",
             "flexDirection": "column",
@@ -4446,6 +4451,7 @@ def _materialization_reward_panel() -> rx.Component:
                     "alignItems": "stretch",
                     "marginTop": "16px",
                 },
+                class_name="me-reward-artifact-choice-grid",
             ),
             style={
                 "position": "relative",
@@ -4898,6 +4904,57 @@ def _rpg_flow_css() -> rx.Component:
             border: 4px solid rgba(253, 230, 138, 0.92) !important;
             border-radius: 20px !important;
             box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.28), 0 18px 36px rgba(250, 204, 21, 0.18) !important;
+        }
+        @media (hover: none) and (pointer: coarse) {
+            .me-rpg-output-panel .me-reward-artifact-choice-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+                gap: 14px !important;
+            }
+            .me-rpg-output-panel .me-reward-artifact-choice {
+                min-height: 0 !important;
+                padding: 14px !important;
+                gap: 12px !important;
+            }
+            .me-rpg-output-panel .me-reward-artifact-choice strong {
+                font-size: 1.24rem !important;
+                line-height: 1.18 !important;
+                word-break: normal !important;
+                overflow-wrap: normal !important;
+            }
+            .me-rpg-output-panel .me-reward-artifact-choice span {
+                font-size: 0.98rem !important;
+                line-height: 1.35 !important;
+                word-break: normal !important;
+                overflow-wrap: normal !important;
+            }
+            .me-rpg-output-panel .me-artifact-email-cell {
+                flex: 1 1 100% !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: none !important;
+            }
+            .me-rpg-output-panel .me-email-send-form,
+            .me-rpg-output-panel .me-email-send-row {
+                width: 100% !important;
+            }
+            .me-rpg-output-panel .me-email-send-row {
+                flex-direction: column !important;
+                gap: 8px !important;
+            }
+            .me-rpg-output-panel .me-email-send-input {
+                width: 100% !important;
+                min-height: 46px !important;
+                box-sizing: border-box !important;
+                font-size: 1rem !important;
+            }
+            .me-rpg-output-panel .me-email-send-form .ui.button {
+                width: 100% !important;
+                min-height: 48px !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                white-space: normal !important;
+                line-height: 1.2 !important;
+            }
         }
         .me-rpg-dashboard {
             display: grid;
@@ -6528,6 +6585,7 @@ def _model_action_panel() -> rx.Component:
             ),
             rx.el.div(
                 _email_send_form(ComposeState, button_label="Send print file + report"),
+                class_name="me-artifact-email-cell",
                 style={
                     "flex": "1 1 440px",
                     "minWidth": "340px",
@@ -9580,12 +9638,14 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 overflow: hidden !important;
             }
             .me-rpg-profile-page .me-rpg-body-map-title {
-                position: absolute !important;
-                top: 8px !important;
-                left: max(10px, env(safe-area-inset-left, 0px)) !important;
-                right: max(10px, env(safe-area-inset-right, 0px)) !important;
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+                right: auto !important;
                 z-index: 7 !important;
                 max-width: none !important;
+                width: calc(100% - 20px) !important;
+                margin: 8px auto 0 !important;
                 padding: 9px 10px !important;
                 border: 1px solid rgba(167, 139, 250, 0.30) !important;
                 background: rgba(15, 23, 42, 0.78) !important;
@@ -9602,10 +9662,10 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
             .me-rpg-profile-page .me-rpg-body-stage {
                 flex: none !important;
                 width: 100% !important;
-                height: calc(100svh - 3.6rem) !important;
-                min-height: calc(100svh - 3.6rem) !important;
+                height: calc(100svh - 3.6rem - 130px) !important;
+                min-height: 560px !important;
                 max-height: none !important;
-                padding: 76px 0 calc(100px + env(safe-area-inset-bottom, 0px)) !important;
+                padding: 10px 0 calc(100px + env(safe-area-inset-bottom, 0px)) !important;
                 justify-content: center !important;
                 overflow: hidden !important;
                 box-sizing: border-box !important;
