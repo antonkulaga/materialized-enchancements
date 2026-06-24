@@ -5346,6 +5346,9 @@ def _rpg_flow_css() -> rx.Component:
                 rgba(2, 6, 23, 0.44);
             overflow: hidden;
         }
+        .me-rpg-mobile-sticky-materialize {
+            display: none;
+        }
         .me-rpg-category-anchor:hover {
             filter: brightness(1.12);
         }
@@ -5864,6 +5867,10 @@ def _rpg_active_genes_layout() -> rx.Component:
                         "me-rpg-center-panel",
                     ),
                 ),
+            ),
+            rx.el.div(
+                _rpg_materialization_leg_cta(),
+                class_name="me-rpg-mobile-sticky-materialize",
             ),
             _onboarding_backdrop(),
             _mobile_body_change_overlay(),
@@ -9583,8 +9590,32 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 padding: 0 !important;
                 scrollbar-gutter: auto !important;
             }
-            .me-rpg-profile-page .me-rpg-left-panel {
+            .me-rpg-profile-page .me-rpg-mobile-sticky-materialize {
                 order: 2;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                position: sticky !important;
+                bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 10px)) !important;
+                z-index: 1350 !important;
+                width: 100% !important;
+                padding: 0 10px !important;
+                margin: 0 0 14px 0 !important;
+                box-sizing: border-box !important;
+                pointer-events: none !important;
+            }
+            .me-rpg-profile-page .me-rpg-mobile-sticky-materialize .me-rpg-materialize-leg-cta {
+                position: relative !important;
+                left: auto !important;
+                bottom: auto !important;
+                transform: none !important;
+                width: min(92vw, 440px) !important;
+                max-width: calc(100vw - 24px) !important;
+                z-index: auto !important;
+                pointer-events: auto !important;
+            }
+            .me-rpg-profile-page .me-rpg-left-panel {
+                order: 3;
                 flex: 0 0 auto !important;
                 width: 100% !important;
                 min-width: 100% !important;
@@ -9752,14 +9783,8 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 top: 76% !important;
                 left: calc(50% + min(34vw, 190px)) !important;
             }
-            .me-rpg-profile-page .me-rpg-materialize-leg-cta {
-                position: fixed !important;
-                left: 50% !important;
-                bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 10px)) !important;
-                transform: translateX(-50%) !important;
-                width: min(92vw, 440px) !important;
-                max-width: calc(100vw - 24px) !important;
-                z-index: 1350 !important;
+            .me-rpg-profile-page .me-rpg-body-stage > .me-rpg-materialize-leg-cta {
+                display: none !important;
             }
             .me-rpg-profile-page .me-rpg-materialize-credit-line {
                 width: 100% !important;

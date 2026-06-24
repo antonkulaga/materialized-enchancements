@@ -257,7 +257,7 @@ def _mobile_onboarding_scroll_script(step: int) -> str:
     selector_by_step = {
         0: "#gene-library",
         1: "#compose-personal-tag",
-        2: ".me-rpg-materialize-leg-cta",
+        2: ".me-rpg-mobile-sticky-materialize .me-rpg-materialize-leg-cta",
         3: "#gene-library",
     }
     selector = selector_by_step[min(3, max(0, step))]
