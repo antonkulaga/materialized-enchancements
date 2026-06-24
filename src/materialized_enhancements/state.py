@@ -267,6 +267,7 @@ def _mobile_onboarding_scroll_script(step: int) -> str:
 (() => {{
     const isMobile = window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
     if (!isMobile) return;
+    if (document.querySelector(".me-onboarding-tip-card")) return;
     window.setTimeout(() => {{
         const target = document.querySelector({json.dumps(selector)});
         if (!target) return;

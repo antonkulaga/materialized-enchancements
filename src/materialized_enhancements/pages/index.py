@@ -9902,9 +9902,19 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 z-index: 1010 !important;
             }
             .me-rpg-profile-page .me-onboarding-tip-card {
+                position: fixed !important;
+                left: 12px !important;
+                right: 12px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                z-index: 1400 !important;
+                width: auto !important;
                 max-width: calc(100vw - 24px) !important;
+                max-height: min(58svh, 390px) !important;
+                overflow-y: auto !important;
+                overscroll-behavior: contain !important;
                 padding: 10px 12px !important;
-                margin-bottom: 8px !important;
+                margin: 0 !important;
                 border-radius: 12px !important;
                 box-shadow: 0 0 18px rgba(255, 255, 255, 0.52) !important;
             }
