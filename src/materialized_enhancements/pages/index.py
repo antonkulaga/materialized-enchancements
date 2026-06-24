@@ -830,6 +830,7 @@ def _budget_gauge() -> rx.Component:
                 "marginBottom": "8px",
                 "borderBottom": "1px solid rgba(167, 139, 250, 0.15)",
             },
+            class_name="me-mission-briefing",
         ),
     )
     return rx.el.div(
@@ -5857,9 +5858,35 @@ def _onboarding_backdrop() -> rx.Component:
     )
 
 
+def _mobile_mission_briefing_autoclose_script() -> rx.Component:
+    return rx.script(
+        """
+        (() => {
+            if (window.__meMobileMissionBriefingAutocloseInstalled) return;
+            window.__meMobileMissionBriefingAutocloseInstalled = true;
+            const isMobile = () => window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+            const closeBriefing = () => {
+                if (!isMobile()) return;
+                const briefing = document.querySelector(".me-mission-briefing");
+                if (!briefing) return;
+                document.documentElement.classList.add("me-mobile-mission-briefing-auto-closed");
+            };
+            const onScroll = () => {
+                if (!isMobile()) return;
+                if (window.scrollY > 96) closeBriefing();
+            };
+            window.addEventListener("scroll", onScroll, { passive: true });
+            window.addEventListener("touchmove", onScroll, { passive: true });
+            setTimeout(onScroll, 300);
+        })();
+        """
+    )
+
+
 def _rpg_active_genes_layout() -> rx.Component:
     return _rpg_shell(
         rx.el.div(
+            _mobile_mission_briefing_autoclose_script(),
             rx.el.div(
                 _rpg_sidebar_intro_stack(),
                 _mobile_budget_materialize_stack(),
@@ -9630,6 +9657,9 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 backdrop-filter: none !important;
                 -webkit-backdrop-filter: none !important;
                 pointer-events: auto !important;
+            }
+            html.me-mobile-mission-briefing-auto-closed .me-rpg-profile-page .me-mission-briefing {
+                display: none !important;
             }
             .me-rpg-profile-page .me-mobile-budget-materialize {
                 display: flex !important;
