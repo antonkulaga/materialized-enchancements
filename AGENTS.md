@@ -51,10 +51,22 @@ so browser storage is cleared and the onboarding sequence appears from step 1.
 ### Cursor Cloud Mobile Preview Tunnel
 
 When working from Cursor Cloud and the user asks to view the running app on a
-phone or through a public preview URL, use a Pinggy tunnel to port 3000. Restart
-the Pinggy tunnel before giving the user a link, verify the restarted tunnel
-returns the app with `HTTP 200 OK`, and give the user the full fresh `https://...`
-Pinggy URL. Do not reuse old tunnel URLs.
+phone, through a public preview URL, or asks to restart the tunnel, use a Pinggy
+tunnel to port 3000.
+
+Required workflow:
+1. Confirm the local app on `http://localhost:3000/` returns `HTTP 200 OK`; start
+   `uv run serve` first if needed.
+2. Restart the Pinggy tunnel; never reuse an old tunnel URL.
+3. Verify the restarted Pinggy `https://...run.pinggy-free.link/` URL returns the
+   app with `HTTP 200 OK`.
+4. In the final response, put the full fresh URL on its own standalone line in
+   this exact format:
+
+   `Tunnel URL: https://<fresh-host>.run.pinggy-free.link/`
+
+Do not bury the tunnel URL in prose. Do not omit the URL after restarting a
+tunnel.
 
 ---
 
