@@ -9616,13 +9616,20 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 z-index: 35 !important;
                 width: 100% !important;
                 margin: 0 0 12px 0 !important;
-                padding: 0 !important;
+                padding: 0 0 8px 0 !important;
                 box-sizing: border-box !important;
+                background: #020617 !important;
+                box-shadow: 0 12px 24px rgba(2, 6, 23, 0.88) !important;
+                pointer-events: none !important;
             }
             .me-rpg-profile-page .me-mobile-budget-stack .me-budget-gauge {
                 position: static !important;
                 top: auto !important;
                 margin-bottom: 8px !important;
+                background: #0f172a !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                pointer-events: auto !important;
             }
             .me-rpg-profile-page .me-mobile-budget-materialize {
                 display: flex !important;
@@ -9633,9 +9640,10 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 bottom: auto !important;
                 z-index: auto !important;
                 width: 100% !important;
-                padding: 0 !important;
+                padding: 0 0 2px 0 !important;
                 margin: 0 0 12px 0 !important;
                 box-sizing: border-box !important;
+                background: #020617 !important;
                 pointer-events: none !important;
             }
             .me-rpg-profile-page .me-mobile-budget-materialize--hidden {
@@ -9649,7 +9657,14 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 width: min(92vw, 440px) !important;
                 max-width: calc(100vw - 24px) !important;
                 z-index: auto !important;
+                padding: 8px !important;
+                border-radius: 30px !important;
+                background: #020617 !important;
+                box-shadow: 0 10px 22px rgba(2, 6, 23, 0.82) !important;
                 pointer-events: auto !important;
+            }
+            .me-rpg-profile-page .me-mobile-budget-materialize .me-rpg-materialize-credit-line {
+                background: #0f172a !important;
             }
             .me-rpg-profile-page .me-rpg-left-panel {
                 order: 2;
