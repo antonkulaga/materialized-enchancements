@@ -3353,7 +3353,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                                 rel="noopener noreferrer",
                                 title="Open in UniProt",
                                 style={
-                                    "fontSize": "1.08rem",
+                                    "fontSize": "0.96rem",
                                     "fontWeight": "900",
                                     "color": rx.cond(included, "#f8fafc", "#cbd5e1"),
                                     "textDecoration": "none",
@@ -3364,7 +3364,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                             rx.el.span(
                                 gene_sym,
                                 style={
-                                    "fontSize": "1.08rem",
+                                    "fontSize": "0.96rem",
                                     "fontWeight": "900",
                                     "color": rx.cond(included, "#f8fafc", "#cbd5e1"),
                                 },
@@ -9727,9 +9727,9 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 box-sizing: border-box !important;
             }
             .me-rpg-profile-page .me-rpg-category-gene-grid {
-                padding-left: 0 !important;
-                margin-left: 0 !important;
-                border-left: none !important;
+                padding-left: 10px !important;
+                margin-left: 4px !important;
+                border-left: 3px solid rgba(124, 58, 237, 0.45) !important;
             }
             .me-rpg-profile-page .me-budget-gauge {
                 position: sticky !important;

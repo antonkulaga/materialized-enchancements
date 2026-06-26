@@ -48,6 +48,60 @@ uv run start        # starts Reflex dev server (http://localhost:3000)
 When testing first-visit onboarding/tutorial tooltips, use `uv run start --clean`
 so browser storage is cleared and the onboarding sequence appears from step 1.
 
+### Mobile Debugging via USB (Android)
+
+To test on a physical Android phone connected via USB:
+
+1. **Enable Developer Options** on the phone: Settings → About phone → Software information → tap Build number 7 times. Then enable **USB debugging** in Settings → Developer options.
+2. **Connect via USB** (use a data-capable cable, not charge-only) and authorize the computer when prompted on the phone ("Allow USB debugging?" → Allow).
+3. **Set up ADB port forwarding** (adjust ports if 3000/8000 are in use by another app):
+   ```bash
+   adb devices                              # verify phone shows as "device" (not "unauthorized")
+   adb reverse tcp:3000 tcp:3000            # frontend
+   adb reverse tcp:8000 tcp:8000            # backend
+   adb forward tcp:9222 localabstract:chrome_devtools_remote  # Chrome DevTools
+   ```
+4. **Prevent screen auto-lock** during debugging:
+   ```bash
+   adb shell svc power stayon usb           # stay awake while USB connected
+   adb shell settings put system screen_off_timeout 1800000  # 30-min fallback
+   ```
+5. **Open the app** in Chrome on the phone:
+   ```bash
+   adb shell am start -a android.intent.action.VIEW -d "http://localhost:3000/" com.android.chrome
+   ```
+   Make sure Chrome is set to **mobile site mode** (not "Request desktop site") for proper responsive layout testing.
+6. **Take ADB screenshots** for visual inspection:
+   ```bash
+   adb exec-out screencap -p > /tmp/phone_screenshot.png
+   ```
+7. **Screen control via ADB** (wake, unlock, tap, scroll):
+   ```bash
+   adb shell input keyevent KEYCODE_WAKEUP          # wake screen
+   adb shell input swipe 540 1800 540 600 300        # swipe up to unlock
+   adb shell input tap 540 1170                       # tap center of screen
+   adb shell input swipe 540 1500 540 500 500         # scroll down
+   ```
+8. **Chrome DevTools MCP** (optional, requires Claude Code restart):
+   Add to `~/.claude/.mcp.json`:
+   ```json
+   {
+     "mcpServers": {
+       "chrome-devtools": {
+         "command": "npx",
+         "args": ["chrome-devtools-mcp@latest", "--wsEndpoint=ws://127.0.0.1:9222/devtools/browser/"]
+       }
+     }
+   }
+   ```
+   After restarting Claude Code, the agent can take screenshots, inspect DOM, read console errors, and analyze network requests directly from the phone's Chrome browser.
+
+When another Reflex app occupies the default ports, start on alternate ports:
+```bash
+uv run preselect --frontend-port 3001 --backend-port 8001
+adb reverse tcp:3001 tcp:3001 && adb reverse tcp:8001 tcp:8001
+```
+
 ### Cursor Cloud Mobile Preview Tunnel
 
 When working from Cursor Cloud and the user asks to view the running app on a

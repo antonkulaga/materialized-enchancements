@@ -202,6 +202,27 @@ uv run start           # development mode (hot-reload)
 uv run serve           # production mode (single-port, Reflex 0.9+)
 ```
 
+### Mobile testing (Android via USB)
+
+Enable Developer Options on the phone (Settings → About phone → Software information → tap Build number 7×), then enable USB debugging. Connect with a data-capable USB cable and authorize when prompted.
+
+```bash
+adb devices                                # verify "device" (not "unauthorized")
+adb reverse tcp:3000 tcp:3000              # frontend → phone can reach localhost:3000
+adb reverse tcp:8000 tcp:8000              # backend WebSocket
+adb shell svc power stayon usb             # keep screen on while USB connected
+adb shell am start -a android.intent.action.VIEW -d "http://localhost:3000/" com.android.chrome
+```
+
+If another app occupies port 3000, use alternate ports:
+
+```bash
+uv run preselect --frontend-port 3001 --backend-port 8001
+adb reverse tcp:3001 tcp:3001 && adb reverse tcp:8001 tcp:8001
+```
+
+Take screenshots with `adb exec-out screencap -p > screenshot.png`. For AI-assisted debugging, forward Chrome DevTools via `adb forward tcp:9222 localabstract:chrome_devtools_remote` and connect the [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp).
+
 Copy `.env.template` to `.env` to override defaults (email delivery, deploy URL, kiosk settings, and post-materialization community links). For production, set `DEPLOY_URL` to your public domain so QR codes, report links, and social shares use absolute URLs.
 
 Useful optional overrides:
