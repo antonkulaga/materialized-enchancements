@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 ensure_generated_public_dirs()
 _generated_static = StaticFiles(directory=GENERATED_PUBLIC_DIR, check_dir=False)
-DESKTOP_VIEWPORT_WIDTH_PX = 1440
 _SUPPRESSED_3DMOL_FRONTEND_ERROR_MARKERS = (
     "OffscreenCanvas.transferToImageBitmap",
     "3dmol",
@@ -43,7 +42,7 @@ _SUPPRESSED_STALE_CLIENT_FRONTEND_ERROR_MARKERS = (
 _logged_suppressed_frontend_errors: set[str] = set()
 
 _head_components: list[rx.Component] = [
-    rx.el.meta(name="viewport", content=f"width={DESKTOP_VIEWPORT_WIDTH_PX}"),
+    rx.el.meta(name="viewport", content="width=device-width, initial-scale=1, viewport-fit=cover"),
     rx.el.link(rel="icon", href=FAVICON_URL_PATH, type="image/x-icon"),
     rx.el.link(rel="shortcut icon", href=FAVICON_URL_PATH, type="image/x-icon"),
 ]

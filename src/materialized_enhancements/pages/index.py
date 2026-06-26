@@ -14,7 +14,6 @@ from materialized_enhancements.gene_data import (
     UNIQUE_CATEGORIES,
 )
 from materialized_enhancements.env import (
-    DISCORD_COMMUNITY_NAME,
     DISCORD_INVITE_URL,
     DONATION_URL,
     GITHUB_PROJECT_URL,
@@ -104,6 +103,7 @@ def _email_send_form(
     return rx.el.div(
         rx.el.div(
             rx.el.input(
+                class_name="me-email-send-input",
                 type="email",
                 placeholder=placeholder,
                 value=state_cls.recipient_email,
@@ -132,12 +132,14 @@ def _email_send_form(
                 ),
                 on_click=send_handler,
                 class_name=rx.cond(
-                    state_cls.can_send_email,
-                    accent_class,
+                    state_cls.email_sending,
                     f"ui disabled {accent_class.removeprefix('ui ')}",
+                    accent_class,
                 ),
+                type="button",
                 style={"padding": "12px 18px", "fontSize": "0.96rem", "fontWeight": "900", "whiteSpace": "nowrap"},
             ),
+            class_name="me-email-send-row",
             style={"display": "flex", "gap": "8px", "alignItems": "stretch"},
         ),
         rx.cond(
@@ -171,6 +173,7 @@ def _email_send_form(
             ),
             rx.fragment(),
         ),
+        class_name="me-email-send-form",
         style={"marginTop": "0"},
     )
 
@@ -827,6 +830,7 @@ def _budget_gauge() -> rx.Component:
                 "marginBottom": "8px",
                 "borderBottom": "1px solid rgba(167, 139, 250, 0.15)",
             },
+            class_name="me-mission-briefing",
         ),
     )
     return rx.el.div(
@@ -912,6 +916,27 @@ def _budget_gauge() -> rx.Component:
             },
         ),
         class_name="me-budget-gauge",
+    )
+
+
+def _mobile_materialize_after_budget() -> rx.Component:
+    """Mobile-only Materialize CTA that follows the sticky credit gauge."""
+    return rx.el.div(
+        _rpg_materialization_leg_cta(),
+        class_name=rx.cond(
+            ComposeState.show_onboarding_suggestion,
+            "me-mobile-budget-materialize me-mobile-budget-materialize--hidden",
+            "me-mobile-budget-materialize",
+        ),
+    )
+
+
+def _mobile_budget_materialize_stack() -> rx.Component:
+    """Budget gauge plus the mobile Materialize CTA in one sticky mobile stack."""
+    return rx.el.div(
+        _budget_gauge(),
+        _mobile_materialize_after_budget(),
+        class_name="me-mobile-budget-stack",
     )
 
 
@@ -2663,7 +2688,6 @@ def _rpg_silhouette_marker(
     icon_name = CATEGORY_ICONS.get(category, "star")
     tooltip = _category_tooltip(category)
     count = ComposeState.active_gene_counts[category]
-    total_count = CATEGORY_COUNTS.get(category, 0)
     is_selected = ComposeState.selected_categories.contains(category)
     is_affordable = ComposeState.affordable_categories.contains(category)
     is_enabled = is_selected | is_affordable
@@ -2968,6 +2992,134 @@ def _rpg_body_map_panel() -> rx.Component:
     )
 
 
+def _mobile_overlay_body_marker(category: str, top: str, left: str) -> rx.Component:
+    color = CATEGORY_COLORS.get(category, "#7c3aed")
+    count = ComposeState.active_gene_counts[category]
+    return rx.el.div(
+        rx.cond(
+            count > 0,
+            rx.el.span(
+                count,
+                style={
+                    "position": "absolute",
+                    "right": "-6px",
+                    "top": "-6px",
+                    "minWidth": "17px",
+                    "height": "17px",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "borderRadius": "999px",
+                    "border": "1px solid rgba(15, 23, 42, 0.96)",
+                    "background": color,
+                    "color": "#ffffff",
+                    "fontSize": "0.58rem",
+                    "fontWeight": "950",
+                    "lineHeight": "1",
+                },
+            ),
+            rx.fragment(),
+        ),
+        class_name=f"me-mobile-overlay-marker me-mobile-overlay-marker--{_category_css_slug(category)}",
+        style={
+            "position": "absolute",
+            "top": top,
+            "left": left,
+            "width": "26px",
+            "height": "26px",
+            "borderRadius": "999px",
+            "transform": "translate(-50%, -50%)",
+            "background": rx.cond(count > 0, color, f"{color}44"),
+            "border": f"1px solid {color}",
+            "boxShadow": rx.cond(count > 0, f"0 0 16px {color}", f"0 0 8px {color}66"),
+            "opacity": rx.cond(count > 0, "1", "0.55"),
+        },
+    )
+
+
+def _mobile_body_change_overlay() -> rx.Component:
+    return rx.el.div(
+        rx.el.div(
+            rx.el.div(
+                _mobile_overlay_body_marker("Expression", "17%", "35%"),
+                _mobile_overlay_body_marker("Perception", "17%", "65%"),
+                _mobile_overlay_body_marker("Longevity & Genome", "48%", "34%"),
+                _mobile_overlay_body_marker("Stress Resistance", "48%", "66%"),
+                _mobile_overlay_body_marker("Environmental Adaptation", "77%", "36%"),
+                _mobile_overlay_body_marker("Regeneration", "77%", "64%"),
+                rx.el.img(
+                    src="/images/body_only.webp",
+                    alt="Mini enhanced body preview",
+                    style={
+                        "height": "120px",
+                        "width": "82px",
+                        "objectFit": "contain",
+                        "display": "block",
+                        "filter": "drop-shadow(0 0 12px rgba(56, 189, 248, 0.44))",
+                    },
+                ),
+                class_name="me-mobile-body-change-mini-stage",
+            ),
+            rx.el.div(
+                rx.el.div(
+                    "Character updated",
+                    style={
+                        "fontSize": "0.72rem",
+                        "fontWeight": "950",
+                        "letterSpacing": "0.08em",
+                        "textTransform": "uppercase",
+                        "color": "#a78bfa",
+                    },
+                ),
+                rx.el.div(
+                    ComposeState.mobile_change_overlay_gene,
+                    style={
+                        "marginTop": "2px",
+                        "fontSize": "0.96rem",
+                        "fontWeight": "950",
+                        "lineHeight": "1.18",
+                        "color": "#f8fafc",
+                    },
+                ),
+                rx.el.div(
+                    ComposeState.mobile_change_overlay_category,
+                    style={
+                        "marginTop": "3px",
+                        "fontSize": "0.78rem",
+                        "fontWeight": "800",
+                        "lineHeight": "1.2",
+                        "color": "#cbd5e1",
+                    },
+                ),
+                style={"minWidth": "0", "flex": "1"},
+            ),
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "12px",
+            },
+        ),
+        id="me-mobile-body-change-overlay",
+        class_name="me-mobile-body-change-overlay",
+        aria_live="polite",
+        style={
+            "position": "fixed",
+            "right": "14px",
+            "bottom": "14px",
+            "zIndex": "1400",
+            "width": "min(360px, calc(100vw - 28px))",
+            "padding": "10px 12px",
+            "borderRadius": "18px",
+            "border": "1px solid rgba(167, 139, 250, 0.55)",
+            "background": "rgba(15, 23, 42, 0.94)",
+            "boxShadow": "0 20px 48px rgba(2, 6, 23, 0.58), 0 0 28px rgba(124, 58, 237, 0.32)",
+            "backdropFilter": "blur(14px)",
+            "WebkitBackdropFilter": "blur(14px)",
+            "pointerEvents": "none",
+        },
+    )
+
+
 def _rpg_gene_side_text(title: str, body: rx.Var) -> rx.Component:
     return rx.cond(
         body != "",
@@ -3201,7 +3353,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                                 rel="noopener noreferrer",
                                 title="Open in UniProt",
                                 style={
-                                    "fontSize": "1.08rem",
+                                    "fontSize": "0.96rem",
                                     "fontWeight": "900",
                                     "color": rx.cond(included, "#f8fafc", "#cbd5e1"),
                                     "textDecoration": "none",
@@ -3212,7 +3364,7 @@ def _rpg_gene_card(gene_item: rx.Var) -> rx.Component:
                             rx.el.span(
                                 gene_sym,
                                 style={
-                                    "fontSize": "1.08rem",
+                                    "fontSize": "0.96rem",
                                     "fontWeight": "900",
                                     "color": rx.cond(included, "#f8fafc", "#cbd5e1"),
                                 },
@@ -4086,6 +4238,7 @@ def _reward_artifact_choice(
         type="button",
         on_click=on_click,
         aria_label=action_label,
+        class_name="me-reward-artifact-choice",
         style={
             "display": "flex",
             "flexDirection": "column",
@@ -4320,6 +4473,7 @@ def _materialization_reward_panel() -> rx.Component:
                     "alignItems": "stretch",
                     "marginTop": "16px",
                 },
+                class_name="me-reward-artifact-choice-grid",
             ),
             style={
                 "position": "relative",
@@ -4773,6 +4927,57 @@ def _rpg_flow_css() -> rx.Component:
             border-radius: 20px !important;
             box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.28), 0 18px 36px rgba(250, 204, 21, 0.18) !important;
         }
+        @media (hover: none) and (pointer: coarse) {
+            .me-rpg-output-panel .me-reward-artifact-choice-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+                gap: 14px !important;
+            }
+            .me-rpg-output-panel .me-reward-artifact-choice {
+                min-height: 0 !important;
+                padding: 14px !important;
+                gap: 12px !important;
+            }
+            .me-rpg-output-panel .me-reward-artifact-choice strong {
+                font-size: 1.24rem !important;
+                line-height: 1.18 !important;
+                word-break: normal !important;
+                overflow-wrap: normal !important;
+            }
+            .me-rpg-output-panel .me-reward-artifact-choice span {
+                font-size: 0.98rem !important;
+                line-height: 1.35 !important;
+                word-break: normal !important;
+                overflow-wrap: normal !important;
+            }
+            .me-rpg-output-panel .me-artifact-email-cell {
+                flex: 1 1 100% !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: none !important;
+            }
+            .me-rpg-output-panel .me-email-send-form,
+            .me-rpg-output-panel .me-email-send-row {
+                width: 100% !important;
+            }
+            .me-rpg-output-panel .me-email-send-row {
+                flex-direction: column !important;
+                gap: 8px !important;
+            }
+            .me-rpg-output-panel .me-email-send-input {
+                width: 100% !important;
+                min-height: 46px !important;
+                box-sizing: border-box !important;
+                font-size: 1rem !important;
+            }
+            .me-rpg-output-panel .me-email-send-form .ui.button {
+                width: 100% !important;
+                min-height: 48px !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                white-space: normal !important;
+                line-height: 1.2 !important;
+            }
+        }
         .me-rpg-dashboard {
             display: grid;
             gap: 16px;
@@ -5142,6 +5347,32 @@ def _rpg_flow_css() -> rx.Component:
         .me-rpg-materialize-info-alert {
             border: 1px solid rgba(56, 189, 248, 0.52);
             color: #bae6fd;
+        }
+        .me-mobile-body-change-overlay {
+            display: none;
+            opacity: 0;
+            transform: translateY(18px) scale(0.96);
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+        .me-mobile-body-change-mini-stage {
+            position: relative;
+            width: 118px;
+            min-width: 118px;
+            height: 138px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background:
+                radial-gradient(circle at 50% 42%, rgba(56, 189, 248, 0.28), rgba(2, 6, 23, 0) 68%),
+                rgba(2, 6, 23, 0.44);
+            overflow: hidden;
+        }
+        .me-mobile-budget-materialize {
+            display: none;
+        }
+        .me-mobile-budget-stack {
+            display: block;
         }
         .me-rpg-category-anchor:hover {
             filter: brightness(1.12);
@@ -5527,6 +5758,15 @@ def _rpg_flow_css() -> rx.Component:
                 height: 58px !important;
             }
         }
+        @media (hover: none) and (pointer: coarse) {
+            .me-mobile-body-change-overlay {
+                display: block;
+            }
+            .me-mobile-body-change-overlay.is-visible {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
         .me-protein-stl-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -5618,12 +5858,38 @@ def _onboarding_backdrop() -> rx.Component:
     )
 
 
+def _mobile_mission_briefing_autoclose_script() -> rx.Component:
+    return rx.script(
+        """
+        (() => {
+            if (window.__meMobileMissionBriefingAutocloseInstalled) return;
+            window.__meMobileMissionBriefingAutocloseInstalled = true;
+            const isMobile = () => window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+            const closeBriefing = () => {
+                if (!isMobile()) return;
+                const briefing = document.querySelector(".me-mission-briefing");
+                if (!briefing) return;
+                document.documentElement.classList.add("me-mobile-mission-briefing-auto-closed");
+            };
+            const onScroll = () => {
+                if (!isMobile()) return;
+                if (window.scrollY > 96) closeBriefing();
+            };
+            window.addEventListener("scroll", onScroll, { passive: true });
+            window.addEventListener("touchmove", onScroll, { passive: true });
+            setTimeout(onScroll, 300);
+        })();
+        """
+    )
+
+
 def _rpg_active_genes_layout() -> rx.Component:
     return _rpg_shell(
         rx.el.div(
+            _mobile_mission_briefing_autoclose_script(),
             rx.el.div(
                 _rpg_sidebar_intro_stack(),
-                _budget_gauge(),
+                _mobile_budget_materialize_stack(),
                 _rpg_gene_library_panel(),
                 id="gene-library",
                 class_name=rx.cond(
@@ -5654,6 +5920,7 @@ def _rpg_active_genes_layout() -> rx.Component:
                 ),
             ),
             _onboarding_backdrop(),
+            _mobile_body_change_overlay(),
             class_name="me-rpg-dashboard me-rpg-hero-grid",
             style=rx.cond(
                 ComposeState.show_onboarding_suggestion,
@@ -6372,6 +6639,7 @@ def _model_action_panel() -> rx.Component:
             ),
             rx.el.div(
                 _email_send_form(ComposeState, button_label="Send print file + report"),
+                class_name="me-artifact-email-cell",
                 style={
                     "flex": "1 1 440px",
                     "minWidth": "340px",
@@ -9127,6 +9395,25 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
             border-color: rgba(124, 58, 237, 0.72) !important;
             font-weight: 800 !important;
         }
+        @media (hover: none) and (pointer: coarse) {
+            #me-top-tab-menu.ui.top.attached.tabular.menu {
+                display: flex !important;
+                overflow-x: auto !important;
+                scrollbar-width: none;
+            }
+            #me-top-tab-menu.ui.top.attached.tabular.menu::-webkit-scrollbar {
+                display: none;
+            }
+            #me-top-tab-menu.ui.top.attached.tabular.menu .item {
+                flex: 1 0 auto !important;
+                justify-content: center !important;
+                min-height: 3rem !important;
+                padding: 0.72rem 0.55rem !important;
+                font-size: 0.86rem !important;
+                line-height: 1.05 !important;
+                white-space: nowrap !important;
+            }
+        }
         #me-rpg-tab-segment.ui.bottom.attached.segment {
             background: #020617 !important;
             border-color: rgba(124, 58, 237, 0.42) !important;
@@ -9294,6 +9581,356 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 min-width: 300px !important;
                 min-height: 68px !important;
                 font-size: clamp(1.6rem, 1.4vw, 2.05rem) !important;
+            }
+        }
+        @media (hover: none) and (pointer: coarse) {
+            html:has(.me-rpg-profile-page),
+            body:has(.me-rpg-profile-page) {
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                background: #020617 !important;
+                scroll-behavior: smooth;
+            }
+            #me-app-content:has(.me-rpg-profile-page) {
+                height: auto !important;
+                min-height: 100svh !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                background: #020617 !important;
+            }
+            #me-app-content:has(.me-rpg-profile-page) > .ui.fluid.container {
+                height: auto !important;
+                min-height: 100svh !important;
+                display: block !important;
+            }
+            .me-rpg-profile-page {
+                min-height: 100svh !important;
+                overflow: visible !important;
+                border-radius: 0 !important;
+            }
+            .me-rpg-profile-page > .me-rpg-shell {
+                height: auto !important;
+                min-height: 100svh !important;
+                padding: 0 !important;
+                border-radius: 0 !important;
+                overflow: visible !important;
+            }
+            .me-rpg-profile-page .me-rpg-dashboard {
+                display: flex !important;
+                flex-direction: column !important;
+                height: auto !important;
+                min-height: 100svh !important;
+                max-height: none !important;
+                overflow: visible !important;
+                gap: 0 !important;
+                align-items: stretch !important;
+            }
+            .me-rpg-profile-page .me-rpg-center-panel {
+                order: 1;
+                flex: 0 0 auto !important;
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                scrollbar-gutter: auto !important;
+            }
+            .me-rpg-profile-page .me-mobile-budget-stack {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 35 !important;
+                width: 100% !important;
+                margin: 0 0 12px 0 !important;
+                padding: 0 0 8px 0 !important;
+                box-sizing: border-box !important;
+                background: #020617 !important;
+                box-shadow: 0 12px 24px rgba(2, 6, 23, 0.88) !important;
+                pointer-events: none !important;
+            }
+            .me-rpg-profile-page .me-mobile-budget-stack .me-budget-gauge {
+                position: static !important;
+                top: auto !important;
+                margin-bottom: 8px !important;
+                background: #0f172a !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                pointer-events: auto !important;
+            }
+            html.me-mobile-mission-briefing-auto-closed .me-rpg-profile-page .me-mission-briefing {
+                display: none !important;
+            }
+            .me-rpg-profile-page .me-mobile-budget-materialize {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                position: static !important;
+                top: auto !important;
+                bottom: auto !important;
+                z-index: auto !important;
+                width: 100% !important;
+                padding: 0 0 2px 0 !important;
+                margin: 0 0 12px 0 !important;
+                box-sizing: border-box !important;
+                background: #020617 !important;
+                pointer-events: none !important;
+            }
+            .me-rpg-profile-page .me-mobile-budget-materialize--hidden {
+                display: none !important;
+            }
+            .me-rpg-profile-page .me-mobile-budget-materialize .me-rpg-materialize-leg-cta {
+                position: relative !important;
+                left: auto !important;
+                bottom: auto !important;
+                transform: none !important;
+                width: min(92vw, 440px) !important;
+                max-width: calc(100vw - 24px) !important;
+                z-index: auto !important;
+                padding: 8px !important;
+                border-radius: 30px !important;
+                background: #020617 !important;
+                box-shadow: 0 10px 22px rgba(2, 6, 23, 0.82) !important;
+                pointer-events: auto !important;
+            }
+            .me-rpg-profile-page .me-mobile-budget-materialize .me-rpg-materialize-credit-line {
+                background: #0f172a !important;
+            }
+            .me-rpg-profile-page .me-rpg-left-panel {
+                order: 2;
+                flex: 0 0 auto !important;
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                position: relative !important;
+                top: auto !important;
+                align-self: stretch !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-library-section {
+                height: auto !important;
+                max-height: none !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+                padding: 12px 10px calc(28px + env(safe-area-inset-bottom, 0px)) !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-library-panel {
+                width: 100% !important;
+                padding: 12px !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-library-grid,
+            .me-rpg-profile-page .me-rpg-category-gene-grid {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-category-gene-grid {
+                padding-left: 10px !important;
+                margin-left: 4px !important;
+                border-left: 3px solid rgba(124, 58, 237, 0.45) !important;
+            }
+            .me-rpg-profile-page .me-budget-gauge {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 30 !important;
+                width: 100% !important;
+                border-radius: 14px !important;
+            }
+            .me-rpg-profile-page .me-rpg-sidebar-intro {
+                width: 100% !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-map-panel {
+                min-height: calc(100svh - 3.6rem) !important;
+                height: auto !important;
+                display: flex !important;
+                flex-direction: column !important;
+                position: relative !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-map-title {
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+                right: auto !important;
+                z-index: 7 !important;
+                max-width: none !important;
+                width: calc(100% - 20px) !important;
+                margin: 8px auto 0 !important;
+                padding: 9px 10px !important;
+                border: 1px solid rgba(167, 139, 250, 0.30) !important;
+                background: rgba(15, 23, 42, 0.78) !important;
+                box-shadow: 0 12px 30px rgba(2, 6, 23, 0.34) !important;
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+            }
+            .me-rpg-profile-page #compose-personal-tag {
+                min-height: 44px !important;
+                padding: 10px 13px !important;
+                font-size: 1rem !important;
+                border-radius: 12px !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage {
+                flex: none !important;
+                width: 100% !important;
+                height: calc(100svh - 3.6rem - 130px) !important;
+                min-height: 560px !important;
+                max-height: none !important;
+                padding: 18px 0 24px !important;
+                justify-content: center !important;
+                overflow: hidden !important;
+                box-sizing: border-box !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage::before {
+                inset: 8% 14% 7% !important;
+                filter: blur(18px) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage::after {
+                inset: 18% 35% 9% !important;
+                filter: blur(26px) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-image {
+                height: min(62svh, 540px) !important;
+                max-height: calc(100svh - 3.6rem - 270px) !important;
+                width: auto !important;
+                max-width: min(88vw, 460px) !important;
+                object-fit: contain !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker {
+                width: 150px !important;
+                height: 124px !important;
+                transform: translate(-50%, -50%) scale(0.94) !important;
+                z-index: 4 !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker:hover {
+                transform: translate(-50%, -50%) scale(1) !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-orbit-shell {
+                width: 150px !important;
+                height: 124px !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-gene-orbit {
+                display: none !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-icon-node {
+                width: 56px !important;
+                height: 56px !important;
+                background: rgba(15, 23, 42, 0.84) !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-icon-node i.icon {
+                font-size: 52px !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-count-badge {
+                min-width: 24px !important;
+                height: 24px !important;
+                font-size: 0.74rem !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-label {
+                top: calc(50% + 38px) !important;
+                padding: 5px 8px !important;
+                max-width: 156px !important;
+                white-space: normal !important;
+                border-radius: 8px !important;
+                background: rgba(15, 23, 42, 0.82) !important;
+                font-size: 0.88rem !important;
+                line-height: 1.1 !important;
+            }
+            .me-rpg-profile-page .me-rpg-marker-label span:first-child {
+                font-size: 0.92rem !important;
+                white-space: normal !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--expression {
+                top: 24% !important;
+                left: calc(50% - min(34vw, 190px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--perception {
+                top: 24% !important;
+                left: calc(50% + min(34vw, 190px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--longevity-genome {
+                top: 50% !important;
+                left: calc(50% - min(33vw, 180px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--stress-resistance {
+                top: 50% !important;
+                left: calc(50% + min(33vw, 180px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--environmental-adaptation {
+                top: 76% !important;
+                left: calc(50% - min(34vw, 190px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-marker--regeneration {
+                top: 76% !important;
+                left: calc(50% + min(34vw, 190px)) !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage > .me-rpg-materialize-leg-cta {
+                display: none !important;
+            }
+            .me-rpg-profile-page .me-rpg-body-stage > .me-rpg-materialize-leg-cta.me-onboarding-materialize-lift {
+                display: flex !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-credit-line {
+                width: 100% !important;
+                box-sizing: border-box !important;
+                font-size: 0.74rem !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-credit-line span:last-child {
+                display: none !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-leg-button {
+                width: 100% !important;
+                min-width: 0 !important;
+                min-height: 56px !important;
+                padding: 14px 18px !important;
+                font-size: clamp(1.1rem, 5.2vw, 1.45rem) !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-alert-stack {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .me-rpg-profile-page .me-rpg-materialize-alert {
+                width: 100% !important;
+            }
+            .me-rpg-profile-page .me-onboarding-marker-hint .me-rpg-body-map-title,
+            .me-rpg-profile-page .me-onboarding-marker-hint .me-rpg-body-image,
+            .me-rpg-profile-page .me-onboarding-marker-hint .me-rpg-materialize-leg-cta {
+                opacity: 0.18 !important;
+            }
+            .me-rpg-profile-page .me-onboarding-center-lift {
+                z-index: 1010 !important;
+            }
+            .me-rpg-profile-page .me-onboarding-tip-card {
+                position: fixed !important;
+                left: 12px !important;
+                right: 12px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                z-index: 1400 !important;
+                width: auto !important;
+                max-width: calc(100vw - 24px) !important;
+                max-height: min(58svh, 390px) !important;
+                overflow-y: auto !important;
+                overscroll-behavior: contain !important;
+                padding: 10px 12px !important;
+                margin: 0 !important;
+                border-radius: 12px !important;
+                box-shadow: 0 0 18px rgba(255, 255, 255, 0.52) !important;
+            }
+            .me-rpg-profile-page .me-onboarding-tip-card p {
+                font-size: 0.88rem !important;
+                line-height: 1.38 !important;
+            }
+            .me-rpg-profile-page .me-onboarding-tip-card p:first-of-type {
+                font-size: 1rem !important;
+                line-height: 1.24 !important;
+                margin-bottom: 4px !important;
+            }
+            .me-rpg-profile-page .me-onboarding-tip-card button {
+                width: 32px !important;
+                height: 32px !important;
+                border-radius: 9px !important;
             }
         }
         """

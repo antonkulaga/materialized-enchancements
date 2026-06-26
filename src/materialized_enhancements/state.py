@@ -67,6 +67,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_PERSONAL_TAG = ""
 REPORT_LANDING_HTML_VERSION: int = 2
 REPORT_LANDING_HTML_VERSION_META_NAME = "materialized-report-html-version"
+ONBOARDING_STORAGE_VERSION: str = "2026-06-24-mobile-onboarding-v2"
 REPORT_CHARACTER_NOTE_MAX_CHARS: int = 420
 REPORT_PORTRAIT_MAX_BYTES: int = 2_500_000
 REPORT_PORTRAIT_ALLOWED_TYPES: set[str] = {"image/jpeg", "image/png", "image/webp"}
@@ -223,6 +224,57 @@ def _compact_gene_symbol(gene: str) -> str:
     compact = compact.replace("PIWI/SMEDWI", "SMEDWI")
     compact = compact.replace("Acomys regen. program", "Acomys")
     return compact.strip()
+
+
+def _category_for_gene_name(gene: str) -> str:
+    """Resolve a gene display name to its primary category."""
+    for entry in GENE_LIBRARY:
+        if entry["gene"] == gene:
+            return str(entry["category"])
+    return ""
+
+
+def _mobile_body_change_overlay_script() -> str:
+    """Show the temporary mobile body-change overlay after adding a gene."""
+    return """
+(() => {
+    const isMobile = window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    if (!isMobile) return;
+    const el = document.getElementById("me-mobile-body-change-overlay");
+    if (!el) return;
+    el.classList.remove("is-visible");
+    void el.offsetWidth;
+    el.classList.add("is-visible");
+    window.clearTimeout(window.__meMobileBodyChangeTimer);
+    window.__meMobileBodyChangeTimer = window.setTimeout(() => {
+        el.classList.remove("is-visible");
+    }, 3200);
+})();
+"""
+
+
+def _mobile_onboarding_scroll_script(step: int) -> str:
+    """Scroll the mobile viewport to the current onboarding target."""
+    selector_by_step = {
+        0: "#gene-library",
+        1: "#compose-personal-tag",
+        2: ".me-rpg-body-stage > .me-rpg-materialize-leg-cta.me-onboarding-materialize-lift",
+        3: "#gene-library",
+    }
+    selector = selector_by_step[min(3, max(0, step))]
+    block = "start" if step in (0, 3) else "center"
+    return f"""
+(() => {{
+    const isMobile = window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    if (!isMobile) return;
+    if (document.querySelector(".me-onboarding-tip-card")) return;
+    window.setTimeout(() => {{
+        const target = document.querySelector({json.dumps(selector)});
+        if (!target) return;
+        target.scrollIntoView({{behavior: "smooth", block: {json.dumps(block)}, inline: "nearest"}});
+    }}, 120);
+}})();
+"""
 
 
 # Soft UX hint only: materialize stays allowed below this count.
@@ -478,7 +530,6 @@ def _build_report_landing_html(
     escaped_description = _html_escape(description)
     escaped_page_url = _html_escape(page_url)
     escaped_image_url = _html_escape(image_url)
-    escaped_pdf_url = _html_escape(pdf_url)
     escaped_stl_url = _html_escape(stl_url)
     escaped_params_url = _html_escape(params_url)
     open_url = recreate_url or make_own_url
@@ -895,6 +946,9 @@ class ComposeState(rx.State):
     included_genes: list[str] = []
     expanded_genes: list[str] = []
     hovered_gene_category: str = ""
+    mobile_change_overlay_gene: str = ""
+    mobile_change_overlay_category: str = ""
+    mobile_change_overlay_nonce: int = 0
 
     sculpture_params: Dict[str, Any] = {}
     generating: bool = False
@@ -920,6 +974,7 @@ class ComposeState(rx.State):
         sync=True,
     )
     onboarding_step: str | None = rx.LocalStorage("pending", name="me_onboarding_step", sync=True)
+    onboarding_version: str | None = rx.LocalStorage("pending", name="me_onboarding_version", sync=True)
 
     # Share card (in-memory preview, no disk write)
     share_card_data_url: str = ""
@@ -1010,7 +1065,13 @@ class ComposeState(rx.State):
         self._prune_included_genes()
         self._recompute_params()
 
-    def toggle_gene(self, gene: str) -> None:
+    def _record_mobile_gene_addition(self, gene: str, category: str) -> None:
+        self.mobile_change_overlay_gene = gene
+        self.mobile_change_overlay_category = category
+        self.mobile_change_overlay_nonce += 1
+
+    def toggle_gene(self, gene: str):  # type: ignore[return]
+        added = False
         if gene in self.included_genes:
             self.included_genes = [g for g in self.included_genes if g != gene]
         else:
@@ -1019,9 +1080,13 @@ class ComposeState(rx.State):
             if spent + add_price > DEFAULT_BUDGET:
                 return
             self.included_genes = [*self.included_genes, gene]
+            self._record_mobile_gene_addition(gene, _category_for_gene_name(gene))
+            added = True
         self._recompute_params()
+        if added:
+            yield rx.call_script(_mobile_body_change_overlay_script())
 
-    def toggle_gene_from_library(self, gene: str, category: str) -> None:
+    def toggle_gene_from_library(self, gene: str, category: str):  # type: ignore[return]
         """Toggle a gene from the RPG library, auto-enabling its category."""
         if gene in self.included_genes:
             self.included_genes = [g for g in self.included_genes if g != gene]
@@ -1042,7 +1107,9 @@ class ComposeState(rx.State):
         if category not in self.selected_categories:
             self.selected_categories = [*self.selected_categories, category]
         self.included_genes = [*self.included_genes, gene]
+        self._record_mobile_gene_addition(gene, category)
         self._recompute_params()
+        yield rx.call_script(_mobile_body_change_overlay_script())
 
     def deselect_all_genes(self) -> None:
         """Clear the active RPG gene loadout."""
@@ -1198,6 +1265,7 @@ class ComposeState(rx.State):
 
     def _onboarding_storage_script(self) -> str:
         return (
+            f"localStorage.setItem('me_onboarding_version', {json.dumps(ONBOARDING_STORAGE_VERSION)});"
             f"localStorage.setItem('me_onboarding_complete', {json.dumps(str(self.onboarding_complete or 'false'))});"
             f"localStorage.setItem('me_dismissed_onboarding', {json.dumps(str(self.dismissed_onboarding or 'false'))});"
             f"localStorage.setItem('me_onboarding_step', {json.dumps(str(self.onboarding_step or '0'))});"
@@ -1205,6 +1273,26 @@ class ComposeState(rx.State):
 
     def _sync_onboarding_from_storage(self) -> None:
         """Align cookie + LocalStorage so a partial write still counts as finished."""
+        if self.onboarding_version == "pending":
+            has_prior_onboarding_state = (
+                self.onboarding_complete != "pending"
+                or self.dismissed_onboarding != "pending"
+                or self.onboarding_step != "pending"
+            )
+            self.onboarding_version = ONBOARDING_STORAGE_VERSION
+            if has_prior_onboarding_state:
+                self.onboarding_complete = "false"
+                self.dismissed_onboarding = "false"
+                self.onboarding_step = "0"
+                return
+
+        if self.onboarding_version != ONBOARDING_STORAGE_VERSION:
+            self.onboarding_version = ONBOARDING_STORAGE_VERSION
+            self.onboarding_complete = "false"
+            self.dismissed_onboarding = "false"
+            self.onboarding_step = "0"
+            return
+
         if (
             self.onboarding_complete == "pending"
             and self.dismissed_onboarding == "pending"
@@ -1242,6 +1330,7 @@ class ComposeState(rx.State):
         if next_step >= 3:
             self._mark_onboarding_finished()
         yield rx.call_script(self._onboarding_storage_script())
+        yield rx.call_script(_mobile_onboarding_scroll_script(next_step))
 
     def advance_name_onboarding_on_enter(self, key: str, _key_info: dict[str, Any]):  # type: ignore[return]
         """Move past the name tooltip when the user confirms a non-empty name."""
@@ -1263,10 +1352,12 @@ class ComposeState(rx.State):
         if url_clean or env_clean:
             if env_clean:
                 os.environ["CLEAN_BROWSER_STORAGE"] = "0"
+            self.onboarding_version = ONBOARDING_STORAGE_VERSION
             self.onboarding_complete = "false"
             self.dismissed_onboarding = "false"
             self.onboarding_step = "0"
             yield rx.call_script(
+                f"localStorage.setItem('me_onboarding_version', {json.dumps(ONBOARDING_STORAGE_VERSION)});"
                 "localStorage.setItem('me_onboarding_complete', 'false');"
                 "localStorage.setItem('me_dismissed_onboarding', 'false');"
                 "localStorage.setItem('me_onboarding_step', '0');"
@@ -1274,6 +1365,9 @@ class ComposeState(rx.State):
             )
             return
         self._sync_onboarding_from_storage()
+        if not self.onboarding_finished:
+            yield rx.call_script(self._onboarding_storage_script())
+            yield rx.call_script(_mobile_onboarding_scroll_script(self.onboarding_step_index))
 
     def toggle_choice_expanded(self) -> None:
         self.choice_expanded = not self.choice_expanded
@@ -1705,7 +1799,6 @@ class ComposeState(rx.State):
         relative_png = f"{rel_dir}/report.webp"
         relative_pdf = f"{rel_dir}/report.pdf"
 
-        public_url = generated_public_url(f"{rel_dir}/index.html")
         model_url = generated_public_url(relative_model)
         params_url = generated_public_url(relative_params)
         png_url = generated_public_url(relative_png)
@@ -1877,6 +1970,9 @@ class ComposeState(rx.State):
             return
         if not self.stl_download_path:
             self.email_error = "No sculpture generated yet."
+            return
+        if not RESEND_API_KEY:
+            self.email_error = "Email is not configured (missing RESEND_API_KEY)."
             return
         self.email_error = ""
         self.email_sent = False
@@ -2376,8 +2472,15 @@ class ComposeState(rx.State):
 
     @rx.var
     def onboarding_finished(self) -> bool:
-        if self.onboarding_complete == "pending" or self.dismissed_onboarding == "pending" or self.onboarding_step == "pending":
+        if (
+            self.onboarding_version == "pending"
+            or self.onboarding_complete == "pending"
+            or self.dismissed_onboarding == "pending"
+            or self.onboarding_step == "pending"
+        ):
             return True
+        if self.onboarding_version != ONBOARDING_STORAGE_VERSION:
+            return False
         complete = str(self.onboarding_complete or "false").strip().lower() == "true"
         dismissed = str(self.dismissed_onboarding or "false").strip().lower() == "true"
         step = str(self.onboarding_step or "0").strip().lower()
