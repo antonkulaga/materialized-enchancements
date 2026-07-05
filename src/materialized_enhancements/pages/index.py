@@ -2669,13 +2669,21 @@ def _rpg_silhouette_marker(
                 rx.fragment(),
             ),
             rx.el.div(
-                fomantic_icon(
-                    icon_name,
-                    size=50,
-                    color=color,
+                rx.el.div(
+                    fomantic_icon(
+                        icon_name,
+                        size=50,
+                        color=color,
+                    ),
                     style={
-                        "transform": "scale(0.86)",
-                        "transformOrigin": "center",
+                        "position": "absolute",
+                        "top": "50%",
+                        "left": "50%",
+                        "transform": "translate(-50%, -50%)",
+                        "display": "flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                        "lineHeight": "1",
                     },
                 ),
                 rx.cond(
@@ -2926,10 +2934,10 @@ def _rpg_body_map_panel() -> rx.Component:
             },
         ),
         rx.el.div(
-            _rpg_silhouette_marker("Expression", "12%", "20%"),
-            _rpg_silhouette_marker("Perception", "12%", "80%"),
-            _rpg_silhouette_marker("Longevity & Genome", "48%", "25%"),
-            _rpg_silhouette_marker("Stress Resistance", "48%", "75%"),
+            _rpg_silhouette_marker("Expression", "12%", "22%"),
+            _rpg_silhouette_marker("Perception", "12%", "78%"),
+            _rpg_silhouette_marker("Longevity & Genome", "48%", "22%"),
+            _rpg_silhouette_marker("Stress Resistance", "48%", "78%"),
             _rpg_silhouette_marker("Environmental Adaptation", "76%", "22%"),
             _rpg_silhouette_marker("Regeneration", "76%", "78%"),
             rx.el.img(
@@ -2995,10 +3003,10 @@ def _mobile_body_change_overlay() -> rx.Component:
             rx.el.div(
                 _mobile_overlay_body_marker("Expression", "17%", "35%"),
                 _mobile_overlay_body_marker("Perception", "17%", "65%"),
-                _mobile_overlay_body_marker("Longevity & Genome", "48%", "34%"),
-                _mobile_overlay_body_marker("Stress Resistance", "48%", "66%"),
-                _mobile_overlay_body_marker("Environmental Adaptation", "77%", "36%"),
-                _mobile_overlay_body_marker("Regeneration", "77%", "64%"),
+                _mobile_overlay_body_marker("Longevity & Genome", "48%", "35%"),
+                _mobile_overlay_body_marker("Stress Resistance", "48%", "65%"),
+                _mobile_overlay_body_marker("Environmental Adaptation", "77%", "35%"),
+                _mobile_overlay_body_marker("Regeneration", "77%", "65%"),
                 rx.el.img(
                     src="/images/body_only.webp",
                     alt="Mini enhanced body preview",
