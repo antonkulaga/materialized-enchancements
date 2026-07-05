@@ -2638,6 +2638,7 @@ _ICON_VISUAL_NUDGE: dict[str, tuple[int, int]] = {
     "shield": (2, 0),
     "globe": (2, 0),
     "sync": (1, 0),
+    "camera": (3, 0),
 }
 
 
@@ -2817,24 +2818,6 @@ def _rpg_body_map_panel() -> rx.Component:
         rx.el.div(
             rx.el.div(
                 rx.el.div(
-                    rx.el.div(
-                        rx.el.span(
-                            ComposeState.display_name,
-                            style={
-                                "fontSize": "1.1rem",
-                                "fontWeight": "900",
-                                "color": "#f8fafc",
-                                "letterSpacing": "0.02em",
-                            },
-                        ),
-                        style={
-                            "display": "flex",
-                            "alignItems": "baseline",
-                            "gap": "4px",
-                            "flexWrap": "wrap",
-                            "marginBottom": "6px",
-                        },
-                    ),
                     _name_onboarding_tooltip(),
                     rx.el.div(
                         rx.el.input(
@@ -2846,14 +2829,14 @@ def _rpg_body_map_panel() -> rx.Component:
                             style={
                                 "flex": "1",
                                 "minWidth": "0",
-                                "padding": "15px 18px",
-                                "borderRadius": "14px",
+                                "padding": "10px 14px",
+                                "borderRadius": "12px",
                                 "border": rx.cond(
                                     ComposeState.has_personal_tag,
                                     "1px solid rgba(167, 139, 250, 0.45)",
                                     "2px solid rgba(248, 113, 113, 0.95)",
                                 ),
-                                "fontSize": "1.18rem",
+                                "fontSize": "0.98rem",
                                 "fontWeight": "800",
                                 "outline": "none",
                                 "backgroundColor": "rgba(15, 23, 42, 0.88)",
@@ -2888,6 +2871,7 @@ def _rpg_body_map_panel() -> rx.Component:
                                         "alignItems": "center",
                                         "justifyContent": "center",
                                         "borderRadius": "999px",
+                                        "transform": f"translate({_ICON_VISUAL_NUDGE.get('camera', (0, 0))[0]}px, {_ICON_VISUAL_NUDGE.get('camera', (0, 0))[1]}px)",
                                     },
                                 ),
                             ),
