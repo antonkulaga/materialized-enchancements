@@ -2631,6 +2631,16 @@ def _rpg_marker_gene_orbit_item(gene_name: rx.Var, color: str) -> rx.Component:
     )
 
 
+_ICON_VISUAL_NUDGE: dict[str, tuple[int, int]] = {
+    "paint brush": (1, 0),
+    "eye": (-1, 1),
+    "heartbeat": (2, 1),
+    "shield": (2, 0),
+    "globe": (2, 0),
+    "sync": (1, 0),
+}
+
+
 def _rpg_silhouette_marker(
     category: str,
     top: str,
@@ -2672,14 +2682,15 @@ def _rpg_silhouette_marker(
                 rx.el.div(
                     fomantic_icon(
                         icon_name,
-                        size=50,
+                        size=22,
                         color=color,
                     ),
                     style={
                         "position": "absolute",
                         "top": "50%",
                         "left": "50%",
-                        "transform": "translate(-50%, -50%)",
+                        "transform": f"translate(calc(-50% + {_ICON_VISUAL_NUDGE.get(icon_name, (0, 0))[0]}px), calc(-50% + {_ICON_VISUAL_NUDGE.get(icon_name, (0, 0))[1]}px)) scale(0.70)",
+                        "transformOrigin": "center",
                         "display": "flex",
                         "alignItems": "center",
                         "justifyContent": "center",
