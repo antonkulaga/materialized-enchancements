@@ -2631,6 +2631,17 @@ def _rpg_marker_gene_orbit_item(gene_name: rx.Var, color: str) -> rx.Component:
     )
 
 
+_ICON_VISUAL_NUDGE: dict[str, tuple[int, int]] = {
+    "paint brush": (1, 0),
+    "eye": (-1, 1),
+    "heartbeat": (2, 1),
+    "shield": (2, 0),
+    "globe": (2, 0),
+    "sync": (1, 0),
+    "camera": (3, 0),
+}
+
+
 def _rpg_silhouette_marker(
     category: str,
     top: str,
@@ -2669,13 +2680,22 @@ def _rpg_silhouette_marker(
                 rx.fragment(),
             ),
             rx.el.div(
-                fomantic_icon(
-                    icon_name,
-                    size=50,
-                    color=color,
+                rx.el.div(
+                    fomantic_icon(
+                        icon_name,
+                        size=22,
+                        color=color,
+                    ),
                     style={
-                        "transform": "scale(0.86)",
+                        "position": "absolute",
+                        "top": "50%",
+                        "left": "50%",
+                        "transform": f"translate(calc(-50% + {_ICON_VISUAL_NUDGE.get(icon_name, (0, 0))[0]}px), calc(-50% + {_ICON_VISUAL_NUDGE.get(icon_name, (0, 0))[1]}px)) scale(0.70)",
                         "transformOrigin": "center",
+                        "display": "flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                        "lineHeight": "1",
                     },
                 ),
                 rx.cond(
@@ -2798,24 +2818,6 @@ def _rpg_body_map_panel() -> rx.Component:
         rx.el.div(
             rx.el.div(
                 rx.el.div(
-                    rx.el.div(
-                        rx.el.span(
-                            ComposeState.display_name,
-                            style={
-                                "fontSize": "1.1rem",
-                                "fontWeight": "900",
-                                "color": "#f8fafc",
-                                "letterSpacing": "0.02em",
-                            },
-                        ),
-                        style={
-                            "display": "flex",
-                            "alignItems": "baseline",
-                            "gap": "4px",
-                            "flexWrap": "wrap",
-                            "marginBottom": "6px",
-                        },
-                    ),
                     _name_onboarding_tooltip(),
                     rx.el.div(
                         rx.el.input(
@@ -2827,14 +2829,14 @@ def _rpg_body_map_panel() -> rx.Component:
                             style={
                                 "flex": "1",
                                 "minWidth": "0",
-                                "padding": "15px 18px",
-                                "borderRadius": "14px",
+                                "padding": "10px 14px",
+                                "borderRadius": "12px",
                                 "border": rx.cond(
                                     ComposeState.has_personal_tag,
                                     "1px solid rgba(167, 139, 250, 0.45)",
                                     "2px solid rgba(248, 113, 113, 0.95)",
                                 ),
-                                "fontSize": "1.18rem",
+                                "fontSize": "0.98rem",
                                 "fontWeight": "800",
                                 "outline": "none",
                                 "backgroundColor": "rgba(15, 23, 42, 0.88)",
@@ -2869,6 +2871,7 @@ def _rpg_body_map_panel() -> rx.Component:
                                         "alignItems": "center",
                                         "justifyContent": "center",
                                         "borderRadius": "999px",
+                                        "transform": f"translate({_ICON_VISUAL_NUDGE.get('camera', (0, 0))[0]}px, {_ICON_VISUAL_NUDGE.get('camera', (0, 0))[1]}px)",
                                     },
                                 ),
                             ),
@@ -2926,10 +2929,10 @@ def _rpg_body_map_panel() -> rx.Component:
             },
         ),
         rx.el.div(
-            _rpg_silhouette_marker("Expression", "12%", "20%"),
-            _rpg_silhouette_marker("Perception", "12%", "80%"),
-            _rpg_silhouette_marker("Longevity & Genome", "48%", "25%"),
-            _rpg_silhouette_marker("Stress Resistance", "48%", "75%"),
+            _rpg_silhouette_marker("Expression", "12%", "22%"),
+            _rpg_silhouette_marker("Perception", "12%", "78%"),
+            _rpg_silhouette_marker("Longevity & Genome", "48%", "22%"),
+            _rpg_silhouette_marker("Stress Resistance", "48%", "78%"),
             _rpg_silhouette_marker("Environmental Adaptation", "76%", "22%"),
             _rpg_silhouette_marker("Regeneration", "76%", "78%"),
             rx.el.img(
@@ -2995,10 +2998,10 @@ def _mobile_body_change_overlay() -> rx.Component:
             rx.el.div(
                 _mobile_overlay_body_marker("Expression", "17%", "35%"),
                 _mobile_overlay_body_marker("Perception", "17%", "65%"),
-                _mobile_overlay_body_marker("Longevity & Genome", "48%", "34%"),
-                _mobile_overlay_body_marker("Stress Resistance", "48%", "66%"),
-                _mobile_overlay_body_marker("Environmental Adaptation", "77%", "36%"),
-                _mobile_overlay_body_marker("Regeneration", "77%", "64%"),
+                _mobile_overlay_body_marker("Longevity & Genome", "48%", "35%"),
+                _mobile_overlay_body_marker("Stress Resistance", "48%", "65%"),
+                _mobile_overlay_body_marker("Environmental Adaptation", "77%", "35%"),
+                _mobile_overlay_body_marker("Regeneration", "77%", "65%"),
                 rx.el.img(
                     src="/images/body_only.webp",
                     alt="Mini enhanced body preview",
