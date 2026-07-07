@@ -1137,6 +1137,22 @@ class ComposeState(rx.State):
             yield event
         yield rx.call_script(_mobile_body_change_overlay_script())
 
+    def remove_gene_marker_shortcut(self, gene: str, category: str):  # type: ignore[return]
+        """Right-click shortcut on a body-map marker chip: always remove, never add."""
+        if gene not in self.included_genes:
+            return
+        self.included_genes = [g for g in self.included_genes if g != gene]
+        remaining_in_category = [
+            g for g in GENE_LIBRARY
+            if g["category"] == category and g["gene"] in self.included_genes
+        ]
+        if not remaining_in_category:
+            self.selected_categories = [c for c in self.selected_categories if c != category]
+        self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
+
     def deselect_all_genes(self):  # type: ignore[return]
         """Clear the active RPG gene loadout."""
         self.selected_categories = []
@@ -2665,16 +2681,18 @@ class ComposeState(rx.State):
         return counts
 
     @rx.var
-    def active_compact_gene_names_by_category(self) -> dict[str, list[str]]:
-        """Per-category compact active gene names for the body-map marker labels."""
-        names: dict[str, list[str]] = {c: [] for c in UNIQUE_CATEGORIES}
+    def active_compact_gene_names_by_category(self) -> dict[str, list[dict[str, str]]]:
+        """Per-category compact active gene labels for the body-map marker chips."""
+        names: dict[str, list[dict[str, str]]] = {c: [] for c in UNIQUE_CATEGORIES}
         for g in GENE_LIBRARY:
             if g["category"] not in self.selected_categories:
                 continue
             if g["gene"] not in self.included_genes:
                 continue
             cat = g["category"]
-            names.setdefault(cat, []).append(_compact_gene_symbol(g["gene"]))
+            names.setdefault(cat, []).append(
+                {"gene": g["gene"], "label": _compact_gene_symbol(g["gene"])}
+            )
         return names
 
     @rx.var
