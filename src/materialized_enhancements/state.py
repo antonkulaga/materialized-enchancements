@@ -958,6 +958,7 @@ class ComposeState(rx.State):
     notice_kind: str = ""
     notice_visible: bool = False
     notice_epoch: int = 0
+    remove_hint_shown: bool = False
     stl_filename: str = ""
     stl_download_path: str = ""
     pipeline_stats: Dict[str, Any] = {}
@@ -1216,6 +1217,13 @@ class ComposeState(rx.State):
         if self.materialize_requirements_notice:
             return self._raise_notice(self.materialize_requirements_notice, "warning")
         if self.materialize_totem_diversity_notice:
+            if not self.remove_hint_shown:
+                self.remove_hint_shown = True
+                self.notice_text = self.materialize_totem_diversity_notice
+                self.notice_kind = "warning"
+                self.notice_visible = True
+                self.notice_epoch += 1
+                return ComposeState.fade_notice_then_hint(self.notice_epoch)
             return self._raise_notice(self.materialize_totem_diversity_notice, "warning")
         return None
 
@@ -1229,6 +1237,39 @@ class ComposeState(rx.State):
         await asyncio.sleep(0.5)
         async with self:
             if self.notice_epoch == epoch:
+                self.notice_text = ""
+                self.notice_kind = ""
+
+    @rx.event(background=True)
+    async def fade_notice_then_hint(self, epoch: int) -> None:
+        await asyncio.sleep(5)
+        async with self:
+            if self.notice_epoch != epoch:
+                return
+            self.notice_visible = False
+        await asyncio.sleep(0.5)
+        async with self:
+            if self.notice_epoch != epoch:
+                return
+            self.notice_text = ""
+            self.notice_kind = ""
+        await asyncio.sleep(0.3)
+        async with self:
+            if self.notice_epoch != epoch:
+                return
+            self.notice_text = "You can remove genes by right-clicking their marker chip on the body map."
+            self.notice_kind = "hint"
+            self.notice_visible = True
+            self.notice_epoch += 1
+            next_epoch = self.notice_epoch
+        await asyncio.sleep(5)
+        async with self:
+            if self.notice_epoch != next_epoch:
+                return
+            self.notice_visible = False
+        await asyncio.sleep(0.5)
+        async with self:
+            if self.notice_epoch == next_epoch:
                 self.notice_text = ""
                 self.notice_kind = ""
 

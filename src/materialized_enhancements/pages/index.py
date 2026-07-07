@@ -9257,9 +9257,11 @@ def _inline_notice(text: rx.Var, size: int = 12) -> rx.Component:
 
 def _global_notice_toast() -> rx.Component:
     is_error = ComposeState.notice_kind == "error"
-    accent = rx.cond(is_error, "#fca5a5", "#fde68a")
+    is_hint = ComposeState.notice_kind == "hint"
+    accent = rx.cond(is_error, "#fca5a5", rx.cond(is_hint, "#86efac", "#fde68a"))
+    icon_name = rx.cond(is_hint, "info circle", "circle-alert")
     return rx.el.div(
-        fomantic_icon("circle-alert", size=14, color=accent),
+        fomantic_icon(icon_name, size=14, color=accent),
         rx.el.span(ComposeState.notice_text, style={"marginLeft": "8px"}),
         style={
             "position": "fixed",
@@ -9279,7 +9281,11 @@ def _global_notice_toast() -> rx.Component:
             "border": rx.cond(
                 is_error,
                 "1px solid rgba(248, 113, 113, 0.48)",
-                "1px solid rgba(251, 191, 36, 0.48)",
+                rx.cond(
+                    is_hint,
+                    "1px solid rgba(134, 239, 172, 0.48)",
+                    "1px solid rgba(251, 191, 36, 0.48)",
+                ),
             ),
             "color": accent,
             "transition": "opacity 0.5s ease, transform 0.5s ease",
