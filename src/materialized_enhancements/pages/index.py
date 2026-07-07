@@ -161,16 +161,7 @@ def _email_send_form(
         ),
         rx.cond(
             state_cls.email_error != "",
-            rx.el.div(
-                fomantic_icon("warning sign", size=12, color="#dc2626"),
-                rx.el.span(state_cls.email_error, style={"marginLeft": "4px"}),
-                style={
-                    "marginTop": "6px",
-                    "fontSize": "0.78rem",
-                    "color": "#dc2626",
-                    "fontWeight": "600",
-                },
-            ),
+            _inline_notice(state_cls.email_error),
             rx.fragment(),
         ),
         class_name="me-email-send-form",
@@ -2542,15 +2533,6 @@ def _rpg_selected_gene_loadout() -> rx.Component:
 def _rpg_materialization_leg_cta() -> rx.Component:
     return rx.el.div(
         _materialize_onboarding_tooltip(),
-        rx.el.div(
-            rx.el.span(ComposeState.budget_spent, style={"fontWeight": "950", "color": "#ffffff"}),
-            f" / {DEFAULT_BUDGET} cr",
-            rx.el.span(
-                " · Unlocks: character sheet, share link, 3D file",
-                style={"fontWeight": "700", "color": "#a78bfa", "letterSpacing": "0.02em"},
-            ),
-            class_name="me-rpg-materialize-credit-line",
-        ),
         rx.el.button(
             rx.cond(
                 ComposeState.generating,
@@ -2581,36 +2563,6 @@ def _rpg_materialization_leg_cta() -> rx.Component:
                 "Generate the 3D sculpture and report.",
                 ComposeState.materialize_requirements_notice,
             ),
-        ),
-        rx.el.div(
-            rx.cond(
-                ComposeState.materialize_requirements_notice != "",
-                rx.el.div(
-                    fomantic_icon("circle-alert", size=12, color="#fca5a5"),
-                    rx.el.span(ComposeState.materialize_requirements_notice, style={"marginLeft": "6px"}),
-                    class_name="me-rpg-materialize-alert me-rpg-materialize-error",
-                ),
-                rx.fragment(),
-            ),
-            rx.cond(
-                ComposeState.generation_error != "",
-                rx.el.div(
-                    fomantic_icon("circle-alert", size=12, color="#fca5a5"),
-                    rx.el.span(ComposeState.generation_error, style={"marginLeft": "6px"}),
-                    class_name="me-rpg-materialize-alert me-rpg-materialize-error",
-                ),
-                rx.fragment(),
-            ),
-            rx.cond(
-                ComposeState.materialize_totem_diversity_notice != "",
-                rx.el.div(
-                    fomantic_icon("circle-alert", size=12, color="#fbbf24"),
-                    rx.el.span(ComposeState.materialize_totem_diversity_notice, style={"marginLeft": "6px"}),
-                    class_name="me-rpg-materialize-alert me-rpg-materialize-warning",
-                ),
-                rx.fragment(),
-            ),
-            class_name="me-rpg-materialize-alert-stack",
         ),
         class_name=rx.cond(
             ComposeState.show_onboarding_materialize,
@@ -4523,12 +4475,7 @@ def _shared_report_banner() -> rx.Component:
         ),
         rx.cond(
             ComposeState.shared_report_error != "",
-            rx.el.div(
-                fomantic_icon("warning sign", size=16, color="#fecaca"),
-                rx.el.span(ComposeState.shared_report_error, style={"marginLeft": "8px"}),
-                class_name="ui red message",
-                style={"margin": "0"},
-            ),
+            _inline_notice(ComposeState.shared_report_error, size=16),
             rx.fragment(),
         ),
     )
@@ -5322,31 +5269,6 @@ def _rpg_flow_css() -> rx.Component:
         }
         .me-rpg-materialize-leg-button.is-active-pulse {
             animation: me-pulse 2s infinite ease-in-out !important;
-        }
-        .me-rpg-materialize-alert {
-            width: min(460px, 82vw);
-            box-sizing: border-box;
-            padding: 9px 12px;
-            border-radius: 8px;
-            background: rgba(15, 23, 42, 0.84);
-            color: #f8fafc;
-            font-size: 0.78rem;
-            font-weight: 800;
-            line-height: 1.35;
-            text-align: left;
-            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.36);
-        }
-        .me-rpg-materialize-error {
-            border: 1px solid rgba(248, 113, 113, 0.48);
-            color: #fecaca;
-        }
-        .me-rpg-materialize-warning {
-            border: 1px solid rgba(251, 191, 36, 0.48);
-            color: #fde68a;
-        }
-        .me-rpg-materialize-info-alert {
-            border: 1px solid rgba(56, 189, 248, 0.52);
-            color: #bae6fd;
         }
         .me-mobile-body-change-overlay {
             display: none;
@@ -6452,47 +6374,6 @@ def _choice_section() -> rx.Component:
                     "Select categories from the left panel.",
                     style={"color": "#9ca3af", "fontSize": "0.88rem", "textAlign": "center", "padding": "16px"},
                 ),
-            ),
-            # Error display
-            rx.cond(
-                ComposeState.generation_error != "",
-                rx.el.div(
-                    fomantic_icon("circle-alert", size=14, color="#dc2626"),
-                    rx.el.span(
-                        ComposeState.generation_error,
-                        style={"marginLeft": "6px", "fontSize": "0.82rem", "color": "#dc2626"},
-                    ),
-                    style={
-                        "display": "flex",
-                        "alignItems": "flex-start",
-                        "padding": "10px",
-                        "borderRadius": "6px",
-                        "border": "1px solid #fca5a5",
-                        "backgroundColor": "#fef2f2",
-                        "marginBottom": "10px",
-                    },
-                ),
-                rx.fragment(),
-            ),
-            rx.cond(
-                ComposeState.materialize_totem_diversity_notice != "",
-                rx.el.div(
-                    fomantic_icon("circle-alert", size=14, color="#b45309"),
-                    rx.el.span(
-                        ComposeState.materialize_totem_diversity_notice,
-                        style={"marginLeft": "6px", "fontSize": "0.82rem", "color": "#92400e"},
-                    ),
-                    style={
-                        "display": "flex",
-                        "alignItems": "flex-start",
-                        "padding": "10px",
-                        "borderRadius": "6px",
-                        "border": "1px solid #fcd34d",
-                        "backgroundColor": "#fffbeb",
-                        "marginBottom": "10px",
-                    },
-                ),
-                rx.fragment(),
             ),
             rx.el.button(
                 rx.cond(
@@ -8686,11 +8567,7 @@ def _report_portrait_upload_panel() -> rx.Component:
         ),
         rx.cond(
             ComposeState.report_portrait_error != "",
-            rx.el.div(
-                ComposeState.report_portrait_error,
-                class_name="ui red message",
-                style={"fontSize": "0.82rem", "padding": "8px 10px", "margin": "0"},
-            ),
+            _inline_notice(ComposeState.report_portrait_error),
             rx.fragment(),
         ),
         style={
@@ -8903,15 +8780,7 @@ def _share_qr_panel() -> rx.Component:
             ),
             rx.cond(
                 ComposeState.report_publish_error != "",
-                rx.el.div(
-                    ComposeState.report_publish_error,
-                    style={
-                        "fontSize": "0.74rem",
-                        "color": "#fecaca",
-                        "marginTop": "6px",
-                        "lineHeight": "1.35",
-                    },
-                ),
+                _inline_notice(ComposeState.report_publish_error, size=11),
                 rx.fragment(),
             ),
             style={"flex": "1", "minWidth": "180px", "overflow": "hidden"},
@@ -9353,6 +9222,65 @@ def _tab_menu(active_route: str) -> rx.Component:
         ),
         class_name="ui top attached tabular menu",
         id="me-top-tab-menu",
+    )
+
+
+def _inline_notice(text: rx.Var, size: int = 12) -> rx.Component:
+    return rx.el.div(
+        fomantic_icon("circle-alert", size=size, color="#fca5a5"),
+        rx.el.span(text, style={"marginLeft": "6px"}),
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "marginTop": "6px",
+            "padding": "6px 10px",
+            "borderRadius": "8px",
+            "fontSize": "0.78rem",
+            "fontWeight": "700",
+            "lineHeight": "1.35",
+            "backgroundColor": "rgba(15, 23, 42, 0.6)",
+            "border": "1px solid rgba(248, 113, 113, 0.48)",
+            "color": "#fca5a5",
+        },
+    )
+
+
+def _global_notice_toast() -> rx.Component:
+    is_error = ComposeState.notice_kind == "error"
+    accent = rx.cond(is_error, "#fca5a5", "#fde68a")
+    return rx.el.div(
+        fomantic_icon("circle-alert", size=14, color=accent),
+        rx.el.span(ComposeState.notice_text, style={"marginLeft": "8px"}),
+        style={
+            "position": "fixed",
+            "left": "75%",
+            "bottom": "28px",
+            "zIndex": 2000,
+            "display": "flex",
+            "alignItems": "center",
+            "maxWidth": "min(90vw, 440px)",
+            "padding": "12px 18px",
+            "borderRadius": "10px",
+            "fontSize": "0.9rem",
+            "fontWeight": "700",
+            "lineHeight": "1.35",
+            "boxShadow": "0 12px 32px rgba(2, 6, 23, 0.38)",
+            "backgroundColor": "rgba(15, 23, 42, 0.84)",
+            "border": rx.cond(
+                is_error,
+                "1px solid rgba(248, 113, 113, 0.48)",
+                "1px solid rgba(251, 191, 36, 0.48)",
+            ),
+            "color": accent,
+            "transition": "opacity 0.5s ease, transform 0.5s ease",
+            "opacity": rx.cond(ComposeState.notice_visible, 1, 0),
+            "transform": rx.cond(
+                ComposeState.notice_visible,
+                "translate(-50%, 0)",
+                "translate(-50%, 12px)",
+            ),
+            "pointerEvents": rx.cond(ComposeState.notice_visible, "auto", "none"),
+        },
     )
 
 
@@ -9949,6 +9877,7 @@ def _tab_page(active_route: str, content: rx.Component) -> rx.Component:
                 "padding": "0.85rem" if is_rpg_route else "1rem",
             },
         ),
+        _global_notice_toast(),
     )
 
 

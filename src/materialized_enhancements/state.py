@@ -953,6 +953,11 @@ class ComposeState(rx.State):
     sculpture_params: Dict[str, Any] = {}
     generating: bool = False
     generation_error: str = ""
+
+    notice_text: str = ""
+    notice_kind: str = ""
+    notice_visible: bool = False
+    notice_epoch: int = 0
     stl_filename: str = ""
     stl_download_path: str = ""
     pipeline_stats: Dict[str, Any] = {}
@@ -1024,11 +1029,14 @@ class ComposeState(rx.State):
     pending_pdf_base64: str = ""
     pending_pdf_filename: str = ""
 
-    def set_personal_tag(self, value: str) -> None:
+    def set_personal_tag(self, value: str):  # type: ignore[return]
         self.personal_tag = value
         self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
 
-    def toggle_category(self, category: str) -> None:
+    def toggle_category(self, category: str):  # type: ignore[return]
         if category in self.selected_categories:
             self.selected_categories = [c for c in self.selected_categories if c != category]
         else:
@@ -1042,6 +1050,9 @@ class ComposeState(rx.State):
             self.selected_categories = [*self.selected_categories, category]
         self._prune_included_genes()
         self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
 
     def select_category(self, category: str):  # type: ignore[return]
         """Select a category from the body map without treating a repeat click as removal."""
@@ -1057,13 +1068,19 @@ class ComposeState(rx.State):
         self.selected_categories = [*self.selected_categories, category]
         self._prune_included_genes()
         self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
         if self.onboarding_step_index == 0:
             yield from self.advance_onboarding()
 
-    def remove_category(self, category: str) -> None:
+    def remove_category(self, category: str):  # type: ignore[return]
         self.selected_categories = [c for c in self.selected_categories if c != category]
         self._prune_included_genes()
         self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
 
     def _record_mobile_gene_addition(self, gene: str, category: str) -> None:
         self.mobile_change_overlay_gene = gene
@@ -1083,6 +1100,9 @@ class ComposeState(rx.State):
             self._record_mobile_gene_addition(gene, _category_for_gene_name(gene))
             added = True
         self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
         if added:
             yield rx.call_script(_mobile_body_change_overlay_script())
 
@@ -1097,6 +1117,9 @@ class ComposeState(rx.State):
             if not remaining_in_category:
                 self.selected_categories = [c for c in self.selected_categories if c != category]
             self._recompute_params()
+            event = self._sync_advisory_notice()
+            if event:
+                yield event
             return
 
         spent = _sum_credits_for_included_genes(self.selected_categories, self.included_genes)
@@ -1109,14 +1132,20 @@ class ComposeState(rx.State):
         self.included_genes = [*self.included_genes, gene]
         self._record_mobile_gene_addition(gene, category)
         self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
         yield rx.call_script(_mobile_body_change_overlay_script())
 
-    def deselect_all_genes(self) -> None:
+    def deselect_all_genes(self):  # type: ignore[return]
         """Clear the active RPG gene loadout."""
         self.selected_categories = []
         self.included_genes = []
         self.expanded_genes = []
         self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
 
     def toggle_gene_details(self, gene: str) -> None:
         if gene in self.expanded_genes:
@@ -1156,6 +1185,36 @@ class ComposeState(rx.State):
             drop.add(name)
             total -= price
         self.included_genes = [g for g in self.included_genes if g not in drop]
+
+    def _raise_notice(self, text: str, kind: str) -> rx.event.EventSpec:
+        self.notice_text = text
+        self.notice_kind = kind
+        self.notice_visible = True
+        self.notice_epoch += 1
+        return ComposeState.fade_notice(self.notice_epoch)
+
+    def _raise_error_notice(self, text: str) -> rx.event.EventSpec:
+        return self._raise_notice(text, "error")
+
+    def _sync_advisory_notice(self) -> rx.event.EventSpec | None:
+        if self.materialize_requirements_notice:
+            return self._raise_notice(self.materialize_requirements_notice, "warning")
+        if self.materialize_totem_diversity_notice:
+            return self._raise_notice(self.materialize_totem_diversity_notice, "warning")
+        return None
+
+    @rx.event(background=True)
+    async def fade_notice(self, epoch: int) -> None:
+        await asyncio.sleep(5)
+        async with self:
+            if self.notice_epoch != epoch:
+                return
+            self.notice_visible = False
+        await asyncio.sleep(0.5)
+        async with self:
+            if self.notice_epoch == epoch:
+                self.notice_text = ""
+                self.notice_kind = ""
 
     def _active_gene_library(self) -> list[dict]:
         """Gene library filtered to selected categories and explicitly included genes."""
@@ -1237,6 +1296,12 @@ class ComposeState(rx.State):
             async with self:
                 self.generating = False
                 self.generation_error = str(exc)
+                self.notice_text = self.generation_error
+                self.notice_kind = "error"
+                self.notice_visible = True
+                self.notice_epoch += 1
+                epoch = self.notice_epoch
+            yield ComposeState.fade_notice(epoch)
             return
 
         stl_bytes = stl_path.read_bytes()
@@ -1669,10 +1734,11 @@ class ComposeState(rx.State):
         self.report_params_url = ""
         self.share_card_data_url = ""
 
-    async def upload_report_portrait(self, files: list[rx.UploadFile]) -> None:
+    async def upload_report_portrait(self, files: list[rx.UploadFile]) -> AsyncIterator[rx.event.EventSpec]:
         """Attach an optional user photo to the personal report."""
         if not files:
             self.report_portrait_error = "Choose an image first."
+            yield self._raise_error_notice(self.report_portrait_error)
             return
         file = files[0]
         filename = Path(file.filename or "portrait").name
@@ -1680,10 +1746,12 @@ class ComposeState(rx.State):
         mime = (file.content_type or REPORT_PORTRAIT_FALLBACK_MIME_BY_SUFFIX.get(suffix, "")).lower()
         if mime not in REPORT_PORTRAIT_ALLOWED_TYPES:
             self.report_portrait_error = "Use a PNG, JPG, or WebP image."
+            yield self._raise_error_notice(self.report_portrait_error)
             return
         data = await file.read()
         if len(data) > REPORT_PORTRAIT_MAX_BYTES:
             self.report_portrait_error = "Image is too large. Please use an image under 2.5 MB."
+            yield self._raise_error_notice(self.report_portrait_error)
             return
         self.report_portrait_data_url = f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
         self.report_portrait_filename = filename
@@ -1714,6 +1782,7 @@ class ComposeState(rx.State):
         """
         if not self.stl_download_path:
             self.report_publish_error = "Generate a 3D model first."
+            yield self._raise_error_notice(self.report_publish_error)
             return
         tag = self.personal_tag.strip() or "anonymous"
         seed = self.sculpture_params.get("seed", self.param_seed)
@@ -1754,18 +1823,18 @@ class ComposeState(rx.State):
         if err:
             self.report_publishing = False
             self.report_publish_error = err
-            yield rx.toast.error(f"Could not publish report: {err}")
+            yield self._raise_error_notice(f"Could not publish report: {err}")
             return
         if not self.stl_download_path:
             self.report_publishing = False
             self.report_publish_error = "No sculpture generated yet."
-            yield rx.toast.error(self.report_publish_error)
+            yield self._raise_error_notice(self.report_publish_error)
             return
 
         stl_path = Path(self.stl_download_path)
         if not stl_path.exists():
             self.report_publish_error = "STL file not found on disk."
-            yield rx.toast.error(self.report_publish_error)
+            yield self._raise_error_notice(self.report_publish_error)
             return
 
         uploaded_via_http = str(data.get("status", "")) == "uploaded"
@@ -1785,7 +1854,7 @@ class ComposeState(rx.State):
             except (ValueError, binascii.Error) as exc:
                 self.report_publishing = False
                 self.report_publish_error = str(exc)
-                yield rx.toast.error(f"Could not publish report: {exc}")
+                yield self._raise_error_notice(f"Could not publish report: {exc}")
                 return
 
         model_path = out_dir / "model.stl"
@@ -1859,7 +1928,7 @@ class ComposeState(rx.State):
         except OSError as exc:
             logger.exception("Generated report publish failed")
             self.report_publish_error = f"Could not write generated report: {exc}"
-            yield rx.toast.error(self.report_publish_error)
+            yield self._raise_error_notice(self.report_publish_error)
             return
 
         self.report_publish_error = ""
@@ -1940,10 +2009,11 @@ class ComposeState(rx.State):
         self.materialization_artifact_tab = "model"
         yield rx.redirect("/")
 
-    def reset_report_publish(self) -> None:
+    def reset_report_publish(self) -> AsyncIterator[rx.event.EventSpec]:
         """Clear a stuck browser-side report publish so the visitor can retry."""
         self.report_publishing = False
         self.report_publish_error = "Public link generation was reset. Try creating the link again."
+        yield self._raise_error_notice(self.report_publish_error)
 
     def set_recipient_email(self, value: str) -> None:
         self.recipient_email = value
@@ -1967,12 +2037,15 @@ class ComposeState(rx.State):
         """
         if not is_valid_email(self.recipient_email):
             self.email_error = "Please enter a valid email address."
+            yield self._raise_error_notice(self.email_error)
             return
         if not self.stl_download_path:
             self.email_error = "No sculpture generated yet."
+            yield self._raise_error_notice(self.email_error)
             return
         if not RESEND_API_KEY:
             self.email_error = "Email is not configured (missing RESEND_API_KEY)."
+            yield self._raise_error_notice(self.email_error)
             return
         self.email_error = ""
         self.email_sent = False
@@ -2009,7 +2082,7 @@ class ComposeState(rx.State):
         yield ComposeState.send_sculpture_email
 
     @rx.event(background=True)
-    async def send_sculpture_email(self) -> None:
+    async def send_sculpture_email(self) -> AsyncIterator[rx.event.EventSpec]:
         """Email the user the same payload the Download button would write to disk:
         STL + params JSON + the report PDF (built client-side and stashed on
         ``pending_pdf_*``). Zips when the combined attachment payload is large.
@@ -2019,34 +2092,43 @@ class ComposeState(rx.State):
         recipient/STL preconditions have been validated.
         """
         async with self:
+            invalid_reason = ""
             if not self.stl_download_path:
+                invalid_reason = "No sculpture generated yet."
+            elif not is_valid_email(self.recipient_email.strip()):
+                invalid_reason = "Please enter a valid email address."
+            elif not RESEND_API_KEY:
+                invalid_reason = "Email is not configured (missing RESEND_API_KEY)."
+            if invalid_reason:
                 self.email_sending = False
-                self.email_error = "No sculpture generated yet."
-                return
-            recipient = self.recipient_email.strip()
-            if not is_valid_email(recipient):
-                self.email_sending = False
-                self.email_error = "Please enter a valid email address."
-                return
-            if not RESEND_API_KEY:
-                self.email_sending = False
-                self.email_error = "Email is not configured (missing RESEND_API_KEY)."
-                return
-            tag = self.personal_tag.strip() or "anonymous"
-            cats = list(self.selected_categories)
-            traits = list(self.selected_traits)
-            included_genes = [g["gene"] for g in self.included_composition_genes]
-            organisms = [
-                {"common_name": a["common_name"], "scientific_name": a["scientific_name"], "superpower": a["superpower"], "traits_csv": a["traits_csv"]}
-                for a in self.selected_animals
-            ]
-            params = dict(self.sculpture_params)
-            stats = dict(self.pipeline_stats)
-            stl_path = Path(self.stl_download_path)
-            stl_filename = self.stl_filename or stl_path.name
-            share_url = self.share_url
-            pdf_base64 = self.pending_pdf_base64
-            pdf_filename = self.pending_pdf_filename or f"materialized_{stl_path.stem}.pdf"
+                self.email_error = invalid_reason
+                self.notice_text = invalid_reason
+                self.notice_kind = "error"
+                self.notice_visible = True
+                self.notice_epoch += 1
+                epoch = self.notice_epoch
+            else:
+                epoch = None
+                recipient = self.recipient_email.strip()
+                tag = self.personal_tag.strip() or "anonymous"
+                cats = list(self.selected_categories)
+                traits = list(self.selected_traits)
+                included_genes = [g["gene"] for g in self.included_composition_genes]
+                organisms = [
+                    {"common_name": a["common_name"], "scientific_name": a["scientific_name"], "superpower": a["superpower"], "traits_csv": a["traits_csv"]}
+                    for a in self.selected_animals
+                ]
+                params = dict(self.sculpture_params)
+                stats = dict(self.pipeline_stats)
+                stl_path = Path(self.stl_download_path)
+                stl_filename = self.stl_filename or stl_path.name
+                share_url = self.share_url
+                pdf_base64 = self.pending_pdf_base64
+                pdf_filename = self.pending_pdf_filename or f"materialized_{stl_path.stem}.pdf"
+
+        if epoch is not None:
+            yield ComposeState.fade_notice(epoch)
+            return
 
         try:
             stl_bytes = stl_path.read_bytes()
@@ -2054,6 +2136,12 @@ class ComposeState(rx.State):
             async with self:
                 self.email_sending = False
                 self.email_error = f"Could not read STL file: {exc}"
+                self.notice_text = self.email_error
+                self.notice_kind = "error"
+                self.notice_visible = True
+                self.notice_epoch += 1
+                epoch = self.notice_epoch
+            yield ComposeState.fade_notice(epoch)
             return
 
         params_json = json.dumps(
@@ -2118,8 +2206,14 @@ class ComposeState(rx.State):
             async with self:
                 self.email_sending = False
                 self.email_error = str(exc)
+                self.notice_text = self.email_error
+                self.notice_kind = "error"
+                self.notice_visible = True
+                self.notice_epoch += 1
+                epoch = self.notice_epoch
                 self.pending_pdf_base64 = ""
                 self.pending_pdf_filename = ""
+            yield ComposeState.fade_notice(epoch)
             return
 
         async with self:
@@ -2324,7 +2418,7 @@ class ComposeState(rx.State):
             included_genes=list(self.included_genes),
         )
 
-    def apply_saved_report(self) -> None:
+    def apply_saved_report(self) -> AsyncIterator[rx.event.EventSpec]:
         """Load a generated report bundle from ?shared_report=<slug>."""
         params = self.router.url.query_parameters
         slug = str(params.get("shared_report", "")).strip()
@@ -2334,6 +2428,7 @@ class ComposeState(rx.State):
         self.shared_report_error = ""
         if not _is_safe_report_slug(slug):
             self.shared_report_error = "Shared report link is invalid."
+            yield self._raise_error_notice(self.shared_report_error)
             return
 
         rel_dir = f"reports/{slug}"
@@ -2342,6 +2437,7 @@ class ComposeState(rx.State):
         model_path = out_dir / "model.stl"
         if not params_path.exists() or not model_path.exists():
             self.shared_report_error = "Shared report files are not available on this server."
+            yield self._raise_error_notice(self.shared_report_error)
             return
 
         try:
@@ -2350,9 +2446,11 @@ class ComposeState(rx.State):
         except (OSError, ValueError, TypeError) as exc:
             logger.warning("apply_saved_report: could not read shared report %s: %s", slug, exc)
             self.shared_report_error = "Shared report files could not be loaded."
+            yield self._raise_error_notice(self.shared_report_error)
             return
         if not isinstance(artifact, dict):
             self.shared_report_error = "Shared report metadata is invalid."
+            yield self._raise_error_notice(self.shared_report_error)
             return
 
         categories = [
@@ -3018,7 +3116,7 @@ class JigsawState(rx.State):
         )
 
     @rx.event(background=True)
-    async def send_jigsaw_email(self) -> None:
+    async def send_jigsaw_email(self) -> AsyncIterator[rx.event.EventSpec]:
         """Email the user the jigsaw SVG + STL plus a short helper report of
         selected organisms and the traits the totem grants. Zips when the
         combined attachment payload gets large. Requires the STL to be ready.
@@ -3026,34 +3124,44 @@ class JigsawState(rx.State):
         async with self:
             if self.email_sending:
                 return
+            invalid_reason = ""
             if not self.generated_jigsaw_svg:
-                self.email_error = "No jigsaw generated yet."
-                return
-            if not self.stl_ready or not self._stl_bytes:
-                self.email_error = "STL is still being generated — please wait."
-                return
-            recipient = self.recipient_email.strip()
-            if not is_valid_email(recipient):
-                self.email_error = "Please enter a valid email address."
-                return
-            if not RESEND_API_KEY:
-                self.email_error = "Email is not configured (missing RESEND_API_KEY)."
-                return
-            self.email_sending = True
-            self.email_sent = False
-            self.email_error = ""
-            tag = self.personal_tag.strip() or "anonymous"
-            organisms = list(self.selected_organisms)
-            traits = list(self.selected_traits)
-            organism_entries = [
-                {"common_name": a["common_name"], "scientific_name": a["scientific_name"], "superpower": a["superpower"]}
-                for a in self.selected_animal_entries
-            ]
-            svg_text = self.generated_jigsaw_svg
-            stl_bytes = bytes(self._stl_bytes)
-            pieces = self.jigsaw_pieces
-            dimensions = self.jigsaw_dimensions
-            seed = self.jigsaw_seed
+                invalid_reason = "No jigsaw generated yet."
+            elif not self.stl_ready or not self._stl_bytes:
+                invalid_reason = "STL is still being generated — please wait."
+            elif not is_valid_email(self.recipient_email.strip()):
+                invalid_reason = "Please enter a valid email address."
+            elif not RESEND_API_KEY:
+                invalid_reason = "Email is not configured (missing RESEND_API_KEY)."
+            if invalid_reason:
+                self.email_error = invalid_reason
+                self.notice_text = invalid_reason
+                self.notice_kind = "error"
+                self.notice_visible = True
+                self.notice_epoch += 1
+                epoch = self.notice_epoch
+            else:
+                epoch = None
+                recipient = self.recipient_email.strip()
+                self.email_sending = True
+                self.email_sent = False
+                self.email_error = ""
+                tag = self.personal_tag.strip() or "anonymous"
+                organisms = list(self.selected_organisms)
+                traits = list(self.selected_traits)
+                organism_entries = [
+                    {"common_name": a["common_name"], "scientific_name": a["scientific_name"], "superpower": a["superpower"]}
+                    for a in self.selected_animal_entries
+                ]
+                svg_text = self.generated_jigsaw_svg
+                stl_bytes = bytes(self._stl_bytes)
+                pieces = self.jigsaw_pieces
+                dimensions = self.jigsaw_dimensions
+                seed = self.jigsaw_seed
+
+        if invalid_reason:
+            yield ComposeState.fade_notice(epoch)
+            return
 
         attachments = maybe_zip_attachments(
             [
@@ -3098,6 +3206,12 @@ class JigsawState(rx.State):
             async with self:
                 self.email_sending = False
                 self.email_error = str(exc)
+                self.notice_text = self.email_error
+                self.notice_kind = "error"
+                self.notice_visible = True
+                self.notice_epoch += 1
+                epoch = self.notice_epoch
+            yield ComposeState.fade_notice(epoch)
             return
 
         async with self:
@@ -3311,5 +3425,3 @@ class JigsawState(rx.State):
     @rx.var
     def can_materialize(self) -> bool:
         return len(self.selected_organisms) > 0 and len(self.personal_tag.strip()) > 0
-
-
