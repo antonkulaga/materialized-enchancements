@@ -2572,10 +2572,15 @@ def _rpg_materialization_leg_cta() -> rx.Component:
     )
 
 
-def _rpg_marker_gene_chip(gene_name: rx.Var, color: str) -> rx.Component:
+def _rpg_marker_gene_chip(gene_item: rx.Var, category: str, color: str) -> rx.Component:
     return rx.el.span(
-        gene_name,
+        gene_item["label"],
         class_name="me-rpg-marker-gene-chip",
+        title="Right-click to remove",
+        on_context_menu=[
+            ComposeState.remove_gene_marker_shortcut(gene_item["gene"], category),
+            rx.prevent_default,
+        ],
         style={
             "display": "inline-flex",
             "alignItems": "center",
@@ -2598,11 +2603,13 @@ def _rpg_marker_gene_chip(gene_name: rx.Var, color: str) -> rx.Component:
             "whiteSpace": "nowrap",
             "overflow": "hidden",
             "textOverflow": "ellipsis",
+            "pointerEvents": "auto",
+            "cursor": "context-menu",
         },
     )
 
 
-def _rpg_marker_gene_orbit_item(gene_name: rx.Var, color: str) -> rx.Component:
+def _rpg_marker_gene_orbit_item(gene_item: rx.Var, category: str, color: str) -> rx.Component:
     return rx.el.div(
         rx.el.span(
             class_name="me-rpg-marker-gene-line",
@@ -2619,7 +2626,7 @@ def _rpg_marker_gene_orbit_item(gene_name: rx.Var, color: str) -> rx.Component:
                 "zIndex": "0",
             },
         ),
-        _rpg_marker_gene_chip(gene_name, color),
+        _rpg_marker_gene_chip(gene_item, category, color),
         class_name="me-rpg-marker-gene-orbit-item",
         style={
             "position": "absolute",
@@ -2663,7 +2670,7 @@ def _rpg_silhouette_marker(
                 rx.el.div(
                     rx.foreach(
                         ComposeState.active_compact_gene_names_by_category[category],
-                        lambda gene_name: _rpg_marker_gene_orbit_item(gene_name, color),
+                        lambda gene_item: _rpg_marker_gene_orbit_item(gene_item, category, color),
                     ),
                     class_name="me-rpg-marker-gene-orbit",
                     style={
@@ -9250,9 +9257,11 @@ def _inline_notice(text: rx.Var, size: int = 12) -> rx.Component:
 
 def _global_notice_toast() -> rx.Component:
     is_error = ComposeState.notice_kind == "error"
-    accent = rx.cond(is_error, "#fca5a5", "#fde68a")
+    is_hint = ComposeState.notice_kind == "hint"
+    accent = rx.cond(is_error, "#fca5a5", rx.cond(is_hint, "#86efac", "#fde68a"))
+    icon_name = rx.cond(is_hint, "info circle", "circle-alert")
     return rx.el.div(
-        fomantic_icon("circle-alert", size=14, color=accent),
+        fomantic_icon(icon_name, size=14, color=accent),
         rx.el.span(ComposeState.notice_text, style={"marginLeft": "8px"}),
         style={
             "position": "fixed",
@@ -9272,7 +9281,11 @@ def _global_notice_toast() -> rx.Component:
             "border": rx.cond(
                 is_error,
                 "1px solid rgba(248, 113, 113, 0.48)",
-                "1px solid rgba(251, 191, 36, 0.48)",
+                rx.cond(
+                    is_hint,
+                    "1px solid rgba(134, 239, 172, 0.48)",
+                    "1px solid rgba(251, 191, 36, 0.48)",
+                ),
             ),
             "color": accent,
             "transition": "opacity 0.5s ease, transform 0.5s ease",

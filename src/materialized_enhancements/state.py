@@ -958,6 +958,7 @@ class ComposeState(rx.State):
     notice_kind: str = ""
     notice_visible: bool = False
     notice_epoch: int = 0
+    remove_hint_shown: bool = False
     stl_filename: str = ""
     stl_download_path: str = ""
     pipeline_stats: Dict[str, Any] = {}
@@ -1137,6 +1138,22 @@ class ComposeState(rx.State):
             yield event
         yield rx.call_script(_mobile_body_change_overlay_script())
 
+    def remove_gene_marker_shortcut(self, gene: str, category: str):  # type: ignore[return]
+        """Right-click shortcut on a body-map marker chip: always remove, never add."""
+        if gene not in self.included_genes:
+            return
+        self.included_genes = [g for g in self.included_genes if g != gene]
+        remaining_in_category = [
+            g for g in GENE_LIBRARY
+            if g["category"] == category and g["gene"] in self.included_genes
+        ]
+        if not remaining_in_category:
+            self.selected_categories = [c for c in self.selected_categories if c != category]
+        self._recompute_params()
+        event = self._sync_advisory_notice()
+        if event:
+            yield event
+
     def deselect_all_genes(self):  # type: ignore[return]
         """Clear the active RPG gene loadout."""
         self.selected_categories = []
@@ -1200,6 +1217,13 @@ class ComposeState(rx.State):
         if self.materialize_requirements_notice:
             return self._raise_notice(self.materialize_requirements_notice, "warning")
         if self.materialize_totem_diversity_notice:
+            if not self.remove_hint_shown:
+                self.remove_hint_shown = True
+                self.notice_text = self.materialize_totem_diversity_notice
+                self.notice_kind = "warning"
+                self.notice_visible = True
+                self.notice_epoch += 1
+                return ComposeState.fade_notice_then_hint(self.notice_epoch)
             return self._raise_notice(self.materialize_totem_diversity_notice, "warning")
         return None
 
@@ -1213,6 +1237,39 @@ class ComposeState(rx.State):
         await asyncio.sleep(0.5)
         async with self:
             if self.notice_epoch == epoch:
+                self.notice_text = ""
+                self.notice_kind = ""
+
+    @rx.event(background=True)
+    async def fade_notice_then_hint(self, epoch: int) -> None:
+        await asyncio.sleep(5)
+        async with self:
+            if self.notice_epoch != epoch:
+                return
+            self.notice_visible = False
+        await asyncio.sleep(0.5)
+        async with self:
+            if self.notice_epoch != epoch:
+                return
+            self.notice_text = ""
+            self.notice_kind = ""
+        await asyncio.sleep(0.3)
+        async with self:
+            if self.notice_epoch != epoch:
+                return
+            self.notice_text = "You can remove genes by right-clicking their marker chip on the body map."
+            self.notice_kind = "hint"
+            self.notice_visible = True
+            self.notice_epoch += 1
+            next_epoch = self.notice_epoch
+        await asyncio.sleep(5)
+        async with self:
+            if self.notice_epoch != next_epoch:
+                return
+            self.notice_visible = False
+        await asyncio.sleep(0.5)
+        async with self:
+            if self.notice_epoch == next_epoch:
                 self.notice_text = ""
                 self.notice_kind = ""
 
@@ -2665,16 +2722,18 @@ class ComposeState(rx.State):
         return counts
 
     @rx.var
-    def active_compact_gene_names_by_category(self) -> dict[str, list[str]]:
-        """Per-category compact active gene names for the body-map marker labels."""
-        names: dict[str, list[str]] = {c: [] for c in UNIQUE_CATEGORIES}
+    def active_compact_gene_names_by_category(self) -> dict[str, list[dict[str, str]]]:
+        """Per-category compact active gene labels for the body-map marker chips."""
+        names: dict[str, list[dict[str, str]]] = {c: [] for c in UNIQUE_CATEGORIES}
         for g in GENE_LIBRARY:
             if g["category"] not in self.selected_categories:
                 continue
             if g["gene"] not in self.included_genes:
                 continue
             cat = g["category"]
-            names.setdefault(cat, []).append(_compact_gene_symbol(g["gene"]))
+            names.setdefault(cat, []).append(
+                {"gene": g["gene"], "label": _compact_gene_symbol(g["gene"])}
+            )
         return names
 
     @rx.var
